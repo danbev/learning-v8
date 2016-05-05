@@ -26,7 +26,8 @@ class ArrayBufferAllocator : public v8::ArrayBuffer::Allocator {
 };
 
 void doit(const FunctionCallbackInfo<Value>& args) {
-    printf("doing it\n");
+    String::Utf8Value str(args[0]);
+    printf("doit argument = %s\n", *str);
 }
 
 
@@ -76,7 +77,7 @@ int main(int argc, char* argv[]) {
         Context::Scope context_scope(context);
 
         // Create a string containing the JavaScript source code.
-        Local<String> source = String::NewFromUtf8(isolate, "doit();", NewStringType::kNormal).ToLocalChecked();
+        Local<String> source = String::NewFromUtf8(isolate, "doit('bajja');", NewStringType::kNormal).ToLocalChecked();
 
         // Compile the source code.
         Local<Script> script = Script::Compile(context, source).ToLocalChecked();
