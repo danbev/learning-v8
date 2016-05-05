@@ -25,6 +25,10 @@ class ArrayBufferAllocator : public v8::ArrayBuffer::Allocator {
         }
 };
 
+void doit(const FunctionCallbackInfo<Value>& args) {
+    printf("doing it\n");
+}
+
 
 int main(int argc, char* argv[]) {
     // Inline caching util? IC in the v8 source seems to refer to Inline Cachine
@@ -57,10 +61,14 @@ int main(int argc, char* argv[]) {
         // you can simply delete the handle scope.
         HandleScope handle_scope(isolate);
 
+        Local<ObjectTemplate> global = ObjectTemplate::New(isolate);
+        global->Set(String::NewFromUtf8(isolate, "doit", NewStringType::kNormal).ToLocalChecked(),
+                FunctionTemplate::New(isolate, doit));
+
         // Inside an instance of V8 (an Isolate) you can have multiple unrelated JavaScript applications
         // running. JavaScript has global level stuff, and one application should not mess things up for
         // another running application. Context allow for each application not step on each others toes.
-        Local<Context> context = Context::New(isolate);
+        Local<Context> context = Context::New(isolate, NULL, global);
         // a Local<SomeType> is held on the stack, and accociated with a handle scope. When the handle
         // scope is deleted the GC can deallocate the objects.
 
@@ -68,7 +76,7 @@ int main(int argc, char* argv[]) {
         Context::Scope context_scope(context);
 
         // Create a string containing the JavaScript source code.
-        Local<String> source = String::NewFromUtf8(isolate, "Math.PI", NewStringType::kNormal).ToLocalChecked();
+        Local<String> source = String::NewFromUtf8(isolate, "doit();", NewStringType::kNormal).ToLocalChecked();
 
         // Compile the source code.
         Local<Script> script = Script::Compile(context, source).ToLocalChecked();
@@ -78,7 +86,7 @@ int main(int argc, char* argv[]) {
 
         // Convert the result to an UTF8 string and print it.
         String::Utf8Value utf8(result);
-        printf("%s\n", *utf8);
+        //printf("%s\n", *utf8);
     }
 
     // Dispose the isolate and tear down V8.
