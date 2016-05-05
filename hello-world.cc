@@ -64,11 +64,11 @@ int main(int argc, char* argv[]) {
         // a Local<SomeType> is held on the stack, and accociated with a handle scope. When the handle
         // scope is deleted the GC can deallocate the objects.
 
-       // Enter the context for compiling and running the script.
+        // Enter the context for compiling and running the script.
         Context::Scope context_scope(context);
 
         // Create a string containing the JavaScript source code.
-        Local<String> source = String::NewFromUtf8(isolate, "'Hello'", NewStringType::kNormal).ToLocalChecked();
+        Local<String> source = String::NewFromUtf8(isolate, "Math.PI", NewStringType::kNormal).ToLocalChecked();
 
         // Compile the source code.
         Local<Script> script = Script::Compile(context, source).ToLocalChecked();
