@@ -22,3 +22,9 @@ out v8 directory. For example, :
 
     make clean
 
+## Debugging
+
+    lldb hello-world
+    (lldb) breatpoint set --file hello-world.cc --line 27
+
+Now, lets take a look how we
