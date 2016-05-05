@@ -4,14 +4,14 @@ v8_include_dir = $(V8_HOME)/include
 
 v8_libs = $(v8_build_dir)/libv8_base.a $(v8_build_dir)/libv8_libbase.a $(v8_build_dir)/libv8_external_snapshot.a $(v8_build_dir)/libv8_libplatform.a $(v8_build_dir)/libicudata.a $(v8_build_dir)/libicuuc.a $(v8_build_dir)/libicui18n.a
 
-hello-world: natives_blob snapshot_blob
+hello-world: natives_blob.bin snapshot_blob.bin
 	@echo "Using v8_home = $(v8_include_dir)"
 	clang++ -O0 -g -I$(v8_include_dir) $(v8_libs) hello-world.cc -o hello-world -pthread -std=c++0x
 
-natives_blob:
+natives_blob.bin:
 	@cp $(v8_build_dir)/natives_blob.bin .
 
-snapshot_blob:
+snapshot_blob.bin:
 	@cp $(v8_build_dir)/snapshot_blob.bin .
 
 .PHONY: clean
