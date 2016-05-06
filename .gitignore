@@ -1,4 +1,5 @@
 *.swp
+.tags
 hello-world
 natives_blob.bin
 snapshot_blob.bin
