@@ -1,7 +1,3 @@
-// Copyright 2015 the V8 project authors. All rights reserved.
-// Use of this source code is governed by a BSD-style license that can be
-// found in the LICENSE file.
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -27,9 +23,9 @@ class ArrayBufferAllocator : public v8::ArrayBuffer::Allocator {
 
 void doit(const FunctionCallbackInfo<Value>& args) {
     String::Utf8Value str(args[0]);
-    printf("doit argument = %s\n", *str);
+    printf("doit argument = %s...\n", *str);
+    args.GetReturnValue().Set(String::NewFromUtf8(args.GetIsolate(), "done", NewStringType::kNormal).ToLocalChecked());
 }
-
 
 int main(int argc, char* argv[]) {
     // Inline caching util? IC in the v8 source seems to refer to Inline Cachine
@@ -52,10 +48,15 @@ int main(int argc, char* argv[]) {
     Isolate::CreateParams create_params;
     create_params.array_buffer_allocator = &allocator;
     // An Isolate is an independant copy of the V8 runtime which includes its own heap.
-    // To different Isolates can run in parallel and can be seen as entierly different
+    // Two different Isolates can run in parallel and can be seen as entierly different
     // sandboxed instances of a V8 runtime.
     Isolate* isolate = Isolate::New(create_params);
     {
+        // Will set the scope using Isolate::Scope whose constructor will call
+        // isolate->Enter() and its destructor isolate->Exit()
+        // I think this pattern is called "Resource Acquisition Is Initialisation" (RAII),
+        // R, A double I for the cool kids. The resouce allocation is done by the constructor,
+        // and the release by the descructor when this instance goes out of scope.
         Isolate::Scope isolate_scope(isolate);
         // Create a stack-allocated handle scope.
         // A container for handles. Instead of having to manage individual handles (like deleting) them
@@ -77,7 +78,8 @@ int main(int argc, char* argv[]) {
         Context::Scope context_scope(context);
 
         // Create a string containing the JavaScript source code.
-        Local<String> source = String::NewFromUtf8(isolate, "doit('bajja');", NewStringType::kNormal).ToLocalChecked();
+        const char *js = "doit('bajja');";
+        Local<String> source = String::NewFromUtf8(isolate, js, NewStringType::kNormal).ToLocalChecked();
 
         // Compile the source code.
         Local<Script> script = Script::Compile(context, source).ToLocalChecked();
@@ -87,7 +89,7 @@ int main(int argc, char* argv[]) {
 
         // Convert the result to an UTF8 string and print it.
         String::Utf8Value utf8(result);
-        //printf("%s\n", *utf8);
+        printf("%s\n", *utf8);
     }
 
     // Dispose the isolate and tear down V8.
