@@ -7,6 +7,8 @@
 
 using namespace v8;
 
+int age = 41;
+
 class ArrayBufferAllocator : public v8::ArrayBuffer::Allocator {
     public:
         virtual void* Allocate(size_t length) {
@@ -25,6 +27,14 @@ void doit(const FunctionCallbackInfo<Value>& args) {
     String::Utf8Value str(args[0]);
     printf("doit argument = %s...\n", *str);
     args.GetReturnValue().Set(String::NewFromUtf8(args.GetIsolate(), "done", NewStringType::kNormal).ToLocalChecked());
+}
+
+void ageGetter(Local<String> property, const PropertyCallbackInfo<Value>& info) {
+    info.GetReturnValue().Set(age);
+}
+
+void ageSetter(Local<String> property, Local<Value> value, const PropertyCallbackInfo<void>& info) {
+    age = value->Int32Value();
 }
 
 int main(int argc, char* argv[]) {
@@ -63,9 +73,16 @@ int main(int argc, char* argv[]) {
         // you can simply delete the handle scope.
         HandleScope handle_scope(isolate);
 
+        // Create a JavaScript template object allowing the object (in this case a function which is
+        // also an object in JavaScript remember).
         Local<ObjectTemplate> global = ObjectTemplate::New(isolate);
+        // associate 'doit' with the doit function, allowing JavaScript to call it.
         global->Set(String::NewFromUtf8(isolate, "doit", NewStringType::kNormal).ToLocalChecked(),
                 FunctionTemplate::New(isolate, doit));
+        // make 'age' available to JavaScript
+        global->SetAccessor(String::NewFromUtf8(isolate, "age", NewStringType::kNormal).ToLocalChecked(),
+                ageGetter,
+                ageSetter);
 
         // Inside an instance of V8 (an Isolate) you can have multiple unrelated JavaScript applications
         // running. JavaScript has global level stuff, and one application should not mess things up for
@@ -78,7 +95,7 @@ int main(int argc, char* argv[]) {
         Context::Scope context_scope(context);
 
         // Create a string containing the JavaScript source code.
-        const char *js = "doit('bajja');";
+        const char *js = "age = 40; doit(age);";
         Local<String> source = String::NewFromUtf8(isolate, js, NewStringType::kNormal).ToLocalChecked();
 
         // Compile the source code.
