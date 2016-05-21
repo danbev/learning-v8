@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <string>
 
 #include "libplatform/libplatform.h"
 #include "v8.h"
@@ -37,12 +38,18 @@ void ageSetter(Local<String> property, Local<Value> value, const PropertyCallbac
     age = value->Int32Value();
 }
 
+void propertyListener(Local<String> name, const PropertyCallbackInfo<Value>& info) {
+    String::Utf8Value utf8_value(name);
+    std::string key = std::string(*utf8_value);
+    printf("ageListener called for nam %s.\n", key.c_str());
+}
+
 int main(int argc, char* argv[]) {
-    // Inline caching util? IC in the v8 source seems to refer to Inline Cachine
+    // Inline caching util? IC in the v8 source seems to refer to Inline Caching
     V8::InitializeICU();
     // Now this is where the files 'natives_blob.bin' and snapshot_blob.bin' come into play. But what
     // are these bin files?
-    // The JavaScript spec specifies a lot of built-in functionality which every V8 context must provide.
+    // JavaScript specifies a lot of built-in functionality which every V8 context must provide.
     // For example, you can run Math.PI and that will work in a JavaScript console/repl. The global object
     // and all the built-in functionality must be setup and initialized into the V8 heap. This can be time
     // consuming and affect runtime performance if this has to be done every time. The blobs above are prepared
@@ -83,6 +90,8 @@ int main(int argc, char* argv[]) {
         global->SetAccessor(String::NewFromUtf8(isolate, "age", NewStringType::kNormal).ToLocalChecked(),
                 ageGetter,
                 ageSetter);
+        // set a named property interceptor
+        global->SetNamedPropertyHandler(propertyListener);
 
         // Inside an instance of V8 (an Isolate) you can have multiple unrelated JavaScript applications
         // running. JavaScript has global level stuff, and one application should not mess things up for
