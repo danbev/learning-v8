@@ -31,4 +31,23 @@ out v8 directory. For example, :
     lldb hello-world
     (lldb) breatpoint set --file hello-world.cc --line 27
 
-Now, lets take a look how we
+### Local<String>
+
+```c++
+Local<String> script_name = ...;
+```
+So what is script_name. Well it is an object reference that is managed by the v8 GC.
+The GS needs to be able to move things (pointers around) and also track if things should be GC'd
+
+```shell
+(lldb) p script_name.IsEmpty()
+(bool) $12 = false
+````
+
+A Local<T> has overloaded a number of operators, for example ->:
+```shell
+(lldb) p script_name->Length()
+(int) $14 = 7
+````
+Where Length is a method on the v8 String class.
+
