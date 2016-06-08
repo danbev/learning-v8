@@ -37,7 +37,7 @@ out v8 directory. For example, :
 Local<String> script_name = ...;
 ```
 So what is script_name. Well it is an object reference that is managed by the v8 GC.
-The GS needs to be able to move things (pointers around) and also track if things should be GC'd
+The GC needs to be able to move things (pointers around) and also track if things should be GC'd
 
 ```shell
 (lldb) p script_name.IsEmpty()
