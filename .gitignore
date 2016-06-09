@@ -1,4 +1,5 @@
 *.swp
+*.swo
 tags
 hello-world
 natives_blob.bin
