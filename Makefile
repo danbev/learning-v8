@@ -1,5 +1,5 @@
 V8_HOME ?= /Users/danielbevenius/work/google/javascript/v8
-v8_build_dir = $(V8_HOME)/out/native
+v8_build_dir = $(V8_HOME)/out/x64.debug
 v8_include_dir = $(V8_HOME)/include
 
 v8_libs = $(v8_build_dir)/libv8_base.a $(v8_build_dir)/libv8_libbase.a $(v8_build_dir)/libv8_external_snapshot.a $(v8_build_dir)/libv8_libplatform.a $(v8_build_dir)/libicudata.a $(v8_build_dir)/libicuuc.a $(v8_build_dir)/libicui18n.a
