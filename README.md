@@ -101,6 +101,7 @@ You'll see a few of these calls in the hello_world example:
 
 NewFromUtf8 actually returns a The Local<String> wrapped in a MaybeLocal which fores a check to see if 
 the Local<> is empty before using it. 
+NewStringType is an enum which can be k (for constant) normal or internalized.
 
 The following is after running the preprocessor (clang -E src/api.cc):
 
@@ -141,3 +142,59 @@ I was wondering where the Utils::ToLocal was defined but could not find it until
 3) depot-tools-auth login https://codereview.chromium.org
 3) git cl upload
 
+
+
+### Tasks 
+4740 // TODO(dcarney): mark V8_WARN_UNUSED_RESULT
+2741   Maybe<bool> Delete(Local<Context> context, Local<Value> key); 
+and 4747, and 2764
+
+3384     V8_DEPRECATE_SOON("Use maybe version", void Resolve(Local<Value> value));
+3385     // TODO(dcarney): mark V8_WARN_UNUSED_RESULT
+3386     Maybe<bool> Resolve(Local<Context> context, Local<Value> value);
+3387
+3388     V8_DEPRECATE_SOON("Use maybe version", void Reject(Local<Value> value));
+3389     // TODO(dcarney): mark V8_WARN_UNUSED_RESULT
+3390     Maybe<bool> Reject(Local<Context> context, Local<Value> value);
+
+
+The formatting here looks a little strange:
+3135 template<typename T>
+3136 class ReturnValue {
+3137  public:
+3138   template <class S> V8_INLINE ReturnValue(const ReturnValue<S>& that)
+3139       : value_(that.value_) {
+3140     TYPE_CHECK(T, S);
+3141   }
+
+
+No space between these declarations:
+3322   /**
+3323    * Returns zero based line number of function body and
+3324    * kLineOffsetNotFound if no information available.
+3325    */
+3326   int GetScriptLineNumber() const;
+3327   /**
+3328    * Returns zero based column number of function body and
+3329    * kLineOffsetNotFound if no information available.
+3330    */
+3331   int GetScriptColumnNumber() const;
+
+
+3435 /**
+3436  * An instance of the built-in Proxy constructor (ECMA-262, 6th Edition,
+3437  * 26.2.1).
+3438  */
+3439 class V8_EXPORT Proxy : public Object {
+3440  public:
+3441   Local<Object> GetTarget();
+3442   Local<Value> GetHandler();
+3443   bool IsRevoked();
+3444   void Revoke();
+3445
+3446   /**
+3447    * Creates a new empty Map. <-- a Map???
+3448    */
+3449   static MaybeLocal<Proxy> New(Local<Context> context,
+3450                                Local<Object> local_target,
+3451                                Local<Object> local_handler);
