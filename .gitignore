@@ -1,7 +1,10 @@
 *.swp
 *.swo
+*.dSYM/
+deps
 tags
 hello-world
 natives_blob.bin
 snapshot_blob.bin
 hello-world.dSYM
+tests/local_test
