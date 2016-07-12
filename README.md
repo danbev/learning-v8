@@ -211,3 +211,52 @@ No space between these declarations:
 3449   static MaybeLocal<Proxy> New(Local<Context> context,
 3450                                Local<Object> local_target,
 3451                                Local<Object> local_handler);
+
+
+### Building chromium
+When making changes to V8 you might need to verify that your changes have not broken anything in Chromium. 
+
+Generate Your Project (gpy) :
+You'll have to run this once before building:
+
+    $ gclient sync
+    $ gclient runhooks
+
+GN bulid:
+
+    $ gn gen out/Debug
+
+#### Building
+
+    $ ninja -C out/Debug chrome
+
+An error I got when building the first time:
+
+    traceback (most recent call last):
+    File "./gyp-mac-tool", line 713, in <module>
+      sys.exit(main(sys.argv[1:]))
+    File "./gyp-mac-tool", line 29, in main
+      exit_code = executor.Dispatch(args)
+    File "./gyp-mac-tool", line 44, in Dispatch
+      return getattr(self, method)(*args[1:])
+    File "./gyp-mac-tool", line 68, in ExecCopyBundleResource
+      self._CopyStringsFile(source, dest)
+    File "./gyp-mac-tool", line 134, in _CopyStringsFile
+      import CoreFoundation
+    ImportError: No module named CoreFoundation
+    [6642/20987] CXX obj/base/debug/base.task_annotator.o
+    [6644/20987] ACTION base_nacl: build newlib plib_9b4f41e4158ebb93a5d28e6734a13e85
+    ninja: build stopped: subcommand failed.
+
+I was ableo to get around this by:
+
+    $ pip install -U pyobjc
+
+
+#### Testing
+
+    $ out/Default/unit_tests --gtest_filter="PushClientTest.*"
+
+
+#### Using a specific version of V8
+So, we want to include our updated version of V8 so that we can verify that it builds correctly.
