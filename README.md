@@ -143,6 +143,19 @@ I was wondering where the Utils::ToLocal was defined but could not find it until
 3) git cl upload
 
 
+### Small Integers
+Reading through v8.h I came accross `// Tag information for Smi`
+Smi stands for small integers. It turns out that ECMA Number is defined as 64-bit binary double-precision
+but internaly v8 uses 32-bit to represent all values. How can that work, you can represent a 64-bit value
+using only 32-bits rigth? 
+Instead the small integer is represented by the 32 bits plus a pointer to the 64-bit number. v8 needs to
+know if a value stored in memory represents a 32-bit integer, or if it is really a 64-bit number, in which
+case it has to follow the pointer to get the complete value. This is where the concept of tagging comes in.
+Tagging involved borrowing one bit of the 32-bit, making it 31-bit and having the leftover bit represent a 
+tag. If the tag is zero then this is a plain value, but if tag is 1 then the pointer must be followed.
+This does not only have to be for numbers it could also be used for object (I think)
+
+### v8::PersistentObject 
 
 ### Tasks 
 4740 // TODO(dcarney): mark V8_WARN_UNUSED_RESULT
