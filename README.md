@@ -260,3 +260,44 @@ I was ableo to get around this by:
 
 #### Using a specific version of V8
 So, we want to include our updated version of V8 so that we can verify that it builds correctly.
+While I'm not sure this is the proper way to do it, I was able to update DEPS in src (chromium) and set
+the v8 entry to git@github.com:danbev/v8.git@064718a8921608eaf9b5eadbb7d734ec04068a87:
+"git@github.com:danbev/v8.git@064718a8921608eaf9b5eadbb7d734ec04068a87"
+
+You'll have to run `gclient sync` after this. 
+
+
+### Buiding pdfium
+You may have to compile this project (in addition to chromium to verify that changes in v8 are not breaking
+code in pdfium.
+
+#### Create/clone the project
+
+     $ mkdir pdfuim_reop
+     $ gclient config --unmanaged https://pdfium.googlesource.com/pdfium.git
+     $ gclient sync
+     $ cd pdfium
+
+#### Building
+
+    $ ninja -C out/Default
+
+#### Using a branch of v8
+You should be able to update the .gclient file adding a custom_deps entry:
+
+    solutions = [
+    {
+      "name"        : "pdfium",
+      "url"         : "https://pdfium.googlesource.com/pdfium.git",
+      "deps_file"   : "DEPS",
+      "managed"     : False,
+      "custom_deps" : {
+        "v8": "git@github.com:danbev/v8.git@064718a8921608eaf9b5eadbb7d734ec04068a87"
+      },
+    },
+   ]
+   cache_dir = None
+    
+For some reason this did not work for me so I just updated the DEPS file directly. This is not very 
+good as DEPS is a version controlled file. I need to figure out what I did wrong here.
+
