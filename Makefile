@@ -14,10 +14,11 @@ natives_blob.bin:
 snapshot_blob.bin:
 	@cp $(v8_build_dir)/snapshot_blob.bin .
 
-check: tests/local_test tests/persistent-object_test  tests/maybe_test
+check: tests/local_test tests/persistent-object_test  tests/maybe_test tests/smi_test
 	./tests/local_test
 	./tests/persistent-object_test
 	./tests/maybe_test
+	./tests/smi_test
 
 tests/local_test: tests/local_test.cc
 	$ clang++ -std=c++0x -O0 -g -I`pwd`/deps/googletest/googletest/include -I$(v8_include_dir) $(v8_libs) -pthread tests/main.cc lib/gtest/libgtest.a -o tests/local_test
@@ -27,6 +28,9 @@ tests/persistent-object_test: tests/persistent-object_test.cc
 
 tests/maybe_test: tests/maybe_test.cc
 	$ clang++ -std=c++0x -O0 -g -I`pwd`/deps/googletest/googletest/include -I$(v8_include_dir) $(v8_libs) -pthread tests/main.cc lib/gtest/libgtest.a -o tests/maybe_test
+
+tests/smi_test: tests/smi_test.cc
+	$ clang++ -std=c++0x -O0 -g -I`pwd`/deps/googletest/googletest/include -I$(v8_include_dir) $(v8_libs) -pthread tests/main.cc lib/gtest/libgtest.a -o tests/smi_test
 
 .PHONY: clean
 
@@ -38,3 +42,4 @@ clean:
 	rm -rf tests/local_test
 	rm -rf tests/persistent-object_test
 	rm -rf tests/maybe_test
+	rm -rf tests/smi_test

@@ -10,3 +10,4 @@ hello-world.dSYM
 tests/local_test
 tests/maybe_test
 tests/persistent-object_test
+tests/smi_test
