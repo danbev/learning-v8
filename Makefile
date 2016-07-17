@@ -14,10 +14,7 @@ natives_blob.bin:
 snapshot_blob.bin:
 	@cp $(v8_build_dir)/snapshot_blob.bin .
 
-check: tests/local_test tests/persistent-object_test  tests/maybe_test tests/smi_test
-	./tests/local_test
-	./tests/persistent-object_test
-	./tests/maybe_test
+check: tests/local_test tests/persistent-object_test tests/maybe_test tests/smi_test
 	./tests/smi_test
 
 tests/local_test: tests/local_test.cc
