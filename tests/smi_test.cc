@@ -1,6 +1,7 @@
 #include <iostream>
 #include "gtest/gtest.h"
 #include "v8.h"
+#include <bitset>
 
 /*
  * Small integer (SMI) example. These are tagged values.
@@ -22,6 +23,22 @@
  *
  */
 TEST(Smi, IntToSmi) {
-  v8::internal::Object* obj = v8::internal::IntToSmi<31>(2);
-  EXPECT_EQ(2, *obj);
+  int value = 2;
+  int smiShiftTagSize = 1;
+  int smiShiftSize = 0;
+  int smi_shift_bits = smiShiftTagSize + smiShiftSize;
+  int smiTag = 0;
+  EXPECT_EQ("00000000000000000000000000000010", std::bitset<32>(value).to_string());
+  // unintptr_t is being used because bitwise operations cannot be done on pointers
+  // according to the standard. 
+  uintptr_t tagged = (static_cast<uintptr_t>(value) << smi_shift_bits) | smiTag;
+  EXPECT_EQ("00000000000000000000000000000100", std::bitset<32>(tagged).to_string());
+  // so we are left shifting one position and then ORing with 0 keeping the int
+  // intact. 
+
+  v8::internal::Object* obj = reinterpret_cast<v8::internal::Object*>(tagged);
+  // to get the int back we have to right shift since we left shifted before.
+  int unwrapped = static_cast<int>(reinterpret_cast<intptr_t>(obj)) >> smi_shift_bits;
+  std::cout << "unwrapped  = " << unwrapped << std::endl;
+  EXPECT_EQ("00000000000000000000000000000010", std::bitset<32>(unwrapped).to_string());
 }
