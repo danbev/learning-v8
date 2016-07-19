@@ -301,3 +301,10 @@ You should be able to update the .gclient file adding a custom_deps entry:
 For some reason this did not work for me so I just updated the DEPS file directly. This is not very 
 good as DEPS is a version controlled file. I need to figure out what I did wrong here.
 
+### Polymorfic Inline cache (PIC)
+Are a way to optimize polymorphic function calls in dynamic languages, for example JavaScript.
+
+The problem is that we don't have type information so methods cannot be called directly but 
+instead be looked up. In a static language a virtual table might have been used. In JavaScript
+is no inheritance relationship so it is not possible to know a vtable offset ahead of time.
+
