@@ -301,10 +301,22 @@ You should be able to update the .gclient file adding a custom_deps entry:
 For some reason this did not work for me so I just updated the DEPS file directly. This is not very 
 good as DEPS is a version controlled file. I need to figure out what I did wrong here.
 
+
+#### Build failure
+After rebasing I've seen the following issue:
+
+    $ ninja -C out/Debug chrome
+    ninja: Entering directory `out/Debug'
+    ninja: error: '../../chrome/renderer/resources/plugins/plugin_delay.html', needed by 'gen/chrome/grit/renderer_resources.h', missing and no known rule to make it
+
+The "solution" was to remove the out directory and rebuild.
+
+### Tasks
+To find suitable task you can use `label:HelpWanted` at [bugs.chromium.org](https://bugs.chromium.org/p/v8/issues/list?can=2&q=label%3AHelpWanted+&x=priority&y=owner&cells=ids).
+
 ### Polymorfic Inline cache (PIC)
 Are a way to optimize polymorphic function calls in dynamic languages, for example JavaScript.
 
-The problem is that we don't have type information so methods cannot be called directly but 
 instead be looked up. In a static language a virtual table might have been used. In JavaScript
 is no inheritance relationship so it is not possible to know a vtable offset ahead of time.
 
