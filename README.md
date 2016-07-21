@@ -314,8 +314,53 @@ The "solution" was to remove the out directory and rebuild.
 ### Tasks
 To find suitable task you can use `label:HelpWanted` at [bugs.chromium.org](https://bugs.chromium.org/p/v8/issues/list?can=2&q=label%3AHelpWanted+&x=priority&y=owner&cells=ids).
 
-### Polymorfic Inline cache (PIC)
-Are a way to optimize polymorphic function calls in dynamic languages, for example JavaScript.
+### Caching
+Are ways to optimize polymorphic function calls in dynamic languages, for example JavaScript.
+
+#### Lookup caches
+Sending a message to a receiver requires the runtime to find the correct target method using
+the runtime type of the receiver. A lookup cache maps the type of the receiver/message name
+pair to methods and stores the most recently used lookup results. The cache is first consulted
+and if there is a cache miss a normal lookup is performed and the result stored in the cache.
+
+#### Inline caches
+Using a lookup cache as described about still takes a considerable amount of time since the
+cache must be probed for each message. I can be observed that the type of the target does often
+not vary. If a call to type A is done at a particular call site it is very likely that the next
+time it is called the type will also be A.
+
+The method address looked up by the system lookup routine can be cached and the call instruction
+can be overwritten. Subsequent call for the same type can jump directly to the cached method and
+completely avoid the lookup. The prolog of the called method must verify that the receivers
+type has not changed do the lookup if it has changed (the type if incorrect, no longer A for
+example).
+
+The target methods address is stored in the callers code, or "inline" with the callers code, 
+hence the name "inline cache".
+
+#### Polymorfic Inline cache (PIC)
+A polymorfic call site is one where there are many equally likely receiver types (and thus
+call targets).
+
+- Monomorfic means there is onle one receiver type
+- Polymorfic a few receiver types
+- Megamorfic very many receiver types
+
+This type of caching extends inline caching to not just cache the last lookup, but cache
+all lookup results for a given polymorfic call site using a specially generated stub.
+Lets say we have a method that iterates through a list of types and calls a method. If 
+all the types are the same (monomorfic) a PIC acts just like an inline cache. The calls will
+directly call the target method (with the method prolog followed by the method body).
+If a differenty type exists in the list there will be a cache miss in the prolog and the lookup
+routine called. In normal inline caching this would rebind the call, replace the call to this
+types target method. This would happen each time the type changes.
+
+With PIC the cache miss handler will generate a small stub routine and rebinds the call to this
+stub. The stub will check if the receiver is of a type that it was seen before and branch to 
+the correct targets. Since the type of the target is already know at this point it can directly
+branch to the target method body without the need for the prolog.
+If the type has not been seen before it will be added to the stub to handle that type. Eventually
+the stub will contain all types used and there will be no more cache misses/lookups.
 
 instead be looked up. In a static language a virtual table might have been used. In JavaScript
 is no inheritance relationship so it is not possible to know a vtable offset ahead of time.
