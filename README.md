@@ -362,6 +362,13 @@ branch to the target method body without the need for the prolog.
 If the type has not been seen before it will be added to the stub to handle that type. Eventually
 the stub will contain all types used and there will be no more cache misses/lookups.
 
+The problem is that we don't have type information so methods cannot be called directly, but 
 instead be looked up. In a static language a virtual table might have been used. In JavaScript
 is no inheritance relationship so it is not possible to know a vtable offset ahead of time.
+What can be done is to observe and learn about the "types" used in the program. When an object
+is seen it can be stored and the target of that method call can be stored and inlined into that
+call. Bascially the type will be checked and if that particular type has been seen before the
+method can just be invoked directly. But how do we check the type in a dynamic language? The
+answer is hidden classes which allow the VM to quickly check an object against a hidden class.
 
+The inline caching source are located in `src/ic`.
