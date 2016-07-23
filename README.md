@@ -1,5 +1,5 @@
 ### Learning Google V8
-The sole purpose of this project is to aid me in leaning Google's V8 JavaScript engine
+The sole purpose of this project is to aid me in leaning Google's V8 JavaScript engine.
 
 ## Prerequisites
 You'll need to have checked out the Google V8 Sources to you local file system and build it by following 
@@ -30,6 +30,12 @@ out v8 directory. For example, :
 
     $ make clean
 
+## Contributing a change
+1) Create a working branch as usual and fix/build/test etc.
+2) Login to https://codereview.chromium.org/mine
+3) depot-tools-auth login https://codereview.chromium.org
+3) git cl upload
+
 ## Debugging
 
     $ lldb hello-world
@@ -55,15 +61,13 @@ A Local<T> has overloaded a number of operators, for example ->:
 ````
 Where Length is a method on the v8 String class.
 
-
-
 ### V8_EXPORT
 This can be found in quite a few places in v8 source code. For example:
 
     class V8_EXPORT ArrayBuffer : public Object {
 
 What is this?  
-It is a preprocessor macro with look like this:
+It is a preprocessor macro which looks like this:
 
     #if V8_HAS_ATTRIBUTE_VISIBILITY && defined(V8_SHARED)
     # ifdef BUILDING_V8_SHARED
@@ -88,20 +92,18 @@ shared objects. Functions with hidden visibility have a local scope and cannot b
 
 Visibility can be controlled by using either compiler options or visibility attributes.
 In your header files, wherever you want an interface or API made public outside the current Dynamic Shared Object (DSO)
-, place __attribute__ ((visibility ("default"))) in struct, class and function declarations you wish to make public
+, place __attribute__ ((visibility ("default"))) in struct, class and function declarations you wish to make public.
  With -fvisibility=hidden, you are telling GCC that every declaration not explicitly marked with a visibility attribute 
 has a hidden visibility. There is such a flag in build/common.gypi
-
-
 
 ### ToLocalChecked()
 You'll see a few of these calls in the hello_world example:
 
      Local<String> source = String::NewFromUtf8(isolate, js, NewStringType::kNormal).ToLocalChecked();
 
-NewFromUtf8 actually returns a The Local<String> wrapped in a MaybeLocal which fores a check to see if 
+NewFromUtf8 actually returns a The Local<String> wrapped in a MaybeLocal which forces a check to see if 
 the Local<> is empty before using it. 
-NewStringType is an enum which can be k (for constant) normal or internalized.
+NewStringType is an enum which can be kNormalString (k for constant) or kInternalized.
 
 The following is after running the preprocessor (clang -E src/api.cc):
 
@@ -136,11 +138,6 @@ I was wondering where the Utils::ToLocal was defined but could not find it until
       return Convert<v8::internal::From, v8::To>(obj);                          \
     }
 
-### Contributing a change
-1) Create a working branch as usual and fix/build/test etc.
-2) Login to https://codereview.chromium.org/mine
-3) depot-tools-auth login https://codereview.chromium.org
-3) git cl upload
 
 
 ### Small Integers
@@ -158,18 +155,6 @@ This does not only have to be for numbers it could also be used for object (I th
 ### v8::PersistentObject 
 
 ### Tasks 
-4740 // TODO(dcarney): mark V8_WARN_UNUSED_RESULT
-2741   Maybe<bool> Delete(Local<Context> context, Local<Value> key); 
-and 4747, and 2764
-
-3384     V8_DEPRECATE_SOON("Use maybe version", void Resolve(Local<Value> value));
-3385     // TODO(dcarney): mark V8_WARN_UNUSED_RESULT
-3386     Maybe<bool> Resolve(Local<Context> context, Local<Value> value);
-3387
-3388     V8_DEPRECATE_SOON("Use maybe version", void Reject(Local<Value> value));
-3389     // TODO(dcarney): mark V8_WARN_UNUSED_RESULT
-3390     Maybe<bool> Reject(Local<Context> context, Local<Value> value);
-
 
 The formatting here looks a little strange:
 3135 template<typename T>
@@ -213,7 +198,7 @@ No space between these declarations:
 3451                                Local<Object> local_handler);
 
 
-### Building chromium
+## Building chromium
 When making changes to V8 you might need to verify that your changes have not broken anything in Chromium. 
 
 Generate Your Project (gpy) :
@@ -267,18 +252,18 @@ the v8 entry to git@github.com:danbev/v8.git@064718a8921608eaf9b5eadbb7d734ec040
 You'll have to run `gclient sync` after this. 
 
 
-### Buiding pdfium
+## Buiding pdfium
 You may have to compile this project (in addition to chromium to verify that changes in v8 are not breaking
 code in pdfium.
 
-#### Create/clone the project
+### Create/clone the project
 
      $ mkdir pdfuim_reop
      $ gclient config --unmanaged https://pdfium.googlesource.com/pdfium.git
      $ gclient sync
      $ cd pdfium
 
-#### Building
+### Building
 
     $ ninja -C out/Default
 
@@ -298,10 +283,6 @@ You should be able to update the .gclient file adding a custom_deps entry:
    ]
    cache_dir = None
     
-For some reason this did not work for me so I just updated the DEPS file directly. This is not very 
-good as DEPS is a version controlled file. I need to figure out what I did wrong here.
-
-
 #### Build failure
 After rebasing I've seen the following issue:
 
