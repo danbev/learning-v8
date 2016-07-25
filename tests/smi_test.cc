@@ -39,6 +39,5 @@ TEST(Smi, IntToSmi) {
   v8::internal::Object* obj = reinterpret_cast<v8::internal::Object*>(tagged);
   // to get the int back we have to right shift since we left shifted before.
   int unwrapped = static_cast<int>(reinterpret_cast<intptr_t>(obj)) >> smi_shift_bits;
-  std::cout << "unwrapped  = " << unwrapped << std::endl;
   EXPECT_EQ("00000000000000000000000000000010", std::bitset<32>(unwrapped).to_string());
 }
