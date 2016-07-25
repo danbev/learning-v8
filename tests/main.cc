@@ -2,7 +2,6 @@
 #include "local_test.cc"
 #include "persistent-object_test.cc"
 #include "maybe_test.cc"
-#include "value_test.cc"
 #include "smi_test.cc"
 
 int main(int argc, char* argv[]) {
