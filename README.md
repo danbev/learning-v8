@@ -36,6 +36,11 @@ out v8 directory. For example, :
 3) depot-tools-auth login https://codereview.chromium.org
 3) git cl upload
 
+### Find the current issue number
+
+    $ git cl issue
+
+
 ## Debugging
 
     $ lldb hello-world
@@ -156,16 +161,6 @@ This does not only have to be for numbers it could also be used for object (I th
 
 ### Tasks 
 
-The formatting here looks a little strange:
-3135 template<typename T>
-3136 class ReturnValue {
-3137  public:
-3138   template <class S> V8_INLINE ReturnValue(const ReturnValue<S>& that)
-3139       : value_(that.value_) {
-3140     TYPE_CHECK(T, S);
-3141   }
-
-
 No space between these declarations:
 3322   /**
 3323    * Returns zero based line number of function body and
@@ -233,7 +228,7 @@ An error I got when building the first time:
     [6644/20987] ACTION base_nacl: build newlib plib_9b4f41e4158ebb93a5d28e6734a13e85
     ninja: build stopped: subcommand failed.
 
-I was ableo to get around this by:
+I was able to get around this by:
 
     $ pip install -U pyobjc
 
@@ -353,3 +348,35 @@ method can just be invoked directly. But how do we check the type in a dynamic l
 answer is hidden classes which allow the VM to quickly check an object against a hidden class.
 
 The inline caching source are located in `src/ic`.
+
+
+### gn
+GN is a bulid system that generated Ninja Build files. 
+In [src/gn](./src/gn) you can find an example project that uses gn. It is very basic and the 
+intention is to have something to "play" with while learning how it works.
+
+
+#### Configuration
+
+#### Building the project
+
+
+
+##### Could not find checkout in any parent issue
+When I first tried to run gn in the src directory I got the following error:
+
+    $ gn gen out/mybuild
+    gn.py: Could not find checkout in any parent of the current path.
+    This must be run inside a checkout. 
+
+
+When gn starts it will look for a file named .gn, starting from the current directory and
+continuing up the the parent directories. This file indicates the source root.
+    
+### Ninja
+
+
+### What is a zone
+I noticed that there is a `src/zone.h` and wondered what this is all about. Is this related
+to zone.js in any way?  
+No, this is not related but instead deals with memory allocations.
