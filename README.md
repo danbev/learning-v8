@@ -143,6 +143,7 @@ I was wondering where the Utils::ToLocal was defined but could not find it until
       return Convert<v8::internal::From, v8::To>(obj);                          \
     }
 
+The above can be found in src/api.h. The same goes for Local<Object>, Local<String> etc.
 
 
 ### Small Integers
@@ -156,6 +157,14 @@ case it has to follow the pointer to get the complete value. This is where the c
 Tagging involved borrowing one bit of the 32-bit, making it 31-bit and having the leftover bit represent a 
 tag. If the tag is zero then this is a plain value, but if tag is 1 then the pointer must be followed.
 This does not only have to be for numbers it could also be used for object (I think)
+
+
+### Types
+Most types can be found in src/objects.h
+
+    // Formats of Object*:
+    //  Smi:        [31 bit signed int] 0
+    //  HeapObject: [32 bit direct pointer] (4 byte aligned) | 01
 
 ### v8::PersistentObject 
 
