@@ -2,7 +2,7 @@
 The sole purpose of this project is to aid me in leaning Google's V8 JavaScript engine.
 
 ## Prerequisites
-You'll need to have checked out the Google V8 Sources to you local file system and build it by following 
+You'll need to have checked out the Google V8 sources to you local file system and build it by following 
 the instructions found [here](https://developers.google.com/v8/build).
 
 What I've been using the following target:
