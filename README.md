@@ -31,10 +31,12 @@ out v8 directory. For example, :
     $ make clean
 
 ## Contributing a change
-1) Create a working branch as usual and fix/build/test etc.
-2) Login to https://codereview.chromium.org/mine
-3) depot-tools-auth login https://codereview.chromium.org
-3) git cl upload
+1) Create a working branch as usual and fix/build/test etc.  
+2) Login to https://codereview.chromium.org/mine  
+3) depot-tools-auth login https://codereview.chromium.org  
+3) git cl upload  
+
+See Googles [contributing-code](https://www.chromium.org/developers/contributing-code) for more details.
 
 ### Find the current issue number
 
@@ -106,7 +108,7 @@ You'll see a few of these calls in the hello_world example:
 
      Local<String> source = String::NewFromUtf8(isolate, js, NewStringType::kNormal).ToLocalChecked();
 
-NewFromUtf8 actually returns a The Local<String> wrapped in a MaybeLocal which forces a check to see if 
+NewFromUtf8 actually returns a Local<String> wrapped in a MaybeLocal which forces a check to see if 
 the Local<> is empty before using it. 
 NewStringType is an enum which can be kNormalString (k for constant) or kInternalized.
 
@@ -149,8 +151,8 @@ The above can be found in src/api.h. The same goes for Local<Object>, Local<Stri
 ### Small Integers
 Reading through v8.h I came accross `// Tag information for Smi`
 Smi stands for small integers. It turns out that ECMA Number is defined as 64-bit binary double-precision
-but internaly v8 uses 32-bit to represent all values. How can that work, you can represent a 64-bit value
-using only 32-bits rigth? 
+but internally v8 uses 32-bit to represent all values. How can that work, you can represent a 64-bit value
+using only 32-bits right?   
 Instead the small integer is represented by the 32 bits plus a pointer to the 64-bit number. v8 needs to
 know if a value stored in memory represents a 32-bit integer, or if it is really a 64-bit number, in which
 case it has to follow the pointer to get the complete value. This is where the concept of tagging comes in.
