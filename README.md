@@ -87,7 +87,7 @@ It is a preprocessor macro which looks like this:
     #endif 
 
 So we can see that if V8_HAS_ATTRIBUTE_VISIBILITY and defined(V8_SHARD) and also 
-if BUILDING_V8_SHARED V8_EXPORT is set to __attribute__ ((visibility("default")).
+if BUILDING_V8_SHARED V8_EXPORT is set to `__attribute__ ((visibility("default"))`.
 But in all other cases V8_EXPORT is empty and the preprocessor does not insert 
 anything (nothing will be there come compile time). 
 But what about the `__attribute__ ((visibility("default"))` what is this?  
@@ -99,8 +99,8 @@ shared objects. Functions with hidden visibility have a local scope and cannot b
 
 Visibility can be controlled by using either compiler options or visibility attributes.
 In your header files, wherever you want an interface or API made public outside the current Dynamic Shared Object (DSO)
-, place __attribute__ ((visibility ("default"))) in struct, class and function declarations you wish to make public.
- With -fvisibility=hidden, you are telling GCC that every declaration not explicitly marked with a visibility attribute 
+, place `__attribute__ ((visibility ("default")))` in struct, class and function declarations you wish to make public.
+ With `-fvisibility=hidden`, you are telling GCC that every declaration not explicitly marked with a visibility attribute 
 has a hidden visibility. There is such a flag in build/common.gypi
 
 ### ToLocalChecked()
