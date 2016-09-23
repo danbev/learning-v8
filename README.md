@@ -251,10 +251,11 @@ I was able to get around this by:
 
 
 #### Using a specific version of V8
-So, we want to include our updated version of V8 so that we can verify that it builds correctly.
+So, we want to include our updated version of V8 so that we can verify that it builds correctly with our change to V8.
 While I'm not sure this is the proper way to do it, I was able to update DEPS in src (chromium) and set
 the v8 entry to git@github.com:danbev/v8.git@064718a8921608eaf9b5eadbb7d734ec04068a87:
-"git@github.com:danbev/v8.git@064718a8921608eaf9b5eadbb7d734ec04068a87"
+
+    "git@github.com:danbev/v8.git@064718a8921608eaf9b5eadbb7d734ec04068a87"
 
 You'll have to run `gclient sync` after this. 
 
