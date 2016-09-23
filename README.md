@@ -173,35 +173,36 @@ Most types can be found in src/objects.h
 ### Tasks 
 
 No space between these declarations:
-3322   /**
-3323    * Returns zero based line number of function body and
-3324    * kLineOffsetNotFound if no information available.
-3325    */
-3326   int GetScriptLineNumber() const;
-3327   /**
-3328    * Returns zero based column number of function body and
-3329    * kLineOffsetNotFound if no information available.
-3330    */
-3331   int GetScriptColumnNumber() const;
+
+    3322   /**
+    3323    * Returns zero based line number of function body and
+    3324    * kLineOffsetNotFound if no information available.
+    3325    */
+    3326   int GetScriptLineNumber() const;
+    3327   /**
+    3328    * Returns zero based column number of function body and
+    3329    * kLineOffsetNotFound if no information available.
+    3330    */
+    3331   int GetScriptColumnNumber() const;
 
 
-3435 /**
-3436  * An instance of the built-in Proxy constructor (ECMA-262, 6th Edition,
-3437  * 26.2.1).
-3438  */
-3439 class V8_EXPORT Proxy : public Object {
-3440  public:
-3441   Local<Object> GetTarget();
-3442   Local<Value> GetHandler();
-3443   bool IsRevoked();
-3444   void Revoke();
-3445
-3446   /**
-3447    * Creates a new empty Map. <-- a Map???
-3448    */
-3449   static MaybeLocal<Proxy> New(Local<Context> context,
-3450                                Local<Object> local_target,
-3451                                Local<Object> local_handler);
+    3435 /**
+    3436  * An instance of the built-in Proxy constructor (ECMA-262, 6th Edition,
+    3437  * 26.2.1).
+    3438  */
+    3439 class V8_EXPORT Proxy : public Object {
+    3440  public:
+    3441   Local<Object> GetTarget();
+    3442   Local<Value> GetHandler();
+    3443   bool IsRevoked();
+    3444   void Revoke();
+    3445
+    3446   /**
+    3447    * Creates a new empty Map. <-- a Map???
+    3448    */
+    3449   static MaybeLocal<Proxy> New(Local<Context> context,
+    3450                                Local<Object> local_target,
+    3451                                Local<Object> local_handler);
 
 
 ## Building chromium
