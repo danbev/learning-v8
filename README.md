@@ -5,6 +5,10 @@ The sole purpose of this project is to aid me in leaning Google's V8 JavaScript 
 You'll need to have checked out the Google V8 sources to you local file system and build it by following 
 the instructions found [here](https://developers.google.com/v8/build).
 
+### gclient sync
+
+    gclient sync
+
 What I've been using the following target:
 
     $ make x64.debug
@@ -314,7 +318,7 @@ and if there is a cache miss a normal lookup is performed and the result stored 
 
 #### Inline caches
 Using a lookup cache as described about still takes a considerable amount of time since the
-cache must be probed for each message. I can be observed that the type of the target does often
+cache must be probed for each message. It can be observed that the type of the target does often
 not vary. If a call to type A is done at a particular call site it is very likely that the next
 time it is called the type will also be A.
 
