@@ -13,6 +13,8 @@ What I've been using the following target:
 
     $ make x64.debug
 
+You should then be able to find the output in `out/x64.debug/`
+
 To run the tests:
 
     $ make x64.check
@@ -51,6 +53,47 @@ See Googles [contributing-code](https://www.chromium.org/developers/contributing
 
     $ lldb hello-world
     (lldb) breatpoint set --file hello-world.cc --line 27
+
+### Using d8
+This is the source used for the following examples:
+
+    $ cat class.js
+    function Person(name, age) {
+      this.name = name;
+      this.age = age;
+    }
+
+    print("before");
+    const p = new Person("Daniel", 41);
+    print(p.name);
+    print(p.age);
+    print("after"); 
+
+#### Show Inline Caches (IC)
+--trace-ic
+
+    $ out/x64.debug/d8 --trace-ic class.js
+
+    [StoreIC in ~PostExperimentals+556 at native prologue.js:1 (0->.) map=0x266632187ab1 0x3482ff408421 <String[6]: Export>]
+    [StoreIC in ~PostExperimentals+593 at native prologue.js:1 (0->.) map=0x26663218ae41 0x3482ff408611 <String[9]: PostDebug>]
+    [StoreIC in ~PostExperimentals+630 at native prologue.js:1 (0->.) map=0x26663218ae99 0x3482ff4085e1 <String[17]: PostExperimentals>]
+    [LoadGlobalIC in ~+146 at class.js:6 (0->1) map=0x26663218abd9 0xd0e63ea87c1 <String[5]: print>]
+    [CallIC in ~+191 at class.js:6 (0->1) map=0x0 0x330398682231 <String[5]: print>]
+    before
+    [StoreIC in ~Person+65 at class.js:2 (0->.) map=0x26663218afa1 0x3482ff403361 <String[4]: name>]
+    [StoreIC in ~Person+102 at class.js:3 (0->.) map=0x26663218b0a9 0xd0e63eabd89 <String[3]: age>]
+    [LoadIC in ~+400 at class.js:8 (0->.) map=0x26663218b101 0x3482ff403361 <String[4]: name>]
+    [CallIC in ~+425 at class.js:8 (0->1) map=0x0 0x330398682231 <String[5]: print>]
+    Daniel
+    [LoadIC in ~+496 at class.js:9 (0->.) map=0x26663218b101 0xd0e63eabd89 <String[3]: age>]
+    [CallIC in ~+521 at class.js:9 (0->1) map=0x0 0x330398682231 <String[5]: print>]
+    41
+    [CallIC in ~+589 at class.js:10 (0->1) map=0x0 0x330398682231 <String[5]: print>]
+    after
+
+LoadIC (0->.) means that it has transitioned from unititialized state (0) to pre-monomophic state (.)
+monomorphic state is specified with a `1
+What we are doing caching knowledge about the layout of the previously seen object inside the StoreIC/LoadIC calls.
 
 ### Local<String>
 
@@ -174,6 +217,26 @@ Most types can be found in src/objects.h
 
 ### v8::PersistentObject 
 
+
+### Hidden classes
+There is plenty of information about how these work but I was not aware that d8 could be used
+with the `--trace-maps`` flag to show information about hidden classes (which are called maps in V8)
+
+    function Person(name, age) {
+      this.name = name;
+      this.age = age;
+    }
+
+    const p = new Person("Daniel", 41);
+
+
+    $ ./d8 --trace-maps class.js
+
+    [TraceMaps: InitialMap map= 0x37facd30afa1 SFI= 34_Person ]
+    [TraceMaps: Transition from= 0x37facd30afa1 to= 0x37facd30b0a9 name= name ]
+    [TraceMaps: Transition from= 0x37facd30b0a9 to= 0x37facd30b101 name= age ]
+
+
 ### Tasks 
 
 No space between these declarations:
@@ -218,11 +281,17 @@ You'll have to run this once before building:
     $ gclient sync
     $ gclient runhooks
 
-GN bulid:
+#### Update the code base
+
+    $ git fetch origin/master
+    $ git co master
+    $ git merge origin/master
+
+### Building using GN
 
     $ gn gen out/Debug
 
-#### Building
+### Building using Ninja
 
     $ ninja -C out/Debug chrome
 
@@ -262,6 +331,16 @@ the v8 entry to git@github.com:danbev/v8.git@064718a8921608eaf9b5eadbb7d734ec040
     "git@github.com:danbev/v8.git@064718a8921608eaf9b5eadbb7d734ec04068a87"
 
 You'll have to run `gclient sync` after this. 
+
+Another way is to not updated the `DEPS` file, which is a version controlled file, but instead update
+`.gclientrc` and add a `custom_deps` entry:
+
+    solutions = [{u'managed': False, u'name': u'src', u'url': u'https://chromium.googlesource.com/chromium/src.git', 
+    u'custom_deps': {
+      "src/v8": "git@github.com:danbev/v8.git@27a666f9be7ca3959c7372bdeeee14aef2a4b7ba"
+    }, u'deps_file': u'.DEPS.git', u'safesync_url': u''}]
+    
+You'll have to run `gclient sync` after this too.
 
 
 ## Buiding pdfium
