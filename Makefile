@@ -4,30 +4,32 @@ v8_include_dir = $(V8_HOME)/include
 
 v8_libs = $(v8_build_dir)/libv8_base.a $(v8_build_dir)/libv8_libbase.a $(v8_build_dir)/libv8_external_snapshot.a $(v8_build_dir)/libv8_libplatform.a $(v8_build_dir)/libicuuc.a $(v8_build_dir)/libicui18n.a ${v8_build_dir}/libv8_libsampler.a
 
+COMPILE_TEST = clang++ -std=c++0x -O0 -g -I`pwd`/deps/googletest/googletest/include -I$(v8_include_dir) $(v8_libs) -pthread tests/main.cc lib/gtest/libgtest.a -o 
+
 hello-world: natives_blob.bin snapshot_blob.bin hello-world.cc
 	@echo "Using v8_home = $(v8_include_dir)"
-	clang++ -O0 -g -I$(v8_include_dir) $(v8_libs) hello-world.cc -o hello-world -pthread -std=c++0x
+	clang++ -O0 -g -I$(v8_include_dir) $(v8_libs) hello-world.cc -o $@ -pthread -std=c++0x
 
 natives_blob.bin:
-	@cp $(v8_build_dir)/natives_blob.bin .
+	@cp $(v8_build_dir)/$@ .
 
 snapshot_blob.bin:
-	@cp $(v8_build_dir)/snapshot_blob.bin .
+	@cp $(v8_build_dir)/$@ .
 
 check: tests/local_test tests/persistent-object_test tests/maybe_test tests/smi_test
 	./tests/smi_test
 
 tests/local_test: tests/local_test.cc
-	$ clang++ -std=c++0x -O0 -g -I`pwd`/deps/googletest/googletest/include -I$(v8_include_dir) $(v8_libs) -pthread tests/main.cc lib/gtest/libgtest.a -o tests/local_test
+	$(COMPILE_TEST) tests/local_test
 
 tests/persistent-object_test: tests/persistent-object_test.cc
-	$ clang++ -std=c++0x -O0 -g -I`pwd`/deps/googletest/googletest/include -I$(v8_include_dir) $(v8_libs) -pthread tests/main.cc lib/gtest/libgtest.a -o tests/persistent-object_test
+	$(COMPILE_TEST) tests/persistent-object_test
 
 tests/maybe_test: tests/maybe_test.cc
-	$ clang++ -std=c++0x -O0 -g -I`pwd`/deps/googletest/googletest/include -I$(v8_include_dir) $(v8_libs) -pthread tests/main.cc lib/gtest/libgtest.a -o tests/maybe_test
+	$(COMPILE_TEST) tests/maybe_test
 
 tests/smi_test: tests/smi_test.cc
-	$ clang++ -std=c++0x -O0 -g -I`pwd`/deps/googletest/googletest/include -I$(v8_include_dir) $(v8_libs) -pthread tests/main.cc lib/gtest/libgtest.a -o tests/smi_test
+	$(COMPILE_TEST) tests/smi_test
 
 .PHONY: clean
 
