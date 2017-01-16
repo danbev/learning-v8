@@ -583,10 +583,10 @@ Shell::ExecuteString
 
 
 ### Compiler
-So V8 compiles all JavaScript to native code and has two compilers. The first one is quick and produces none optimized code and is called the full compiler (full-codegen) in the source tree.
+So V8 compiles all JavaScript to native code and has two compilers. The first one is quick and produces non optimized code and is called the full compiler (full-codegen) in the source tree.
 The second is a slower compiler but can produce optimized native code and there are two version of this, the older one named Crankshaft and the new Turbofan.
 
-The first time V8 sees a function it will parse it into an AST but not to any further processing of that tree
+The first time V8 sees a function it will parse it into an AST but not do any further processing of that tree
 until that function is used. Processing will be running the full-codegen compiler.
 
 #### full-codegen
@@ -595,7 +595,7 @@ All local variables are stored either on the stack or on the heap and not in CPU
 
 Inline Cachine (IC) is done here which also help to gather type information.
 V8 also has a profiler thread which monitors which functions are hot and should be optimized. This profiling
-also allows V8 to find out inforation about types using IC. This type information can then be fed to Crankshaft/Turbofan.
+also allows V8 to find out information about types using IC. This type information can then be fed to Crankshaft/Turbofan.
 The type information is stored as a 8 bit value. 
 
 Each AST node is associated with 
