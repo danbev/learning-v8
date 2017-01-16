@@ -72,28 +72,40 @@ This is the source used for the following examples:
 #### Show Inline Caches (IC)
 --trace-ic
 
-    $ out/x64.debug/d8 --trace-ic class.js
+    $ out/x64.debug/d8 --trace-ic --trace-maps class.js
 
-    [StoreIC in ~PostExperimentals+556 at native prologue.js:1 (0->.) map=0x266632187ab1 0x3482ff408421 <String[6]: Export>]
-    [StoreIC in ~PostExperimentals+593 at native prologue.js:1 (0->.) map=0x26663218ae41 0x3482ff408611 <String[9]: PostDebug>]
-    [StoreIC in ~PostExperimentals+630 at native prologue.js:1 (0->.) map=0x26663218ae99 0x3482ff4085e1 <String[17]: PostExperimentals>]
-    [LoadGlobalIC in ~+146 at class.js:6 (0->1) map=0x26663218abd9 0xd0e63ea87c1 <String[5]: print>]
-    [CallIC in ~+191 at class.js:6 (0->1) map=0x0 0x330398682231 <String[5]: print>]
     before
-    [StoreIC in ~Person+65 at class.js:2 (0->.) map=0x26663218afa1 0x3482ff403361 <String[4]: name>]
-    [StoreIC in ~Person+102 at class.js:3 (0->.) map=0x26663218b0a9 0xd0e63eabd89 <String[3]: age>]
-    [LoadIC in ~+400 at class.js:8 (0->.) map=0x26663218b101 0x3482ff403361 <String[4]: name>]
-    [CallIC in ~+425 at class.js:8 (0->1) map=0x0 0x330398682231 <String[5]: print>]
+    [TraceMaps: Normalize from= 0x19a314288b89 to= 0x19a31428aff9 reason= NormalizeAsPrototype ]
+    [TraceMaps: ReplaceDescriptors from= 0x19a31428aff9 to= 0x19a31428b051 reason= CopyAsPrototype ]
+    [TraceMaps: InitialMap map= 0x19a31428afa1 SFI= 34_Person ]
+
+    [StoreIC in ~Person+65 at class.js:2 (0->.) map=0x19a31428afa1 0x10e68ba83361 <String[4]: name>]
+    [TraceMaps: Transition from= 0x19a31428afa1 to= 0x19a31428b0a9 name= name ]
+    [StoreIC in ~Person+102 at class.js:3 (0->.) map=0x19a31428b0a9 0x2beaa25abd89 <String[3]: age>]
+    [TraceMaps: Transition from= 0x19a31428b0a9 to= 0x19a31428b101 name= age ]
+    [TraceMaps: SlowToFast from= 0x19a31428b051 to= 0x19a31428b159 reason= OptimizeAsPrototype ]
+    [StoreIC in ~Person+65 at class.js:2 (.->1) map=0x19a31428afa1 0x10e68ba83361 <String[4]: name>]
+    [StoreIC in ~Person+102 at class.js:3 (.->1) map=0x19a31428b0a9 0x2beaa25abd89 <String[3]: age>]
+    [LoadIC in ~+546 at class.js:9 (0->.) map=0x19a31428b101 0x10e68ba83361 <String[4]: name>]
+    [CallIC in ~+571 at class.js:9 (0->1) map=0x0 0x32f481082231 <String[5]: print>]
     Daniel
-    [LoadIC in ~+496 at class.js:9 (0->.) map=0x26663218b101 0xd0e63eabd89 <String[3]: age>]
-    [CallIC in ~+521 at class.js:9 (0->1) map=0x0 0x330398682231 <String[5]: print>]
+    [LoadIC in ~+642 at class.js:10 (0->.) map=0x19a31428b101 0x2beaa25abd89 <String[3]: age>]
+    [CallIC in ~+667 at class.js:10 (0->1) map=0x0 0x32f481082231 <String[5]: print>]
     41
-    [CallIC in ~+589 at class.js:10 (0->1) map=0x0 0x330398682231 <String[5]: print>]
+    [LoadIC in ~+738 at class.js:11 (0->.) map=0x19a31428b101 0x10e68ba83361 <String[4]: name>]
+    [CallIC in ~+763 at class.js:11 (0->1) map=0x0 0x32f481082231 <String[5]: print>]
+    Tilda
+    [LoadIC in ~+834 at class.js:12 (0->.) map=0x19a31428b101 0x2beaa25abd89 <String[3]: age>]
+    [CallIC in ~+859 at class.js:12 (0->1) map=0x0 0x32f481082231 <String[5]: print>]
+    2
+    [CallIC in ~+927 at class.js:13 (0->1) map=0x0 0x32f481082231 <String[5]: print>]
     after
 
 LoadIC (0->.) means that it has transitioned from unititialized state (0) to pre-monomophic state (.)
-monomorphic state is specified with a `1
+monomorphic state is specified with a `1. These states can be found in [src/ic/ic.cc](https://github.com/v8/v8/blob/df1494d69deab472a1a709bd7e688297aa5cc655/src/ic/ic.cc#L33-L52).
 What we are doing caching knowledge about the layout of the previously seen object inside the StoreIC/LoadIC calls.
+
+    $ lldb -- out/x64.debug/d8 class.js
 
 ### Local<String>
 
@@ -133,7 +145,7 @@ It is a preprocessor macro which looks like this:
     # define V8_EXPORT
     #endif 
 
-So we can see that if V8_HAS_ATTRIBUTE_VISIBILITY and defined(V8_SHARD) and also 
+So we can see that if V8_HAS_ATTRIBUTE_VISIBILITY and defined(V8_SHARED) and also 
 if BUILDING_V8_SHARED V8_EXPORT is set to `__attribute__ ((visibility("default"))`.
 But in all other cases V8_EXPORT is empty and the preprocessor does not insert 
 anything (nothing will be there come compile time). 
@@ -476,3 +488,117 @@ continuing up the the parent directories. This file indicates the source root.
 I noticed that there is a `src/zone.h` and wondered what this is all about. Is this related
 to zone.js in any way?  
 No, this is not related but instead deals with memory allocations.
+
+### Performance Optimizations
+Code is optimized 1 function at a time, without knowledge of what other code is doing
+
+
+### V8_shell startup
+What happens when the v8_shell is run?   
+
+    $ lldb -- out/x64.debug/d8 class.js
+    (lldb) breakpoint set --file d8.cc --line 2662
+    Breakpoint 1: where = d8`v8::Shell::Main(int, char**) + 96 at d8.cc:2662, address = 0x0000000100015150
+
+First things is all the options are set using `Shell::SetOptions`
+SetOptions will call FlagList::SetFlagsFromCommandLine which in our case it simply `class.js`
+Next a new SourceGroup array is create:
+    
+     2261 options.isolate_sources = new SourceGroup[options.num_isolates];
+
+options is of type ShellOptions:
+
+    (lldb) p options
+    (v8::ShellOptions) $5 = {
+      script_executed = false
+      send_idle_notification = false
+      invoke_weak_callbacks = false
+      omit_quit = false
+      stress_opt = false
+      stress_deopt = false
+      stress_runs = 1
+      interactive_shell = false
+      test_shell = false
+      dump_heap_constants = false
+      expected_to_throw = false
+      mock_arraybuffer_allocator = false
+      num_isolates = 1
+      compile_options = kNoCompileOptions
+      isolate_sources = 0x0000000102e00058
+      icu_data_file = 0x0000000000000000 <no value available>
+      natives_blob = 0x0000000000000000 <no value available>
+      snapshot_blob = 0x0000000000000000 <no value available>
+      trace_enabled = false
+      trace_config = 0x0000000000000000 <no value available>
+}
+Next the ICU stuff is initialized (look into this as some point)
+We are then back in Main and have the following lines:
+
+    2685 v8::V8::InitializePlatform(g_platform);
+    2686 v8::V8::Initialize();
+
+This is very similar to what I've seen in the [Node.js startup process](https://github.com/danbev/learning-nodejs#startint-argc-char-argv).
+
+We did not specify any natives_blob or snapshot_blob as an option on the command line so the defaults 
+will be used:
+
+    v8::V8::InitializeExternalStartupData(argv[0]);
+
+Now this is where the files 'natives_blob.bin' and snapshot_blob.bin' come into play. But what
+are these bin files?  
+JavaScript specifies a lot of built-in functionality which every V8 context must provide.
+For example, you can run Math.PI and that will work in a JavaScript console/repl. The global object
+and all the built-in functionality must be setup and initialized into the V8 heap. This can be time
+consuming and affect runtime performance if this has to be done every time. The blobs above are prepared
+snapshots that get directly deserialized into the heap to provide an initilized context.
+The current directory where d8 exist will be used and the files `natives_blob.bin` and `snapshot_blob.bin` will be used.
+
+    result = RunMain(isolate, argc, argv, last_run);
+
+SourceGroup::Execute:
+
+    {
+       Context::Scope cscope(context);
+       PerIsolateData::RealmScope realm_scope(PerIsolateData::Get(isolate));
+       options.isolate_sources[0].Execute(isolate);
+    }
+
+     // Use all other arguments as names of files to load and run.
+     HandleScope handle_scope(isolate);
+     Local<String> file_name =
+         String::NewFromUtf8(isolate, arg, NewStringType::kNormal)
+             .ToLocalChecked();
+     Local<String> source = ReadFile(isolate, arg);
+     if (source.IsEmpty()) {
+       printf("Error reading '%s'\n", arg);
+       Shell::Exit(1);
+     }
+     Shell::options.script_executed = true;
+     if (!Shell::ExecuteString(isolate, source, file_name, false, true)) {
+       exception_was_thrown = true;
+       break;
+     }
+
+Shell::ExecuteString
+
+
+### Compiler
+So V8 compiles all JavaScript to native code and has two compilers. The first one is quick and produces none optimized code and is called the full compiler (full-codegen) in the source tree.
+The second is a slower compiler but can produce optimized native code and there are two version of this, the older one named Crankshaft and the new Turbofan.
+
+The first time V8 sees a function it will parse it into an AST but not to any further processing of that tree
+until that function is used. Processing will be running the full-codegen compiler.
+
+#### full-codegen
+This compiler walks the AST of a function and emits calls to the macroassembler directly.
+All local variables are stored either on the stack or on the heap and not in CPU registers.
+
+Inline Cachine (IC) is done here which also help to gather type information.
+V8 also has a profiler thread which monitors which functions are hot and should be optimized. This profiling
+also allows V8 to find out inforation about types using IC. This type information can then be fed to Crankshaft/Turbofan.
+The type information is stored as a 8 bit value. 
+
+Each AST node is associated with 
+
+
+
