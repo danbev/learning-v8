@@ -408,7 +408,7 @@ pair to methods and stores the most recently used lookup results. The cache is f
 and if there is a cache miss a normal lookup is performed and the result stored in the cache.
 
 #### Inline caches
-Using a lookup cache as described about still takes a considerable amount of time since the
+Using a lookup cache as described above still takes a considerable amount of time since the
 cache must be probed for each message. It can be observed that the type of the target does often
 not vary. If a call to type A is done at a particular call site it is very likely that the next
 time it is called the type will also be A.
@@ -416,7 +416,7 @@ time it is called the type will also be A.
 The method address looked up by the system lookup routine can be cached and the call instruction
 can be overwritten. Subsequent call for the same type can jump directly to the cached method and
 completely avoid the lookup. The prolog of the called method must verify that the receivers
-type has not changed do the lookup if it has changed (the type if incorrect, no longer A for
+type has not changed and do the lookup if it has changed (the type if incorrect, no longer A for
 example).
 
 The target methods address is stored in the callers code, or "inline" with the callers code, 
@@ -435,20 +435,20 @@ all lookup results for a given polymorfic call site using a specially generated 
 Lets say we have a method that iterates through a list of types and calls a method. If 
 all the types are the same (monomorfic) a PIC acts just like an inline cache. The calls will
 directly call the target method (with the method prolog followed by the method body).
-If a differenty type exists in the list there will be a cache miss in the prolog and the lookup
-routine called. In normal inline caching this would rebind the call, replace the call to this
+If a different type exists in the list there will be a cache miss in the prolog and the lookup
+routine called. In normal inline caching this would rebind the call, replacing the call to this
 types target method. This would happen each time the type changes.
 
 With PIC the cache miss handler will generate a small stub routine and rebinds the call to this
 stub. The stub will check if the receiver is of a type that it was seen before and branch to 
-the correct targets. Since the type of the target is already know at this point it can directly
+the correct targets. Since the type of the target is already known at this point it can directly
 branch to the target method body without the need for the prolog.
 If the type has not been seen before it will be added to the stub to handle that type. Eventually
 the stub will contain all types used and there will be no more cache misses/lookups.
 
 The problem is that we don't have type information so methods cannot be called directly, but 
 instead be looked up. In a static language a virtual table might have been used. In JavaScript
-is no inheritance relationship so it is not possible to know a vtable offset ahead of time.
+there is no inheritance relationship so it is not possible to know a vtable offset ahead of time.
 What can be done is to observe and learn about the "types" used in the program. When an object
 is seen it can be stored and the target of that method call can be stored and inlined into that
 call. Bascially the type will be checked and if that particular type has been seen before the
