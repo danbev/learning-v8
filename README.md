@@ -54,6 +54,25 @@ See Googles [contributing-code](https://www.chromium.org/developers/contributing
     $ lldb hello-world
     (lldb) breatpoint set --file hello-world.cc --line 27
 
+## Notes
+V8 is bascially consists of the memory management of the heap and the execution stack (very simplified but helps
+make my point). Things like the callback queue, the event loop and other things like the WebAPIs (DOM, ajax, 
+setTimeout etc)  are found inside Chrome or in the case of Node the APIs are Node.js APIs.
+
+The execution stask is a stack of frame pointers. For each function called that function will be pushed onto 
+the stack. When a function that functions returns it will be removed. If that function calls other functions
+they will be pushed onto the stack. When they have all returned execution can proceed from the returned to 
+point. If one of the functions performs an operation that takes time progress will not be made until it 
+completes as the only way to complete is that the function returns and is popped off the stack. This is 
+what happens when you have a single threaded programming lanugage.
+
+So that describes synchronous functions, what about asynchronous functions?  
+Lets take for example that you call setTimeout (in node or in a browser), the setTimeout function will be
+pushed onto the call stack an executed. This is where the callback queue comes into play. The setTimeout function
+can add functions to the callback queue
+
+
+
 ### Using d8
 This is the source used for the following examples:
 
@@ -306,6 +325,10 @@ You'll have to run this once before building:
 ### Building using Ninja
 
     $ ninja -C out/Debug chrome
+
+Building the tests:
+
+    $ ninja -C out/Debug chrome/test:unit_tests
 
 An error I got when building the first time:
 
@@ -601,4 +624,29 @@ The type information is stored as a 8 bit value.
 Each AST node is associated with 
 
 
+
+### Performance
+Say you have the expression x + y the full-codegen compiler might produce:
+
+    movq rax, x
+    movq rbx, y
+    callq RuntimeAdd
+
+If x and y are integers just using the `add` operation would be much quicker:
+
+    movq rax, x
+    movq rbx, y
+    add rax, rbx
+
+
+Recall that functions are optimized so if the compiler has to bail out and unoptimize 
+part of a function then the whole functions will be affected and it will go back to 
+the unoptimized version.
+
+ 
+### Execution/Runtime
+I'm not sure if V8 follows this exactly but I've heard and read that when the engine comes 
+across a function declaration it only parses and verifies the syntax and saves a ref
+to the function name. The statements inside the function are not checked at this stage
+only the syntax of the function declaration (parenthesis, arguments, brackets etc). 
 
