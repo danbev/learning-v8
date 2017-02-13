@@ -54,17 +54,38 @@ See Googles [contributing-code](https://www.chromium.org/developers/contributing
     $ lldb hello-world
     (lldb) breatpoint set --file hello-world.cc --line 27
 
+There are a number of useful functions in `src/objects-printer.cc` which can also be used in lldb.
+
+#### Print value of a Local object
+
+    (lldb) print _v8_internal_Print_Object(*(v8::internal::Object**)(*init_fn))
+
+#### Print stacktrace
+
+    (lldb) p _v8_internal_Print_StackTrace()
+
+#### Creating command aliases in lldb
+Create a file named .lldbinit (in your project director or home directory)
+
+      command regex -h 'Print a v8 JavaScript object' jlh 's/(.+)/expr -- '_v8_internal_Print_Object(*(v8::internal::Object**)(*%1))/'
+
 ## Notes
 V8 is bascially consists of the memory management of the heap and the execution stack (very simplified but helps
 make my point). Things like the callback queue, the event loop and other things like the WebAPIs (DOM, ajax, 
 setTimeout etc)  are found inside Chrome or in the case of Node the APIs are Node.js APIs.
 
-The execution stask is a stack of frame pointers. For each function called that function will be pushed onto 
+The execution stack is a stack of frame pointers. For each function called that function will be pushed onto 
 the stack. When a function that functions returns it will be removed. If that function calls other functions
 they will be pushed onto the stack. When they have all returned execution can proceed from the returned to 
 point. If one of the functions performs an operation that takes time progress will not be made until it 
 completes as the only way to complete is that the function returns and is popped off the stack. This is 
 what happens when you have a single threaded programming lanugage.
+
+function doit() {
+  console.log('bajja');
+}
+
+doit(); <---
 
 So that describes synchronous functions, what about asynchronous functions?  
 Lets take for example that you call setTimeout (in node or in a browser), the setTimeout function will be
@@ -650,3 +671,11 @@ across a function declaration it only parses and verifies the syntax and saves a
 to the function name. The statements inside the function are not checked at this stage
 only the syntax of the function declaration (parenthesis, arguments, brackets etc). 
 
+
+### Function methods
+The declaration of Function can be found in `include/v8.h` (just noting this as I've looked for it several times)
+
+
+### V8 flags
+
+    $ ./d8 --help
