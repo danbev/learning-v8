@@ -72,9 +72,7 @@ There are a number of useful functions in `src/objects-printer.cc` which can als
     (lldb) p _v8_internal_Print_StackTrace()
 
 #### Creating command aliases in lldb
-Create a file named .lldbinit (in your project director or home directory)
-
-      command regex -h 'Print a v8 JavaScript object' jlh 's/(.+)/expr -- '_v8_internal_Print_Object(*(v8::internal::Object**)(*%1))/'
+Create a file named [.lldbinit](./.lldbinit) (in your project director or home directory)
 
 ## Introduction
 V8 is bascially consists of the memory management of the heap and the execution stack (very simplified but helps
