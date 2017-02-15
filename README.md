@@ -3,8 +3,8 @@ The sole purpose of this project is to aid me in leaning Google's V8 JavaScript 
 
 
 ## Contents
-1. [Building](#building_v8)
-2. [Contributing a change](#contributing_a_change)
+1. [Building](#building-v8)
+2. [Contributing a change](#contributing-a-change)
 3. [Debugging](#debugging)
 4. [Introduction](#introduction)
 
