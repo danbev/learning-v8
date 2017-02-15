@@ -1,7 +1,14 @@
 ### Learning Google V8
 The sole purpose of this project is to aid me in leaning Google's V8 JavaScript engine.
 
-## Prerequisites
+
+## Contents
+1. [Building](#building_v8)
+2. [Contributing a change](#contributing_a_change)
+3. [Debugging](#debugging)
+4. [Introduction](#introduction)
+
+## Building V8
 You'll need to have checked out the Google V8 sources to you local file system and build it by following 
 the instructions found [here](https://developers.google.com/v8/build).
 
@@ -69,7 +76,7 @@ Create a file named .lldbinit (in your project director or home directory)
 
       command regex -h 'Print a v8 JavaScript object' jlh 's/(.+)/expr -- '_v8_internal_Print_Object(*(v8::internal::Object**)(*%1))/'
 
-## Notes
+## Introduction
 V8 is bascially consists of the memory management of the heap and the execution stack (very simplified but helps
 make my point). Things like the callback queue, the event loop and other things like the WebAPIs (DOM, ajax, 
 setTimeout etc)  are found inside Chrome or in the case of Node the APIs are Node.js APIs.
@@ -679,3 +686,13 @@ The declaration of Function can be found in `include/v8.h` (just noting this as 
 ### V8 flags
 
     $ ./d8 --help
+
+### d8
+
+    (lldb) breakpoint set -f d8.cc -l 2935
+
+    return v8::Shell::Main(argc, argv);
+
+    api.cc:6112
+    i::ReadNatives();
+    natives-external.cc
