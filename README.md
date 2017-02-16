@@ -7,6 +7,9 @@ The sole purpose of this project is to aid me in leaning Google's V8 JavaScript 
 2. [Contributing a change](#contributing-a-change)
 3. [Debugging](#debugging)
 4. [Introduction](#introduction)
+5. [Inline caches](#inline-caches)
+6. [Small Integers](#small-integers)
+7. [Building chromium](#building-chromium)
 
 ## Building V8
 You'll need to have checked out the Google V8 sources to you local file system and build it by following 
@@ -31,7 +34,33 @@ out v8 directory. For example, :
 
     $ export V8_HOME=~/work/google/javascript/v8
 
-## Building
+### GN
+
+    $ tools/dev/v8gen.py --help
+
+    $ ./tools/dev/v8gen.py list
+    ....
+    x64.debug
+    x64.optdebug
+    x64.release
+
+    $ vi out.gn/beve/args.gn
+
+Generate Ninja files:
+
+    $ gn args out.gn/beve
+
+This can be used to add/update build arguments
+    
+List avaiable build arguments:
+
+    $ gn args --list out.gn/beve
+
+Building:
+
+    $ ninja -C out.gn/beve
+
+## Building this projects code
 
     $ make
 
@@ -98,6 +127,38 @@ pushed onto the call stack an executed. This is where the callback queue comes i
 can add functions to the callback queue
 
 
+### Isolate
+An Isolate is an independant copy of the V8 runtime which includes its own heap.
+Two different Isolates can run in parallel and can be seen as entierly different
+sandboxed instances of a V8 runtime.
+
+### International Component for Unicode (ICU)
+International Components for Unicode (ICU) deals with internationalization (i18n).
+ICU provides support locale-sensitve string comparisons, date/time/number/currency formatting
+etc. 
+
+There is an optional API called ECMAScript 402 which V8 suppports and which is enabled by
+default. [i18n-support](https://github.com/v8/v8/wiki/i18n-support) says that even if your application does 
+not use ICU you still need to call InitializeICU :
+
+    V8::InitializeICU();
+
+### Snapshots
+JavaScript specifies a lot of built-in functionality which every V8 context must provide.
+For example, you can run Math.PI and that will work in a JavaScript console/repl. The global object
+and all the built-in functionality must be setup and initialized into the V8 heap. This can be time
+consuming and affect runtime performance if this has to be done every time. The blobs above are prepared
+snapshots that get directly deserialized into the heap to provide an initilized context.
+
+Now this is where the files 'natives_blob.bin' and snapshot_blob.bin' come into play. But what are these bin files?  
+If you take a look in src/js you'll find a number of javascript files. These files referenced in src/v8.gyp and are used with 
+by the target `js2c`. This target calls tools/js2c.py which is a tool for converting
+JavaScript source code into C-Style char arrays. This target will process all the library_files specified in the variables section.
+The output of this out/Debug/obj/gen/libraries.cc. So how is this file actually used?
+The `js2c` target produces the libraries.cc file which is used by other targets, for example by `v8_snapshot` which produces a 
+snapshot_blob.bin file.
+
+    V8::InitializeExternalStartupData(argv[0]);
 
 ### Using d8
 This is the source used for the following examples:
@@ -114,7 +175,7 @@ This is the source used for the following examples:
     print(p.age);
     print("after"); 
 
-#### Show Inline Caches (IC)
+#### Inline Caches
 --trace-ic
 
     $ out/x64.debug/d8 --trace-ic --trace-maps class.js
@@ -513,12 +574,6 @@ In [src/gn](./src/gn) you can find an example project that uses gn. It is very b
 intention is to have something to "play" with while learning how it works.
 
 
-#### Configuration
-
-#### Building the project
-
-
-
 ##### Could not find checkout in any parent issue
 When I first tried to run gn in the src directory I got the following error:
 
@@ -545,42 +600,54 @@ Code is optimized 1 function at a time, without knowledge of what other code is 
 ### V8_shell startup
 What happens when the v8_shell is run?   
 
-    $ lldb -- out/x64.debug/d8 class.js
+    $ lldb -- out/x64.debug/d8 --enable-inspector class.js
     (lldb) breakpoint set --file d8.cc --line 2662
     Breakpoint 1: where = d8`v8::Shell::Main(int, char**) + 96 at d8.cc:2662, address = 0x0000000100015150
 
-First things is all the options are set using `Shell::SetOptions`
-SetOptions will call FlagList::SetFlagsFromCommandLine which in our case it simply `class.js`
+First 8::base::debug::EnableInProcessStackDumping() is called followed by some windows specific code guarded
+by macros. Next is all the options are set using `v8::Shell::SetOptions`
+
+SetOptions will call `v8::V8::SetFlagsFromCommandLine` which is found in src/api.cc:
+
+    i::FlagList::SetFlagsFromCommandLine(argc, argv, remove_flags);
+
+This function can be found in src/flags.cc. The flags themselves are defined in src/flag-definitions.h
+
 Next a new SourceGroup array is create:
     
-     2261 options.isolate_sources = new SourceGroup[options.num_isolates];
+    options.isolate_sources = new SourceGroup[options.num_isolates];
+    SourceGroup* current = options.isolate_sources;
+    current->Begin(argv, 1);
+    for (int i = 1; i < argc; i++) {
+      const char* str = argv[i];
 
-options is of type ShellOptions:
+    (lldb) p str
+    (const char *) $6 = 0x00007fff5fbfed4d "manual.js"
 
-    (lldb) p options
-    (v8::ShellOptions) $5 = {
-      script_executed = false
-      send_idle_notification = false
-      invoke_weak_callbacks = false
-      omit_quit = false
-      stress_opt = false
-      stress_deopt = false
-      stress_runs = 1
-      interactive_shell = false
-      test_shell = false
-      dump_heap_constants = false
-      expected_to_throw = false
-      mock_arraybuffer_allocator = false
-      num_isolates = 1
-      compile_options = kNoCompileOptions
-      isolate_sources = 0x0000000102e00058
-      icu_data_file = 0x0000000000000000 <no value available>
-      natives_blob = 0x0000000000000000 <no value available>
-      snapshot_blob = 0x0000000000000000 <no value available>
-      trace_enabled = false
-      trace_config = 0x0000000000000000 <no value available>
-}
-Next the ICU stuff is initialized (look into this as some point)
+There are then checks performed to see if the args is `--isolate` or `--module`, or `-e` and if not (like in our case)
+
+    } else if (strncmp(str, "-", 1) != 0) {
+      // Not a flag, so it must be a script to execute.
+      options.script_executed = true;
+
+TODO: I'm not exactly sure what SourceGroups are about but just noting this and will revisit later.
+
+This will take us back `int Shell::Main` in src/d8.cc
+
+    ::V8::InitializeICUDefaultLocation(argv[0], options.icu_data_file);
+
+    (lldb) p argv[0]
+    (char *) $8 = 0x00007fff5fbfed48 "./d8"
+
+See [ICU](international-component-for-unicode) a little more details.
+
+Next the default V8 platform is initialized:
+
+    g_platform = i::FLAG_verify_predictable ? new PredictablePlatform() : v8::platform::CreateDefaultPlatform();
+
+v8::platform::CreateDefaultPlatform() will be called in our case.
+
+
 We are then back in Main and have the following lines:
 
     2685 v8::V8::InitializePlatform(g_platform);
@@ -592,15 +659,6 @@ We did not specify any natives_blob or snapshot_blob as an option on the command
 will be used:
 
     v8::V8::InitializeExternalStartupData(argv[0]);
-
-Now this is where the files 'natives_blob.bin' and snapshot_blob.bin' come into play. But what
-are these bin files?  
-JavaScript specifies a lot of built-in functionality which every V8 context must provide.
-For example, you can run Math.PI and that will work in a JavaScript console/repl. The global object
-and all the built-in functionality must be setup and initialized into the V8 heap. This can be time
-consuming and affect runtime performance if this has to be done every time. The blobs above are prepared
-snapshots that get directly deserialized into the heap to provide an initilized context.
-The current directory where d8 exist will be used and the files `natives_blob.bin` and `snapshot_blob.bin` will be used.
 
     result = RunMain(isolate, argc, argv, last_run);
 
