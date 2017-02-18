@@ -56,6 +56,15 @@ List avaiable build arguments:
 
     $ gn args --list out.gn/beve
 
+For a debug build:
+
+    is_debug = true
+    target_cpu = "x64"
+    v8_enable_backtrace = true
+    v8_enable_slow_dchecks = true
+    v8_optimized_debug = false
+    
+
 Building:
 
     $ ninja -C out.gn/beve
@@ -647,7 +656,6 @@ Next the default V8 platform is initialized:
 
 v8::platform::CreateDefaultPlatform() will be called in our case.
 
-
 We are then back in Main and have the following lines:
 
     2685 v8::V8::InitializePlatform(g_platform);
@@ -660,7 +668,53 @@ will be used:
 
     v8::V8::InitializeExternalStartupData(argv[0]);
 
-    result = RunMain(isolate, argc, argv, last_run);
+
+back in src/d8.cc line 2918:
+
+    Isolate* isolate = Isolate::New(create_params);
+
+this call will bring us into api.cc line 8185:
+   
+     i::Isolate* isolate = new i::Isolate(false);
+So, we are invoking the Isolate constructor (in src/isolate.cc).
+
+
+    isolate->set_snapshot_blob(i::Snapshot::DefaultSnapshotBlob());
+
+api.cc:
+
+    isolate->Init(NULL);
+    
+    compilation_cache_ = new CompilationCache(this);
+    context_slot_cache_ = new ContextSlotCache();
+    descriptor_lookup_cache_ = new DescriptorLookupCache();
+    unicode_cache_ = new UnicodeCache();
+    inner_pointer_to_code_cache_ = new InnerPointerToCodeCache(this);
+    global_handles_ = new GlobalHandles(this);
+    eternal_handles_ = new EternalHandles();
+    bootstrapper_ = new Bootstrapper(this);
+    handle_scope_implementer_ = new HandleScopeImplementer(this);
+    load_stub_cache_ = new StubCache(this, Code::LOAD_IC);
+    store_stub_cache_ = new StubCache(this, Code::STORE_IC);
+    materialized_object_store_ = new MaterializedObjectStore(this);
+    regexp_stack_ = new RegExpStack();
+    regexp_stack_->isolate_ = this;
+    date_cache_ = new DateCache();
+    call_descriptor_data_ =
+      new CallInterfaceDescriptorData[CallDescriptors::NUMBER_OF_DESCRIPTORS];
+    access_compiler_data_ = new AccessCompilerData();
+    cpu_profiler_ = new CpuProfiler(this);
+    heap_profiler_ = new HeapProfiler(heap());
+    interpreter_ = new interpreter::Interpreter(this);
+    compiler_dispatcher_ =
+      new CompilerDispatcher(this, V8::GetCurrentPlatform(), FLAG_stack_size);
+
+
+src/builtins/builtins.cc, this is where the builtins are defined.
+TODO: sort out what these macros do.
+
+    
+
 
 SourceGroup::Execute:
 
@@ -687,6 +741,13 @@ SourceGroup::Execute:
      }
 
 Shell::ExecuteString
+
+    result = RunMain(isolate, argc, argv, last_run);
+
+
+### Promises
+
+    (lldb) breakpoint set -f builtins-promise.cc -l 842
 
 
 ### Compiler
