@@ -71,6 +71,8 @@ int main(int argc, char* argv[]) {
     Isolate::Scope isolate_scope(isolate);
     HandleScope handle_scope(isolate);
 
+    Local<ObjectTemplate> global = ObjectTemplate::New(isolate);
+
     Local<FunctionTemplate> function_template = FunctionTemplate::New(isolate, NewPerson);
     function_template->SetClassName(String::NewFromUtf8(isolate, "Person"));
     function_template->InstanceTemplate()->SetInternalFieldCount(1);
@@ -79,14 +81,13 @@ int main(int argc, char* argv[]) {
     Local<ObjectTemplate> person_template = ObjectTemplate::New(isolate, function_template);
     person_template->SetInternalFieldCount(1);
 
-    Local<Context> context = Context::New(isolate, NULL, person_template);
+    global->Set(String::NewFromUtf8(isolate, "Person", NewStringType::kNormal).ToLocalChecked(), function_template);
+    global->Set(String::NewFromUtf8(isolate, "print", NewStringType::kNormal).ToLocalChecked(), FunctionTemplate::New(isolate, Print));
+
+    Local<Context> context = Context::New(isolate, NULL, global);
     Context::Scope context_scope(context);
-    auto ignored = context->Global()->Set(context, String::NewFromUtf8(isolate, "Person", NewStringType::kNormal).ToLocalChecked(), function_template->GetFunction());
-    Local<FunctionTemplate> print_template = FunctionTemplate::New(isolate, Print);
-    ignored = context->Global()->Set(context, String::NewFromUtf8(isolate, "print", NewStringType::kNormal).ToLocalChecked(), print_template->GetFunction());
 
     Local<String> source = ReadFile(isolate, "script.js").ToLocalChecked();
-
     Local<Script> script = Script::Compile(context, source).ToLocalChecked();
     script->Run(context).ToLocalChecked();
   }
