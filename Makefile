@@ -12,8 +12,10 @@ hello-world: natives_blob.bin snapshot_blob.bin hello-world.cc
 	clang++ -O0 -g -I$(v8_include_dir) $(v8_dylibs) -L$(v8_build_dir) hello-world.cc -o $@ -pthread -std=c++0x 
 
 instances: natives_blob.bin snapshot_blob.bin instances.cc
-	@echo "Using v8_home = $(v8_include_dir)"
 	clang++ -O0 -g -I$(v8_include_dir) $(v8_dylibs) -L$(v8_build_dir) instances.cc -o $@ -pthread -std=c++0x 
+
+run-script: natives_blob.bin snapshot_blob.bin run-script.cc
+	clang++ -O0 -g -I$(v8_include_dir) $(v8_dylibs) -L$(v8_build_dir) run-script.cc -o $@ -pthread -std=c++0x 
 
 natives_blob.bin:
 	@cp $(v8_build_dir)/$@ .
@@ -44,6 +46,7 @@ list-gtests:
 clean: 
 	rm -f hello-world
 	rm -f instances
+	rm -f run-script
 	rm -f natives_blob.bin
 	rm -f snapshot_blob.bin
 	rm -rf hello-world.dSYM

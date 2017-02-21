@@ -34,6 +34,19 @@ out v8 directory. For example, :
 
     $ export V8_HOME=~/work/google/javascript/v8
 
+## Code in this repo
+
+#### hello-world
+[hello-world](./hello-world.cc) is heavily commented and show the usage of a static int being exposed and
+accessed from JavaScript.
+
+#### instances
+[instances](./instances.cc) shows the usage of creating new instances of a C++ class from JavaScript.
+
+#### run-script
+[run-script](./run-script.cc) is basically the same as instance but reads an external file, [script.js](./script.js)
+and run the script.
+
 ### GN
 
     $ tools/dev/v8gen.py --help
