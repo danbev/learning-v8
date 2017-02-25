@@ -10,6 +10,7 @@ The sole purpose of this project is to aid me in leaning Google's V8 JavaScript 
 5. [Inline caches](#inline-caches)
 6. [Small Integers](#small-integers)
 7. [Building chromium](#building-chromium)
+8. [Compiler pipeline](#compiler-pipeline)
 
 ## Building V8
 You'll need to have checked out the Google V8 sources to you local file system and build it by following 
@@ -681,7 +682,6 @@ will be used:
 
     v8::V8::InitializeExternalStartupData(argv[0]);
 
-
 back in src/d8.cc line 2918:
 
     Isolate* isolate = Isolate::New(create_params);
@@ -690,7 +690,6 @@ this call will bring us into api.cc line 8185:
    
      i::Isolate* isolate = new i::Isolate(false);
 So, we are invoking the Isolate constructor (in src/isolate.cc).
-
 
     isolate->set_snapshot_blob(i::Snapshot::DefaultSnapshotBlob());
 
@@ -726,61 +725,213 @@ api.cc:
 src/builtins/builtins.cc, this is where the builtins are defined.
 TODO: sort out what these macros do.
 
-    
-
-
-SourceGroup::Execute:
-
-    {
-       Context::Scope cscope(context);
-       PerIsolateData::RealmScope realm_scope(PerIsolateData::Get(isolate));
-       options.isolate_sources[0].Execute(isolate);
-    }
-
-     // Use all other arguments as names of files to load and run.
-     HandleScope handle_scope(isolate);
-     Local<String> file_name =
-         String::NewFromUtf8(isolate, arg, NewStringType::kNormal)
-             .ToLocalChecked();
-     Local<String> source = ReadFile(isolate, arg);
-     if (source.IsEmpty()) {
-       printf("Error reading '%s'\n", arg);
-       Shell::Exit(1);
-     }
-     Shell::options.script_executed = true;
-     if (!Shell::ExecuteString(isolate, source, file_name, false, true)) {
-       exception_was_thrown = true;
-       break;
-     }
-
-Shell::ExecuteString
+In src/v8.cc we have a couple of checks for if the optinos passed are for a stress_run but since we 
+did not pass in any such flags this code path will be followed which will call RunMain:
 
     result = RunMain(isolate, argc, argv, last_run);
 
+this will end up calling:
+
+    options.isolate_sources[0].Execute(isolate);
+
+Which will call SourceGroup::Execute(Isolate* isolate)
+
+    // Use all other arguments as names of files to load and run.
+    HandleScope handle_scope(isolate);
+    Local<String> file_name = String::NewFromUtf8(isolate, arg, NewStringType::kNormal).ToLocalChecked();
+    Local<String> source = ReadFile(isolate, arg);
+    if (source.IsEmpty()) {
+      printf("Error reading '%s'\n", arg);
+      Shell::Exit(1);
+    }
+    Shell::options.script_executed = true;
+    if (!Shell::ExecuteString(isolate, source, file_name, false, true)) {
+      exception_was_thrown = true;
+      break;
+    }
+
+    ScriptOrigin origin(name);
+    if (compile_options == ScriptCompiler::kNoCompileOptions) {
+      ScriptCompiler::Source script_source(source, origin);
+      return ScriptCompiler::Compile(context, &script_source, compile_options);
+    }
+
+Which will delegate to ScriptCompiler(Local<Context>, Source* source, CompileOptions options):
+
+    auto maybe = CompileUnboundInternal(isolate, source, options);
+
+CompileUnboundInternal
+
+    result = i::Compiler::GetSharedFunctionInfoForScript(
+        str, name_obj, line_offset, column_offset, source->resource_options,
+        source_map_url, isolate->native_context(), NULL, &script_data, options,
+        i::NOT_NATIVES_CODE);
+
+src/compiler.cc
+
+    // Compile the function and add it to the cache.
+    ParseInfo parse_info(script);
+    Zone compile_zone(isolate->allocator(), ZONE_NAME);
+    CompilationInfo info(&compile_zone, &parse_info, Handle<JSFunction>::null());
+
+
+Back in src/compiler.cc-info.cc:
+
+    result = CompileToplevel(&info);
+
+    (lldb) job *result
+    0x17df0df309f1: [SharedFunctionInfo]
+     - name = 0x1a7f12d82471 <String[0]: >
+     - formal_parameter_count = 0
+     - expected_nof_properties = 10
+     - ast_node_count = 23
+     - instance class name = #Object
+
+     - code = 0x1d8484d3661 <Code: BUILTIN>
+     - source code = function bajja(a, b, c) {
+      var d = c - 100;
+      return a + d * b;
+    }
+
+    var result = bajja(2, 2, 150);
+    print(result);
+
+     - anonymous expression
+     - function token position = -1
+     - start position = 0
+     - end position = 114
+     - no debug info
+     - length = 0
+     - optimized_code_map = 0x1a7f12d82241 <FixedArray[0]>
+     - feedback_metadata = 0x17df0df30d09: [FeedbackMetadata]
+     - length: 3
+     - slot_count: 11
+     Slot #0 LOAD_GLOBAL_NOT_INSIDE_TYPEOF_IC
+     Slot #2 kCreateClosure
+     Slot #3 LOAD_GLOBAL_NOT_INSIDE_TYPEOF_IC
+     Slot #5 CALL_IC
+     Slot #7 CALL_IC
+     Slot #9 LOAD_GLOBAL_NOT_INSIDE_TYPEOF_IC
+
+     - bytecode_array = 0x17df0df30c61
+
+
+Back in d8.cc:
+
+    maybe_result = script->Run(realm);
+
+
+src/api.cc
+   
+    auto fun = i::Handle<i::JSFunction>::cast(Utils::OpenHandle(this));
+
+    (lldb) job *fun
+    0x17df0df30e01: [Function]
+     - map = 0x19cfe0003859 [FastProperties]
+     - prototype = 0x17df0df043b1
+     - elements = 0x1a7f12d82241 <FixedArray[0]> [FAST_HOLEY_ELEMENTS]
+     - initial_map =
+     - shared_info = 0x17df0df309f1 <SharedFunctionInfo>
+     - name = 0x1a7f12d82471 <String[0]: >
+     - formal_parameter_count = 0
+     - context = 0x17df0df03bf9 <FixedArray[245]>
+     - feedback vector cell = 0x17df0df30ed1 Cell for 0x17df0df30e49 <FixedArray[13]>
+     - code = 0x1d8484d3661 <Code: BUILTIN>
+     - properties = 0x1a7f12d82241 <FixedArray[0]> {
+        #length: 0x2c35a5718089 <AccessorInfo> (const accessor descriptor)
+        #name: 0x2c35a57180f9 <AccessorInfo> (const accessor descriptor)
+        #arguments: 0x2c35a5718169 <AccessorInfo> (const accessor descriptor)
+        #caller: 0x2c35a57181d9 <AccessorInfo> (const accessor descriptor)
+        #prototype: 0x2c35a5718249 <AccessorInfo> (const accessor descriptor)
+
+      }
+
+    i::Handle<i::Object> receiver = isolate->global_proxy();
+    Local<Value> result;
+    has_pending_exception = !ToLocal<Value>(i::Execution::Call(isolate, fun, receiver, 0, nullptr), &result);
+
+src/execution.cc
 
 ### Promises
 
     (lldb) breakpoint set -f builtins-promise.cc -l 842
 
 
-### Compiler
-So V8 compiles all JavaScript to native code and has two compilers. The first one is quick and produces non optimized code and is called the full compiler (full-codegen) in the source tree.
-The second is a slower compiler but can produce optimized native code and there are two version of this, the older one named Crankshaft and the new Turbofan.
+### Compiler pipeline
+When a script is compiled all of the top level code is parsed. These are function declarartions (but not the function
+bodies). 
+
+function f1() {       <- top level code
+  console.log('f1');  <- non top level
+}
+
+function f2() {       <- top level code
+  f1();               <- non top level
+  console.logg('f2'); <- non top level
+}
+
+f2();                 <- top level code
+var i = 10;           <- top level code
+
+The non top level code must be pre-parsed to check for syntax errors.
+The top level code is parsed and compiles by the full-codegen compiler. This compiler does not perform any optimizations and
+it's only task is to generate machine code as quickly as possible.
+
+Source ------> Parser  --------> Full-codegen ---------> Unoptimized Machine Code
+
+So the whole script is parsed even though we only generated code for the top-level code. The pre-parse (the syntax checking)
+was not stored in any way. The functions are lazy stubs that when/if the function gets called the function get compiled. This
+means that the function has to be parsed (again, the first time was the pre-parse remember).
+If a function is determined to be hot it will be optimized by one of the two optimizing compilers crankshaft for older parts oof JavaScript or Turbofan for Web Assembly (WASM) and some of the newer es6 features. 
 
 The first time V8 sees a function it will parse it into an AST but not do any further processing of that tree
 until that function is used. Processing will be running the full-codegen compiler.
 
-#### full-codegen
-This compiler walks the AST of a function and emits calls to the macroassembler directly.
-All local variables are stored either on the stack or on the heap and not in CPU registers.
+                     +-----> Full-codegen -----> Unoptimized code
+                    /                               \/ /\       \
+Parser  ------> AST -------> Cranshaft    -----> Optimized code  |
+                    \                                           /
+                     +-----> Turbofan     -----> Optimized code
 
 Inline Cachine (IC) is done here which also help to gather type information.
 V8 also has a profiler thread which monitors which functions are hot and should be optimized. This profiling
 also allows V8 to find out information about types using IC. This type information can then be fed to Crankshaft/Turbofan.
 The type information is stored as a 8 bit value. 
 
-Each AST node is associated with 
+When a function is optimized the unoptimized code cannot be thrown away as it might be needed since JavaScript is highly
+dynamic the optimzed function migth change and the in that case we fallback to the unoptimzed code. This takes up
+alot of memory which may be important for low end devices. Also the time spent in parsing (twice) takes time.
 
+The idea with Ignition is to be an bytecode interpreter and to reduce memory consumption, the bytecode is very consice
+compared to native code which can vary depending on the target platform.
+The whole source can be parsed and compiled, compared to the current pipeline the has the pre-parse and parse stages mentioned above. So even unused functions will get compiled.
+The bytecode becomes the source of truth instead of as before the AST.
+
+Source ------> Parser  --------> Ignition-codegen ---------> Bytecode ---------> Turbofan ----> Optimized Code ---+
+                                                              /\                                                  |
+                                                               +--------------------------------------------------+
+
+    function bajja(a, b, c) {
+      var d = c - 100;
+      return a + d * b;
+    }
+
+    var result = bajja(2, 2, 150);
+    print(result); 
+
+    $ ./d8 test.js --ignition  --print_bytecode
+
+    [generating bytecode for function: bajja]
+    Parameter count 4
+    Frame size 8
+     14 E> 0x2eef8d9b103e @    0 : 7f                StackCheck
+     38 S> 0x2eef8d9b103f @    1 : 03 64             LdaSmi [100]   // load 100
+     38 E> 0x2eef8d9b1041 @    3 : 2b 02 02          Sub a2, [2]    // a2 is the third argument. a2 is an argument register
+           0x2eef8d9b1044 @    6 : 1f fa             Star r0        // r0 is a register for local variables. We only have one which is d
+     47 S> 0x2eef8d9b1046 @    8 : 1e 03             Ldar a1        // LoaD accumulator from Register argument from a1 which is b
+     60 E> 0x2eef8d9b1048 @   10 : 2c fa 03          Mul r0, [3]    // multiply that is our local variable in r0
+     56 E> 0x2eef8d9b104b @   13 : 2a 04 04          Add a0, [4]    // add that to our argument register 0 which is a 
+     65 S> 0x2eef8d9b104e @   16 : 83                Return         // return the value in the accumulator?
 
 
 ### Performance
