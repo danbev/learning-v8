@@ -7,8 +7,8 @@ command regex -h 'Print content of a v8::Local handle' jlh 's/(.+)/expr -- '_v8_
 # Print Code objects containing given PC.
 command regex -h 'Print a v8 Code object from an internal code address' jco 's/(.+)/expr -- '_v8_internal_Print_Code((void*)(*%1))/'
 
-# Print TypeFeedbackVector
-command regex -h 'Print a v8 TypeFeedbackVector object' jfv 's/(.+)/expr -- '_v8_internal_Print_TypeFeedbackVector((void*)(%1))/'
+# Print FeedbackVector
+command regex -h 'Print a v8 FeedbackVector object' jfv 's/(.+)/expr -- '_v8_internal_Print_FeedbackVector((void*)(%1))/'
 
 # Print TypeFeedbackMetadata
 command regex -h 'Print a v8 TypeFeedbackMetadata object' jfm 's/(.+)/expr -- '_v8_internal_Print_TypeFeedbackMetadata((void*)(%1))/'
@@ -24,3 +24,5 @@ command regex -h 'Print a v8 TransitionArray object' jta 's/(.+)/expr -- '_v8_in
 
 # Print JavaScript stack trace.
 command alias -h 'Print the current JavaScript stack trace' -- jst expr _v8_internal_Print_StackTrace()
+
+command script import ~/lldb_commands.py
