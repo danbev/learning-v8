@@ -11,6 +11,8 @@ def bta(debugger, command, result, dict):
   frame = thread.GetSelectedFrame()
   for frame in thread:
     functionSignature = frame.GetDisplayFunctionName()
+    if functionSignature is None:
+      continue
     functionName = func_name_re.match(functionSignature)
     line = frame.GetLineEntry().GetLine()
     sourceFile = frame.GetLineEntry().GetFileSpec().GetFilename()
@@ -22,7 +24,7 @@ def bta(debugger, command, result, dict):
     print("[%-2s] %-60s %-40s" % (frame.GetFrameID(), 
                                   functionName.group(1),
                                   sourceFile))
-    match = assert_re.match(functionSignature)
+    match = assert_re.match(str(functionSignature))
     if match:
       if match.group(3) == "false":
         prefix = "Disallow"
@@ -35,4 +37,4 @@ def bta(debugger, command, result, dict):
 
 
 def __lldb_init_module (debugger, dict):
-  debugger.HandleCommand('command script add -f lldb-commands.bta bta')
+  debugger.HandleCommand('command script add -f lldb_commands.bta bta')
