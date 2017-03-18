@@ -65,10 +65,11 @@ Generate Ninja files:
     $ gn args out.gn/beve
 
 This can be used to add/update build arguments
-    
+
 List avaiable build arguments:
 
     $ gn args --list out.gn/beve
+
 
 For a debug build:
 
@@ -77,11 +78,21 @@ For a debug build:
     v8_enable_backtrace = true
     v8_enable_slow_dchecks = true
     v8_optimized_debug = false
-    
+
+List all available targets:
+
+    $ ninja -C out.gn/beve/ -t targets all
 
 Building:
 
     $ ninja -C out.gn/beve
+
+Running quickchecks:
+
+    $ ./tools/run-tests.py --outdir=out.gn/beve --quickchecks
+
+You can use `./tools-run-tests.py -h` to list all the opitions that can be passed
+to run-tests.
 
 ## Building this projects code
 
