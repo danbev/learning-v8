@@ -435,7 +435,7 @@ You'll have to run this once before building:
 
 #### Update the code base
 
-    $ git fetch origin/master
+    $ git fetch origin master
     $ git co master
     $ git merge origin/master
 
