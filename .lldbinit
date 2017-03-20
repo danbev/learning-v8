@@ -22,7 +22,4 @@ command regex -h 'Print a v8 LayoutDescriptor object' jld 's/(.+)/expr -- '_v8_i
 # Print TransitionArray.
 command regex -h 'Print a v8 TransitionArray object' jta 's/(.+)/expr -- '_v8_internal_Print_TransitionArray((void*)(%1))/'
 
-# Print JavaScript stack trace.
-command alias -h 'Print the current JavaScript stack trace' -- jst expr _v8_internal_Print_StackTrace()
-
 command script import ~/lldb_commands.py

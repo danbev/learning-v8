@@ -1,6 +1,30 @@
 import lldb
 import re
 
+def jst(debugger, command, result, dict):
+  """Print the current JavaScript stack trace"""
+  target = debugger.GetSelectedTarget()
+  process = target.GetProcess()
+  thread = process.GetSelectedThread()
+  frame = thread.GetSelectedFrame()
+  frame.EvaluateExpression("_v8_internal_Print_StackTrace();")
+  print("")
+
+def jss(debugger, command, result, dict):
+  """Skip the jitted stack on x64 to where we entered JS last"""
+  target = debugger.GetSelectedTarget()
+  process = target.GetProcess()
+  thread = process.GetSelectedThread()
+  frame = thread.GetSelectedFrame()
+  js_entry_sp = frame.EvaluateExpression("v8::internal::Isolate::Current()->thread_local_top()->js_entry_sp_;").GetValue()
+  sizeof_void = frame.EvaluateExpression("sizeof(void*)").GetValue()
+  rbp = frame.FindRegister("rbp")
+  rsp = frame.FindRegister("rsp")
+  pc = frame.FindRegister("pc")
+  rbp = js_entry_sp
+  rsp = js_entry_sp + 2 *sizeof_void
+  pc.value = js_entry_sp + sizeof_void
+
 def bta(debugger, command, result, dict):
   """Print stack trace with assertion scopes"""
   func_name_re = re.compile("([^(<]+)(?:\(.+\))?")
@@ -34,7 +58,7 @@ def bta(debugger, command, result, dict):
         color = "\033[92m"
       print("%s -> %s %s (%s)\033[0m" % (color, prefix, match.group(2), match.group(1)))
     
-
-
 def __lldb_init_module (debugger, dict):
+  debugger.HandleCommand('command script add -f lldb_commands.jst jst')
+  debugger.HandleCommand('command script add -f lldb_commands.jss jss')
   debugger.HandleCommand('command script add -f lldb_commands.bta bta')
