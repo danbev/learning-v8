@@ -64,20 +64,21 @@ Generate Ninja files:
 
     $ gn args out.gn/beve
 
-This can be used to add/update build arguments
-
-List avaiable build arguments:
-
-    $ gn args --list out.gn/beve
-
-
-For a debug build:
+This will open an editor where you can set configuration options. I've been using the following:
 
     is_debug = true
     target_cpu = "x64"
     v8_enable_backtrace = true
     v8_enable_slow_dchecks = true
     v8_optimized_debug = false
+
+Note that for lldb command aliases to work `is_debug` must be set to true.
+
+List avaiable build arguments:
+
+    $ gn args --list out.gn/beve
+
+
 
 List all available targets:
 
@@ -188,6 +189,7 @@ Now this is where the files 'natives_blob.bin' and snapshot_blob.bin' come into 
 If you take a look in src/js you'll find a number of javascript files. These files referenced in src/v8.gyp and are used with 
 by the target `js2c`. This target calls tools/js2c.py which is a tool for converting
 JavaScript source code into C-Style char arrays. This target will process all the library_files specified in the variables section.
+For a GN build you'll find the configuration in BUILD.GN.
 The output of this out/Debug/obj/gen/libraries.cc. So how is this file actually used?
 The `js2c` target produces the libraries.cc file which is used by other targets, for example by `v8_snapshot` which produces a 
 snapshot_blob.bin file.
