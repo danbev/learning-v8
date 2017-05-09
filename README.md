@@ -990,3 +990,15 @@ The declaration of Function can be found in `include/v8.h` (just noting this as 
     api.cc:6112
     i::ReadNatives();
     natives-external.cc
+
+### v8::String::NewFromOneByte
+So I was a little confused when I first read this function name and thought it
+had something to do with the length of the string. But the byte is the type
+of the chars that make up the string.
+For example, a one byte char would be reinterpreted as uint8_t:
+
+    const char* data
+
+    reinterpret_cast<const uint8_t*>(data)
+
+
