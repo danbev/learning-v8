@@ -90,7 +90,7 @@ Building:
 
 Running quickchecks:
 
-    $ ./tools/run-tests.py --outdir=out.gn/beve --quickchecks
+    $ ./tools/run-tests.py --outdir=out.gn/beve --quickcheck
 
 You can use `./tools-run-tests.py -h` to list all the opitions that can be passed
 to run-tests.
@@ -1002,3 +1002,5 @@ For example, a one byte char would be reinterpreted as uint8_t:
     reinterpret_cast<const uint8_t*>(data)
 
 
+#### Tasks
+* gdbinit has been updated. Check if there is something that should be ported to lldbinit
