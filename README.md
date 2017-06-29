@@ -1004,3 +1004,123 @@ For example, a one byte char would be reinterpreted as uint8_t:
 
 #### Tasks
 * gdbinit has been updated. Check if there is something that should be ported to lldbinit
+
+
+### Invocation walkthrough 
+This section will go through calling a Script to understand what happens in V8.
+
+I'll be using [run-scripts.cc](./run-scripts.cc) as the example for this.
+
+    $ lldb -- ./run-scripts
+    (lldb) br s -n main
+
+I'll step through until the following call:
+
+    script->Run(context).ToLocalChecked();
+
+So, Script::Run is defined in api.cc
+First things that happens in this function is a macro:
+
+    PREPARE_FOR_EXECUTION_WITH_CONTEXT_IN_RUNTIME_CALL_STATS_SCOPE(
+         "v8", 
+         "V8.Execute", 
+         context, 
+         Script, 
+         Run, 
+         MaybeLocal<Value>(),
+         InternalEscapableScope, 
+    true);
+    TRACE_EVENT_CALL_STATS_SCOPED(isolate, category, name);
+    PREPARE_FOR_EXECUTION_GENERIC(isolate, context, class_name, function_name, \
+        bailout_value, HandleScopeClass, do_callback);
+
+So, what does the preprocessor replace this with then:
+
+    auto isolate = context.IsEmpty() ? i::Isolate::Current()                               : reinterpret_cast<i::Isolate*>(context->GetIsolate());
+
+I'm skipping TRACE_EVENT_CALL_STATS_SCOPED for now.
+`PREPARE_FOR_EXECUTION_GENERIC` will be replaced with:
+
+    if (IsExecutionTerminatingCheck(isolate)) {                        \
+      return bailout_value;                                            \
+    }                                                                  \
+    HandleScopeClass handle_scope(isolate);                            \
+    CallDepthScope<do_callback> call_depth_scope(isolate, context);    \
+    LOG_API(isolate, class_name, function_name);                       \
+    ENTER_V8_DO_NOT_USE(isolate);                                      \
+    bool has_pending_exception = false
+
+ 
+    auto fun = i::Handle<i::JSFunction>::cast(Utils::OpenHandle(this));
+
+    (lldb) job *fun
+    0x33826912c021: [Function]
+     - map = 0x1d0656c03599 [FastProperties]
+     - prototype = 0x338269102e69
+     - elements = 0x35190d902241 <FixedArray[0]> [FAST_HOLEY_ELEMENTS]
+     - initial_map =
+     - shared_info = 0x33826912bc11 <SharedFunctionInfo>
+     - name = 0x35190d902471 <String[0]: >
+     - formal_parameter_count = 0
+     - context = 0x338269102611 <FixedArray[265]>
+     - feedback vector cell = 0x33826912c139 <Cell value= 0x33826912c069 <FixedArray[24]>>
+     - code = 0x1319e25fcf21 <Code BUILTIN>
+     - properties = 0x35190d902241 <FixedArray[0]> {
+        #length: 0x2e9d97ce68b1 <AccessorInfo> (const accessor descriptor)
+        #name: 0x2e9d97ce6921 <AccessorInfo> (const accessor descriptor)
+        #arguments: 0x2e9d97ce6991 <AccessorInfo> (const accessor descriptor)
+        #caller: 0x2e9d97ce6a01 <AccessorInfo> (const accessor descriptor)
+        #prototype: 0x2e9d97ce6a71 <AccessorInfo> (const accessor descriptor)
+     }
+
+The code for i::JSFunction is generated in src/api.h. Lets take a closer look at this.
+
+    #define DECLARE_OPEN_HANDLE(From, To) \
+      static inline v8::internal::Handle<v8::internal::To> \
+      OpenHandle(const From* that, bool allow_empty_handle = false);
+
+    OPEN_HANDLE_LIST(DECLARE_OPEN_HANDLE)
+
+OPEN_HANDLE_LIST looks like this:
+
+    #define OPEN_HANDLE_LIST(V)                    \
+    ....
+    V(Script, JSFunction)                        \ 
+
+So lets expand this for JSFunction and it should become:
+
+      static inline v8::internal::Handle<v8::internal::JSFunction> \
+        OpenHandle(const Script* that, bool allow_empty_handle = false);
+
+So there will be an function named OpenHandle that will take a const pointer to Script.
+
+A little further down in src/api.h there is another macro which looks like this:
+
+    OPEN_HANDLE_LIST(MAKE_OPEN_HANDLE)
+
+MAKE_OPEN_HANDLE:
+
+    #define MAKE_OPEN_HANDLE(From, To)
+      v8::internal::Handle<v8::internal::To> Utils::OpenHandle( 
+      const v8::From* that, bool allow_empty_handle) {         
+      DCHECK(allow_empty_handle || that != NULL);             
+      DCHECK(that == NULL ||                                 
+           (*reinterpret_cast<v8::internal::Object* const*>(that))->Is##To());
+      return v8::internal::Handle<v8::internal::To>(                         
+        reinterpret_cast<v8::internal::To**>(const_cast<v8::From*>(that))); 
+  }
+
+And remember that JSFunction is included in the OPEN_HANDLE_LIST so there will
+be the following in the source after the preprocessor has processed this header:
+
+      v8::internal::Handle<v8::internal::JSFunction> Utils::OpenHandle( 
+        const v8::Script* that, bool allow_empty_handle) {         
+          DCHECK(allow_empty_handle || that != NULL);             
+          DCHECK(that == NULL ||                                 
+           (*reinterpret_cast<v8::internal::Object* const*>(that))->IsJSFunction());
+          return v8::internal::Handle<v8::internal::JSFunction>(                               reinterpret_cast<v8::internal::JSFunction**>(const_cast<v8::Script*>(that))); 
+
+So where is JSFunction declared? 
+It is defined in objects.h
+
+
