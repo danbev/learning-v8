@@ -1124,3 +1124,87 @@ So where is JSFunction declared?
 It is defined in objects.h
 
 
+## String types
+There are a number of different String types in V8 which are optimized for various situations.
+If we look in src/objects.h we can see the object hierarchy:
+    Object
+      SMI
+      HeapObject    // superclass for every object instans allocated on the heap.
+        ...
+        Name
+          String
+            SeqString
+              SeqOneByteString
+              SeqTwoByteString
+            SlicedString
+            ConsString
+            ThinString
+            ExternalString
+              ExternalOneByteString
+              ExternalTwoByteString
+            InternalizedString
+              SeqInternalizedString
+                SeqOneByteInternalizedString
+                SeqTwoByteInternalizedString
+              ConsInternalizedString
+              ExternalInternalizedString
+                ExternalOneByteInternalizedString
+                ExternalTwoByteInternalizedString
+
+Do not that v8::String is declared in include/v8.h
+
+`Name` as can be seen extends HeapObject and anything that can be used as a property name should extend Name.
+Looking at the declaration in include/v8.h we find the following:
+
+    int GetIdentityHash();
+    static Name* Cast(Value* obj)
+
+#### String
+A String extends Name and has a length and content. The content can be made up of 1 or 2 byte characters.
+Looking at the declaration in include/v8.h we find the following:
+
+    enum Encoding {
+      UNKNOWN_ENCODING = 0x1,
+      TWO_BYTE_ENCODING = 0x0,
+      ONE_BYTE_ENCODING = 0x8
+    }; 
+
+    int Length() const;
+    int Uft8Length const;
+    bool IsOneByte() const;
+
+Example usages can be found in [tests/string_test.cc](./tests/string_test.cc).
+Looking at the functions I've get to see one that returns the actual bytes 
+from the String. You can get at the in utf8 format using:
+
+    String::Utf8Value print_value(joined);
+    std::cout << *print_value << '\n';
+
+So that is the only string class in include/v8.h, but there are a lot more implementations that we've seen above. There are used for various cases, for example for indexing, concatenation, and slicing).
+
+#### SeqString
+Represents a sequence of charaters which (the characters) are either one or two bytes in length
+
+#### ConsString
+These are string that are built using:
+
+    const str = "one" + "two";
+
+This would be represented as:
+
+         +--------------+
+         |              | 
+   [str|one|two]     [one|...]   [two|...]
+             |                       |
+             +-----------------------+
+
+So we can see that one and two in str are pointer so existing strings. 
+
+
+#### ExternalString
+These Strings located on the native heap. The ExternalString structure has a pointer to this external location and the usual length field for all Strings.
+
+
+Looking at `String` I was not able to find any construtor for it, nor the other subtypes.
+
+Why do I need an Isolate to create a String?

@@ -44,6 +44,9 @@ tests/maybe_test: tests/maybe_test.cc
 tests/smi_test: tests/smi_test.cc
 	$(COMPILE_TEST) tests/smi_test
 
+tests/string_test: tests/string_test.cc
+	$(COMPILE_TEST) tests/string_test
+
 list-gtests:
 	./tests/smi_test --gtest_list_tests
 
@@ -61,3 +64,4 @@ clean:
 	rm -rf tests/persistent-object_test
 	rm -rf tests/maybe_test
 	rm -rf tests/smi_test
+	rm -rf tests/string_test

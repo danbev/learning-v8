@@ -3,6 +3,7 @@
 #include "persistent-object_test.cc"
 #include "maybe_test.cc"
 #include "smi_test.cc"
+#include "string_test.cc"
 
 int main(int argc, char* argv[]) {
   ::testing::InitGoogleTest(&argc, argv);
