@@ -1127,7 +1127,8 @@ It is defined in objects.h
 ## String types
 There are a number of different String types in V8 which are optimized for various situations.
 If we look in src/objects.h we can see the object hierarchy:
-    Object
+```
+    Object
       SMI
       HeapObject    // superclass for every object instans allocated on the heap.
         ...
@@ -1149,7 +1150,8 @@ If we look in src/objects.h we can see the object hierarchy:
               ConsInternalizedString
               ExternalInternalizedString
                 ExternalOneByteInternalizedString
-                ExternalTwoByteInternalizedString
+                ExternalTwoByteInternalizedString
+```
 
 Do not that v8::String is declared in include/v8.h
 
