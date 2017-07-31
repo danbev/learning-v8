@@ -58,11 +58,11 @@ and run the script.
     x64.optdebug
     x64.release
 
-    $ vi out.gn/beve/args.gn
+    $ vi out.gn/learning/args.gn
 
 Generate Ninja files:
 
-    $ gn args out.gn/beve
+    $ gn args out.gn/learning
 
 This will open an editor where you can set configuration options. I've been using the following:
 
@@ -76,21 +76,21 @@ Note that for lldb command aliases to work `is_debug` must be set to true.
 
 List avaiable build arguments:
 
-    $ gn args --list out.gn/beve
+    $ gn args --list out.gn/learning
 
 
 
 List all available targets:
 
-    $ ninja -C out.gn/beve/ -t targets all
+    $ ninja -C out.gn/learning/ -t targets all
 
 Building:
 
-    $ ninja -C out.gn/beve
+    $ ninja -C out.gn/learning
 
 Running quickchecks:
 
-    $ ./tools/run-tests.py --outdir=out.gn/beve --quickcheck
+    $ ./tools/run-tests.py --outdir=out.gn/learning --quickcheck
 
 You can use `./tools-run-tests.py -h` to list all the opitions that can be passed
 to run-tests.
@@ -1208,5 +1208,3 @@ These Strings located on the native heap. The ExternalString structure has a poi
 
 
 Looking at `String` I was not able to find any construtor for it, nor the other subtypes.
-
-Why do I need an Isolate to create a String?
