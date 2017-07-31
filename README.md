@@ -141,7 +141,32 @@ Create a file named [.lldbinit](./.lldbinit) (in your project director or home d
 ## Introduction
 V8 is bascially consists of the memory management of the heap and the execution stack (very simplified but helps
 make my point). Things like the callback queue, the event loop and other things like the WebAPIs (DOM, ajax, 
-setTimeout etc)  are found inside Chrome or in the case of Node the APIs are Node.js APIs.
+setTimeout etc) are found inside Chrome or in the case of Node the APIs are Node.js APIs:
+
+    +------------------------------------------------------------------------------------------+
+    | Google Chrome                                                                            |
+    |                                                                                          |
+    | +----------------------------------------+          +------------------------------+     |
+    | | Google V8                              |          |            WebAPIs           |     |
+    | | +-------------+ +---------------+      |          |                              |     |
+    | | |    Heap     | |     Stack     |      |          |                              |     |
+    | | |             | |               |      |          |                              |     |
+    | | |             | |               |      |          |                              |     |
+    | | |             | |               |      |          |                              |     |
+    | | |             | |               |      |          |                              |     |
+    | | |             | |               |      |          |                              |     |
+    | | +-------------+ +---------------+      |          |                              |     |
+    | |                                 |      |          |                              |     |
+    | +----------------------------------------+          +------------------------------+     |
+    |                                                                                          |
+    |                                                                                          |
+    | +---------------------+     +---------------------------------------+                    |
+    | |     Event loop      |     |          Callback queue               |                    |
+    | |                     |     |                                       |                    |
+    | +---------------------+     +---------------------------------------+                    |
+    |                                                                                          |
+    |                                                                                          |
+    +------------------------------------------------------------------------------------------+
 
 The execution stack is a stack of frame pointers. For each function called that function will be pushed onto 
 the stack. When a function that functions returns it will be removed. If that function calls other functions
