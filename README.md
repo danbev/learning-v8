@@ -203,7 +203,7 @@ and all the built-in functionality must be setup and initialized into the V8 hea
 consuming and affect runtime performance if this has to be done every time. The blobs above are prepared
 snapshots that get directly deserialized into the heap to provide an initilized context.
 
-Now this is where the files 'natives_blob.bin' and snapshot_blob.bin' come into play. But what are these bin files?  
+Now this is where the files `natives_blob.bin` and `snapshot_blob.bin` come into play. But what are these bin files?  
 If you take a look in src/js you'll find a number of javascript files. These files referenced in src/v8.gyp and are used
 by the target `js2c`. This target calls tools/js2c.py which is a tool for converting
 JavaScript source code into C-Style char arrays. This target will process all the library_files specified in the variables section.
