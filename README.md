@@ -204,15 +204,69 @@ consuming and affect runtime performance if this has to be done every time. The 
 snapshots that get directly deserialized into the heap to provide an initilized context.
 
 Now this is where the files 'natives_blob.bin' and snapshot_blob.bin' come into play. But what are these bin files?  
-If you take a look in src/js you'll find a number of javascript files. These files referenced in src/v8.gyp and are used with 
+If you take a look in src/js you'll find a number of javascript files. These files referenced in src/v8.gyp and are used
 by the target `js2c`. This target calls tools/js2c.py which is a tool for converting
 JavaScript source code into C-Style char arrays. This target will process all the library_files specified in the variables section.
 For a GN build you'll find the configuration in BUILD.GN.
+
 The output of this out/Debug/obj/gen/libraries.cc. So how is this file actually used?
 The `js2c` target produces the libraries.cc file which is used by other targets, for example by `v8_snapshot` which produces a 
 snapshot_blob.bin file.
 
+To see where these bin files are used lets step through and see:
+
+    $ . ./setenv.sh
+
+The above is only required once per shell. TODO: fix this using rpath or something.
+
+    $ lldb hello_world
+    (lldb) br set -n main
+    (lldb) r
+
+Step through to the following line:
+
     V8::InitializeExternalStartupData(argv[0]);
+
+This call will land us in src/api.cc:
+
+    void v8::V8::InitializeExternalStartupData(const char* directory_path) {
+      i::InitializeExternalStartupData(directory_path);
+    }
+
+The implementation of `InitializeExternalStartupData` can be found in src/startup-data-util.cc:
+
+    void InitializeExternalStartupData(const char* directory_path) {
+    #ifdef V8_USE_EXTERNAL_STARTUP_DATA
+      char* natives;
+      char* snapshot;
+      LoadFromFiles(
+        base::RelativePath(&natives, directory_path, "natives_blob.bin"),
+        base::RelativePath(&snapshot, directory_path, "snapshot_blob.bin"));
+      free(natives);
+      free(snapshot);
+    #endif  // V8_USE_EXTERNAL_STARTUP_DATA
+}
+
+Lets take a closer look at `LoadFromFiles`, the implementation if also in `src/startup-data-util.cc`:
+
+    void LoadFromFiles(const char* natives_blob, const char* snapshot_blob) {
+      Load(natives_blob, &g_natives, v8::V8::SetNativesDataBlob);
+      Load(snapshot_blob, &g_snapshot, v8::V8::SetSnapshotDataBlob);
+
+      atexit(&FreeStartupData);
+    }
+
+
+    (lldb) p blob_file
+    (const char *) $1 = 0x0000000104200000 "/Users/danielbevenius/work/nodejs/learning-v8/natives_blob.bin"
+
+This file is then read and set by calling:
+
+    void V8::SetNativesDataBlob(StartupData* natives_blob) {
+      i::V8::SetNativesBlob(natives_blob);
+    }
+
+
 
 ### Using d8
 This is the source used for the following examples:
