@@ -123,7 +123,7 @@ See Googles [contributing-code](https://www.chromium.org/developers/contributing
 ## Debugging
 
     $ lldb hello-world
-    (lldb) breatpoint set --file hello-world.cc --line 27
+    (lldb) br s -f hello-world.cc -l 27
 
 There are a number of useful functions in `src/objects-printer.cc` which can also be used in lldb.
 
@@ -220,7 +220,7 @@ To see where these bin files are used lets step through and see:
 The above is only required once per shell. TODO: fix this using rpath or something.
 
     $ lldb hello_world
-    (lldb) br set -n main
+    (lldb) br s -n main
     (lldb) r
 
 Step through to the following line:
@@ -939,7 +939,7 @@ src/execution.cc
 
 ### Promises
 
-    (lldb) breakpoint set -f builtins-promise.cc -l 842
+    (lldb) br s -f builtins-promise.cc -l 842
 
 
 ### Compiler pipeline
@@ -1055,7 +1055,7 @@ The declaration of Function can be found in `include/v8.h` (just noting this as 
 
 ### d8
 
-    (lldb) breakpoint set -f d8.cc -l 2935
+    (lldb) br s -f d8.cc -l 2935
 
     return v8::Shell::Main(argc, argv);
 
