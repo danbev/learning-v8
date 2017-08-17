@@ -6,13 +6,20 @@ GTEST_FILTER ?= "*"
 
 v8_dylibs = -lv8 -lv8_libbase -lv8_libplatform -licuuc -licui18n 
 
-COMPILE_TEST = clang++ -std=c++11 -O0 -g -I`pwd`/deps/googletest/googletest/include -I$(v8_include_dir) $(v8_dylibs) -L$(v8_build_dir) -pthread tests/main.cc lib/gtest/libgtest.a -o
+COMPILE_TEST = clang++ -std=c++11 -O0 -g -I`pwd`/deps/googletest/googletest/include -I$(v8_include_dir) $(v8_dylibs) -L$(v8_build_dir) -pthread tests/main.cc lib/gtest/libgtest.a -rpath $(v8_build_dir) -o
 
 LD_LIBRARY_PATH=$(v8_build_dir)
 
 hello-world: natives_blob.bin snapshot_blob.bin hello-world.cc
 	@echo "Using v8_home = $(v8_include_dir)"
-	clang++ -O0 -g -I$(v8_include_dir) $(v8_dylibs) -L$(v8_build_dir) hello-world.cc -o $@ -pthread -std=c++0x 
+	clang++ -O0 -g -I$(v8_include_dir) $(v8_dylibs) -L$(v8_build_dir) hello-world.cc -o $@ -pthread -std=c++0x -rpath $(v8_build_dir)
+
+contexts: natives_blob.bin snapshot_blob.bin contexts.cc
+	clang++ -O0 -g -I$(v8_include_dir) $(v8_dylibs) -L$(v8_build_dir) contexts.cc -o $@ -pthread -std=c++0x 
+
+ns: natives_blob.bin snapshot_blob.bin ns.cc
+	@echo "Using v8_home = $(v8_include_dir)"
+	clang++ -O0 -g -I$(v8_include_dir) $(v8_dylibs) -L$(v8_build_dir) ns.cc -o $@ -pthread -std=c++0x 
 
 instances: natives_blob.bin snapshot_blob.bin instances.cc
 	clang++ -O0 -g -I$(v8_include_dir) $(v8_dylibs) -L$(v8_build_dir) instances.cc -o $@ -pthread -std=c++0x 

@@ -321,13 +321,16 @@ What we are doing caching knowledge about the layout of the previously seen obje
 
     $ lldb -- out/x64.debug/d8 class.js
 
-### Local<String>
+### Local
 
 ```c++
 Local<String> script_name = ...;
 ```
 So what is script_name. Well it is an object reference that is managed by the v8 GC.
-The GC needs to be able to move things (pointers around) and also track if things should be GC'd
+The GC needs to be able to move things (pointers around) and also track if things should be GC'd. Local handles
+as opposed to persistent handles are light weight and mostly used local operations. These handles are managed by
+HandleScopes so you must have a handlescope on the stack and the local is only valid as long as the handlescope is
+valid. You can find the available operations for a Local in `include/v8.h`.
 
 ```shell
 (lldb) p script_name.IsEmpty()
@@ -712,7 +715,7 @@ What happens when the v8_shell is run?
     (lldb) breakpoint set --file d8.cc --line 2662
     Breakpoint 1: where = d8`v8::Shell::Main(int, char**) + 96 at d8.cc:2662, address = 0x0000000100015150
 
-First 8::base::debug::EnableInProcessStackDumping() is called followed by some windows specific code guarded
+First v8::base::debug::EnableInProcessStackDumping() is called followed by some windows specific code guarded
 by macros. Next is all the options are set using `v8::Shell::SetOptions`
 
 SetOptions will call `v8::V8::SetFlagsFromCommandLine` which is found in src/api.cc:
@@ -810,7 +813,7 @@ api.cc:
 src/builtins/builtins.cc, this is where the builtins are defined.
 TODO: sort out what these macros do.
 
-In src/v8.cc we have a couple of checks for if the optinos passed are for a stress_run but since we 
+In src/v8.cc we have a couple of checks for if the options passed are for a stress_run but since we 
 did not pass in any such flags this code path will be followed which will call RunMain:
 
     result = RunMain(isolate, argc, argv, last_run);

@@ -10,20 +10,6 @@ using namespace v8;
 
 int age = 41;
 
-class ArrayBufferAllocator : public v8::ArrayBuffer::Allocator {
-    public:
-        virtual void* Allocate(size_t length) {
-            void* data = AllocateUninitialized(length);
-            return data == NULL ? data : memset(data, 0, length);
-        }
-        virtual void* AllocateUninitialized(size_t length) {
-            return malloc(length);
-        }
-        virtual void Free(void* data, size_t) {
-            free(data);
-        }
-};
-
 void doit(const FunctionCallbackInfo<Value>& args) {
     String::Utf8Value str(args[0]);
     printf("doit argument = %s...\n", *str);
@@ -68,9 +54,8 @@ int main(int argc, char* argv[]) {
     V8::InitializePlatform(platform);
     V8::Initialize();
 
-    ArrayBufferAllocator allocator;
     Isolate::CreateParams create_params;
-    create_params.array_buffer_allocator = &allocator;
+    create_params.array_buffer_allocator = v8::ArrayBuffer::Allocator::NewDefaultAllocator();
     // An Isolate is an independant copy of the V8 runtime which includes its own heap.
     // Two different Isolates can run in parallel and can be seen as entierly different
     // sandboxed instances of a V8 runtime.
