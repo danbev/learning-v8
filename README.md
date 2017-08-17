@@ -949,23 +949,23 @@ src/execution.cc
 When a script is compiled all of the top level code is parsed. These are function declarartions (but not the function
 bodies). 
 
-function f1() {       <- top level code
-  console.log('f1');  <- non top level
-}
+    function f1() {       <- top level code
+      console.log('f1');  <- non top level
+    }
 
-function f2() {       <- top level code
-  f1();               <- non top level
-  console.logg('f2'); <- non top level
-}
+    function f2() {       <- top level code
+      f1();               <- non top level
+      console.logg('f2'); <- non top level
+    }
 
-f2();                 <- top level code
-var i = 10;           <- top level code
+    f2();                 <- top level code
+    var i = 10;           <- top level code
 
 The non top level code must be pre-parsed to check for syntax errors.
 The top level code is parsed and compiles by the full-codegen compiler. This compiler does not perform any optimizations and
 it's only task is to generate machine code as quickly as possible.
 
-Source ------> Parser  --------> Full-codegen ---------> Unoptimized Machine Code
+    Source ------> Parser  --------> Full-codegen ---------> Unoptimized Machine Code
 
 So the whole script is parsed even though we only generated code for the top-level code. The pre-parse (the syntax checking)
 was not stored in any way. The functions are lazy stubs that when/if the function gets called the function get compiled. This
@@ -975,11 +975,11 @@ If a function is determined to be hot it will be optimized by one of the two opt
 The first time V8 sees a function it will parse it into an AST but not do any further processing of that tree
 until that function is used. Processing will be running the full-codegen compiler.
 
-                     +-----> Full-codegen -----> Unoptimized code
-                    /                               \/ /\       \
-Parser  ------> AST -------> Cranshaft    -----> Optimized code  |
-                    \                                           /
-                     +-----> Turbofan     -----> Optimized code
+                         +-----> Full-codegen -----> Unoptimized code
+                        /                               \/ /\       \
+    Parser  ------> AST -------> Cranshaft    -----> Optimized code  |
+                        \                                           /
+                         +-----> Turbofan     -----> Optimized code
 
 Inline Cachine (IC) is done here which also help to gather type information.
 V8 also has a profiler thread which monitors which functions are hot and should be optimized. This profiling
@@ -995,9 +995,9 @@ compared to native code which can vary depending on the target platform.
 The whole source can be parsed and compiled, compared to the current pipeline the has the pre-parse and parse stages mentioned above. So even unused functions will get compiled.
 The bytecode becomes the source of truth instead of as before the AST.
 
-Source ------> Parser  --------> Ignition-codegen ---------> Bytecode ---------> Turbofan ----> Optimized Code ---+
-                                                              /\                                                  |
-                                                               +--------------------------------------------------+
+    Source ------> Parser  --------> Ignition-codegen ---------> Bytecode ---------> Turbofan ----> Optimized Code ---+
+                                                                  /\                                                  |
+                                                                   +--------------------------------------------------+
 
     function bajja(a, b, c) {
       var d = c - 100;
