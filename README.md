@@ -35,18 +35,54 @@ out v8 directory. For example, :
 
     $ export V8_HOME=~/work/google/javascript/v8
 
-## Code in this repo
+## Building chromium
+When making changes to V8 you might need to verify that your changes have not broken anything in Chromium. 
 
-#### hello-world
-[hello-world](./hello-world.cc) is heavily commented and show the usage of a static int being exposed and
-accessed from JavaScript.
+Generate Your Project (gpy) :
+You'll have to run this once before building:
 
-#### instances
-[instances](./instances.cc) shows the usage of creating new instances of a C++ class from JavaScript.
+    $ gclient sync
+    $ gclient runhooks
 
-#### run-script
-[run-script](./run-script.cc) is basically the same as instance but reads an external file, [script.js](./script.js)
-and run the script.
+#### Update the code base
+
+    $ git fetch origin master
+    $ git co master
+    $ git merge origin/master
+
+### Building using GN
+
+    $ gn gen out/Debug
+
+### Building using Ninja
+
+    $ ninja -C out/Debug chrome
+
+Building the tests:
+
+    $ ninja -C out/Debug chrome/test:unit_tests
+
+An error I got when building the first time:
+
+    traceback (most recent call last):
+    File "./gyp-mac-tool", line 713, in <module>
+      sys.exit(main(sys.argv[1:]))
+    File "./gyp-mac-tool", line 29, in main
+      exit_code = executor.Dispatch(args)
+    File "./gyp-mac-tool", line 44, in Dispatch
+      return getattr(self, method)(*args[1:])
+    File "./gyp-mac-tool", line 68, in ExecCopyBundleResource
+      self._CopyStringsFile(source, dest)
+    File "./gyp-mac-tool", line 134, in _CopyStringsFile
+      import CoreFoundation
+    ImportError: No module named CoreFoundation
+    [6642/20987] CXX obj/base/debug/base.task_annotator.o
+    [6644/20987] ACTION base_nacl: build newlib plib_9b4f41e4158ebb93a5d28e6734a13e85
+    ninja: build stopped: subcommand failed.
+
+I was able to get around this by:
+
+    $ pip install -U pyobjc
 
 ### GN
 
@@ -78,8 +114,6 @@ List avaiable build arguments:
 
     $ gn args --list out.gn/learning
 
-
-
 List all available targets:
 
     $ ninja -C out.gn/learning/ -t targets all
@@ -94,6 +128,21 @@ Running quickchecks:
 
 You can use `./tools-run-tests.py -h` to list all the opitions that can be passed
 to run-tests.
+
+
+
+## Code in this repo
+
+#### hello-world
+[hello-world](./hello-world.cc) is heavily commented and show the usage of a static int being exposed and
+accessed from JavaScript.
+
+#### instances
+[instances](./instances.cc) shows the usage of creating new instances of a C++ class from JavaScript.
+
+#### run-script
+[run-script](./run-script.cc) is basically the same as instance but reads an external file, [script.js](./script.js)
+and run the script.
 
 ## Building this projects code
 
@@ -500,55 +549,6 @@ No space between these declarations:
     3450                                Local<Object> local_target,
     3451                                Local<Object> local_handler);
 
-
-## Building chromium
-When making changes to V8 you might need to verify that your changes have not broken anything in Chromium. 
-
-Generate Your Project (gpy) :
-You'll have to run this once before building:
-
-    $ gclient sync
-    $ gclient runhooks
-
-#### Update the code base
-
-    $ git fetch origin master
-    $ git co master
-    $ git merge origin/master
-
-### Building using GN
-
-    $ gn gen out/Debug
-
-### Building using Ninja
-
-    $ ninja -C out/Debug chrome
-
-Building the tests:
-
-    $ ninja -C out/Debug chrome/test:unit_tests
-
-An error I got when building the first time:
-
-    traceback (most recent call last):
-    File "./gyp-mac-tool", line 713, in <module>
-      sys.exit(main(sys.argv[1:]))
-    File "./gyp-mac-tool", line 29, in main
-      exit_code = executor.Dispatch(args)
-    File "./gyp-mac-tool", line 44, in Dispatch
-      return getattr(self, method)(*args[1:])
-    File "./gyp-mac-tool", line 68, in ExecCopyBundleResource
-      self._CopyStringsFile(source, dest)
-    File "./gyp-mac-tool", line 134, in _CopyStringsFile
-      import CoreFoundation
-    ImportError: No module named CoreFoundation
-    [6642/20987] CXX obj/base/debug/base.task_annotator.o
-    [6644/20987] ACTION base_nacl: build newlib plib_9b4f41e4158ebb93a5d28e6734a13e85
-    ninja: build stopped: subcommand failed.
-
-I was able to get around this by:
-
-    $ pip install -U pyobjc
 
 
 #### Testing
