@@ -144,6 +144,13 @@ accessed from JavaScript.
 [run-script](./run-script.cc) is basically the same as instance but reads an external file, [script.js](./script.js)
 and run the script.
 
+#### tests
+The tests directory contains unit tests for individual classes/concepts in V8 to help understand them.
+
+These tests can be run using:
+
+    $ make check
+
 ## Building this projects code
 
     $ make
