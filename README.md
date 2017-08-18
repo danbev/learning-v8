@@ -475,10 +475,11 @@ The above can be found in src/api.h. The same goes for Local<Object>, Local<Stri
 
 ### Small Integers
 Reading through v8.h I came accross `// Tag information for Smi`
-Smi stands for small integers. It turns out that ECMA Number is defined as 64-bit binary double-precision
-but internally v8 uses 32-bit to represent all values. How can that work, you can represent a 64-bit value
-using only 32-bits right?   
-Instead the small integer is represented by the 32 bits plus a pointer to the 64-bit number. v8 needs to
+Smi stands for small integers. It turns out that ECMA Number is defined as a 64-bit binary double-precision
+but internally V8 uses 32-bit to represent all values. How can that work, how can you represent a 64-bit value
+using only 32-bits?   
+
+Instead the small integer is represented by the 32 bits plus a pointer to the 64-bit number. V8 needs to
 know if a value stored in memory represents a 32-bit integer, or if it is really a 64-bit number, in which
 case it has to follow the pointer to get the complete value. This is where the concept of tagging comes in.
 Tagging involved borrowing one bit of the 32-bit, making it 31-bit and having the leftover bit represent a 
