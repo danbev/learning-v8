@@ -163,7 +163,7 @@ These tests can be run using:
 
     $ make clean
 
-## Contributing a change
+## Contributing a change to V8
 1) Create a working branch as usual and fix/build/test etc.  
 2) Login to https://codereview.chromium.org/mine  
 3) depot-tools-auth login https://codereview.chromium.org  
@@ -174,7 +174,6 @@ See Googles [contributing-code](https://www.chromium.org/developers/contributing
 ### Find the current issue number
 
     $ git cl issue
-
 
 ## Debugging
 
