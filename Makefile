@@ -12,23 +12,23 @@ LD_LIBRARY_PATH=$(v8_build_dir)
 
 hello-world: natives_blob.bin snapshot_blob.bin hello-world.cc
 	@echo "Using v8_home = $(v8_include_dir)"
-	clang++ -O0 -g -I$(v8_include_dir) $(v8_dylibs) -L$(v8_build_dir) hello-world.cc -o $@ -pthread -std=c++0x -rpath $(v8_build_dir)
+	clang++ -O0 -g -I$(v8_include_dir) $(v8_dylibs) -L$(v8_build_dir) $@.cc -o $@ -pthread -std=c++0x -rpath $(v8_build_dir)
 
 contexts: natives_blob.bin snapshot_blob.bin contexts.cc
-	clang++ -O0 -g -I$(v8_include_dir) $(v8_dylibs) -L$(v8_build_dir) contexts.cc -o $@ -pthread -std=c++0x 
+	clang++ -O0 -g -I$(v8_include_dir) $(v8_dylibs) -L$(v8_build_dir) $@.cc -o $@ -pthread -std=c++0x 
 
 ns: natives_blob.bin snapshot_blob.bin ns.cc
 	@echo "Using v8_home = $(v8_include_dir)"
-	clang++ -O0 -g -I$(v8_include_dir) $(v8_dylibs) -L$(v8_build_dir) ns.cc -o $@ -pthread -std=c++0x 
+	clang++ -O0 -g -I$(v8_include_dir) $(v8_dylibs) -L$(v8_build_dir) $@.cc -o $@ -pthread -std=c++0x 
 
 instances: natives_blob.bin snapshot_blob.bin instances.cc
-	clang++ -O0 -g -I$(v8_include_dir) $(v8_dylibs) -L$(v8_build_dir) instances.cc -o $@ -pthread -std=c++0x 
+	clang++ -O0 -g -I$(v8_include_dir) $(v8_dylibs) -L$(v8_build_dir) $@.cc -o $@ -pthread -std=c++0x 
 
 run-script: natives_blob.bin snapshot_blob.bin run-script.cc
-	clang++ -O0 -g -I$(v8_include_dir) $(v8_dylibs) -L$(v8_build_dir) run-script.cc -o $@ -pthread -std=c++0x 
+	clang++ -O0 -g -I$(v8_include_dir) $(v8_dylibs) -L$(v8_build_dir) $@.cc -o $@ -pthread -std=c++0x 
 
 exceptions: natives_blob.bin snapshot_blob.bin exceptions.cc
-	clang++ -O0 -g -I$(v8_include_dir) -I$(V8_HOME) $(v8_dylibs) -L$(v8_build_dir) exceptions.cc $(v8_src_dir)/objects-printer.cc -o $@ -pthread -std=c++0x 
+	clang++ -O0 -g -I$(v8_include_dir) -I$(V8_HOME) $(v8_dylibs) -L$(v8_build_dir) $@.cc $(v8_src_dir)/objects-printer.cc -o $@ -pthread -std=c++0x 
 
 natives_blob.bin:
 	@cp $(v8_build_dir)/$@ .
@@ -36,23 +36,23 @@ natives_blob.bin:
 snapshot_blob.bin:
 	@cp $(v8_build_dir)/$@ .
 
-check: tests/local_test tests/persistent-object_test tests/maybe_test tests/smi_test
+check: natives_blob.bin snapshot_blob.bin tests/local_test tests/persistent-object_test tests/maybe_test tests/smi_test
 	./tests/smi_test
 
 tests/local_test: tests/local_test.cc
-	$(COMPILE_TEST) tests/local_test
+	$(COMPILE_TEST) $@
 
 tests/persistent-object_test: tests/persistent-object_test.cc
-	$(COMPILE_TEST) tests/persistent-object_test
+	$(COMPILE_TEST) $@
 
 tests/maybe_test: tests/maybe_test.cc
-	$(COMPILE_TEST) tests/maybe_test
+	$(COMPILE_TEST) $@
 
 tests/smi_test: tests/smi_test.cc
-	$(COMPILE_TEST) tests/smi_test
+	$(COMPILE_TEST) $@
 
 tests/string_test: tests/string_test.cc
-	$(COMPILE_TEST) tests/string_test
+	$(COMPILE_TEST) $@
 
 list-gtests:
 	./tests/smi_test --gtest_list_tests
