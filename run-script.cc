@@ -9,20 +9,6 @@
 
 using namespace v8;
 
-class ArrayBufferAllocator : public v8::ArrayBuffer::Allocator {
-  public:
-    virtual void* Allocate(size_t length) {
-      void* data = AllocateUninitialized(length);
-      return data == NULL ? data : memset(data, 0, length);
-    }
-    virtual void* AllocateUninitialized(size_t length) {
-      return malloc(length);
-    }
-    virtual void Free(void* data, size_t) {
-      free(data);
-    }
-};
-
 v8::MaybeLocal<v8::String> ReadFile(v8::Isolate* isolate, const char* name);
 void Print(const v8::FunctionCallbackInfo<v8::Value>& args);
 
@@ -63,9 +49,8 @@ int main(int argc, char* argv[]) {
   V8::InitializePlatform(platform);
   V8::Initialize();
 
-  ArrayBufferAllocator allocator;
   Isolate::CreateParams create_params;
-  create_params.array_buffer_allocator = &allocator;
+  create_params.array_buffer_allocator = v8::ArrayBuffer::Allocator::NewDefaultAllocator();
   Isolate* isolate = Isolate::New(create_params);
   {
     Isolate::Scope isolate_scope(isolate);

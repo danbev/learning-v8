@@ -25,7 +25,7 @@ instances: natives_blob.bin snapshot_blob.bin instances.cc
 	clang++ -O0 -g -I$(v8_include_dir) $(v8_dylibs) -L$(v8_build_dir) $@.cc -o $@ -pthread -std=c++0x 
 
 run-script: natives_blob.bin snapshot_blob.bin run-script.cc
-	clang++ -O0 -g -I$(v8_include_dir) $(v8_dylibs) -L$(v8_build_dir) $@.cc -o $@ -pthread -std=c++0x 
+	clang++ -O0 -g -I$(v8_include_dir) $(v8_dylibs) -L$(v8_build_dir) $@.cc -o $@ -pthread -std=c++0x -rpath $(v8_build_dir)
 
 exceptions: natives_blob.bin snapshot_blob.bin exceptions.cc
 	clang++ -O0 -g -I$(v8_include_dir) -I$(V8_HOME) $(v8_dylibs) -L$(v8_build_dir) $@.cc $(v8_src_dir)/objects-printer.cc -o $@ -pthread -std=c++0x 
