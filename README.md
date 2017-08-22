@@ -235,6 +235,45 @@ Lets take for example that you call setTimeout, the setTimeout function will be
 pushed onto the call stack and executed. This is where the callback queue comes into play and the event loop. The setTimeout function can add functions to the callback queue. This queue will be processed by the event loop when the call stack is empty.
 
 
+#### Threads
+V8 is single threaded (the execution of the functions of the stack) but there are supporting threads used
+for garbage collection, profiling (IC, and perhaps other things) (I think).
+Lets see what threads there are:
+
+    $ lldb -- hello-world
+    (lldb) br s -n main
+    (lldb) r
+    (lldb) thread list
+    thread #1: tid = 0x2efca6, 0x0000000100001e16 hello-world`main(argc=1, argv=0x00007fff5fbfee98) + 38 at hello-world.cc:40, queue = 'com.apple.main-thread', stop reason = breakpoint 1.1
+
+So at startup there is only one thread which is what we expected. Lets skip ahead to where we create the platform:
+
+    Platform* platform = platform::CreateDefaultPlatform();
+    ...
+    DefaultPlatform* platform = new DefaultPlatform(idle_task_support, tracing_controller);
+    platform->SetThreadPoolSize(thread_pool_size);
+
+    (lldb) fr v thread_pool_size
+    (int) thread_pool_size = 0
+
+Next there is a check for 0 and the number of processors -1 is used as the size of the thread pool:
+
+    (lldb) fr v thread_pool_size
+    (int) thread_pool_size = 7
+
+This is all that `SetThreadPoolSize` does. After this we have:
+
+    platform->EnsureInitialized();
+
+    for (int i = 0; i < thread_pool_size_; ++i)
+      thread_pool_.push_back(new WorkerThread(&queue_));
+
+`new WorkerThread` will create a new pthread (on my system which is MacOSX):
+
+    result = pthread_create(&data_->thread_, &attr, ThreadEntry, this);
+
+ThreadEntry can be found in src/base/platform/platform-posix.
+
 ### Isolate
 An Isolate is an independant copy of the V8 runtime which includes its own heap.
 Two different Isolates can run in parallel and can be seen as entierly different
@@ -686,31 +725,6 @@ answer is hidden classes which allow the VM to quickly check an object against a
 The inline caching source are located in `src/ic`.
 
 
-### gn
-GN is a bulid system that generated Ninja Build files. 
-In [src/gn](./src/gn) you can find an example project that uses gn. It is very basic and the 
-intention is to have something to "play" with while learning how it works.
-
-
-##### Could not find checkout in any parent issue
-When I first tried to run gn in the src directory I got the following error:
-
-    $ gn gen out/mybuild
-    gn.py: Could not find checkout in any parent of the current path.
-    This must be run inside a checkout. 
-
-
-When gn starts it will look for a file named .gn, starting from the current directory and
-continuing up the the parent directories. This file indicates the source root.
-    
-### Ninja
-
-
-### What is a zone
-I noticed that there is a `src/zone.h` and wondered what this is all about. Is this related
-to zone.js in any way?  
-No, this is not related but instead deals with memory allocations.
-
 ### Performance Optimizations
 Code is optimized 1 function at a time, without knowledge of what other code is doing
 
@@ -1023,11 +1037,261 @@ The bytecode becomes the source of truth instead of as before the AST.
      38 S> 0x2eef8d9b103f @    1 : 03 64             LdaSmi [100]   // load 100
      38 E> 0x2eef8d9b1041 @    3 : 2b 02 02          Sub a2, [2]    // a2 is the third argument. a2 is an argument register
            0x2eef8d9b1044 @    6 : 1f fa             Star r0        // r0 is a register for local variables. We only have one which is d
-     47 S> 0x2eef8d9b1046 @    8 : 1e 03             Ldar a1        // LoaD accumulator from Register argument from a1 which is b
+     47 S> 0x2eef8d9b1046 @    8 : 1e 03             Ldar a1        // LoaD accumulator from Register argument a1 which is b
      60 E> 0x2eef8d9b1048 @   10 : 2c fa 03          Mul r0, [3]    // multiply that is our local variable in r0
      56 E> 0x2eef8d9b104b @   13 : 2a 04 04          Add a0, [4]    // add that to our argument register 0 which is a 
      65 S> 0x2eef8d9b104e @   16 : 83                Return         // return the value in the accumulator?
 
+
+### bytecode
+Can be found in src/interpreter/bytecodes.h
+
+* StackCheck
+* `Star` Stor content in accumulator regiser in register (the operand).
+* Ldar   LoaD accumulator from Register argument a1 which is b
+
+The registers are not machine registers, apart from the accumlator as I understand it, but would instead be stack allocated.
+
+
+#### Parsing
+Parsing is the parsing of the JavaScript and the generation of the abstract syntax tree. That tree is then visited and 
+bytecode generated from it. This section tries to figure out where in the code these operations are performed.
+
+For example, take the script example.
+
+    $ make run-script
+    $ lldb -- run-script
+    (lldb) br s -n main
+    (lldb) r
+
+Lets take a look at the following line:
+
+    Local<Script> script = Script::Compile(context, source).ToLocalChecked();
+
+This will land us in `api.cc`
+ 
+    ScriptCompiler::Source script_source(source);
+    return ScriptCompiler::Compile(context, &script_source);
+
+
+    MaybeLocal<Script> ScriptCompiler::Compile(Local<Context> context, Source* source, CompileOptions options) {
+    ...
+    auto isolate = context->GetIsolate();
+    auto maybe = CompileUnboundInternal(isolate, source, options);
+
+`CompileUnboundInternal` will call `GetSharedFunctionInfoForScript` (in src/compiler.cc):
+
+    result = i::Compiler::GetSharedFunctionInfoForScript(
+          str, name_obj, line_offset, column_offset, source->resource_options,
+          source_map_url, isolate->native_context(), NULL, &script_data, options,
+          i::NOT_NATIVES_CODE);
+
+    (lldb) br s -f compiler.cc -l 1259
+   
+    LanguageMode language_mode = construct_language_mode(FLAG_use_strict);
+    (lldb) p language_mode
+    (v8::internal::LanguageMode) $10 = SLOPPY
+
+LanguageMode can be found in src/globals.h and it is an enum with three values:
+
+    enum LanguageMode : uint32_t { SLOPPY, STRICT, LANGUAGE_END };
+
+SLOPPY mode I asume is the mode when there is no "use strict";. Remember that this can go inside a function and does not
+have to be at the top level of the file.
+
+    ParseInfo parse_info(script);
+
+This will call ParseInfo's constructor (in src/parsing/parse-info.cc), and which will call `ParseInfo::InitFromIsolate`:
+
+    DCHECK_NOT_NULL(isolate);
+    set_hash_seed(isolate->heap()->HashSeed());
+    set_stack_limit(isolate->stack_guard()->real_climit());
+    set_unicode_cache(isolate->unicode_cache());
+    set_runtime_call_stats(isolate->counters()->runtime_call_stats());
+    set_ast_string_constants(isolate->ast_string_constants());
+
+I was curious about these ast_string_constants:
+
+    (lldb) p *ast_string_constants_
+    (const v8::internal::AstStringConstants) $58 = {
+      zone_ = {
+        allocation_size_ = 1312
+        segment_bytes_allocated_ = 8192
+        position_ = 0x0000000105052538 <no value available>
+        limit_ = 0x0000000105054000 <no value available>
+        allocator_ = 0x0000000103e00080
+        segment_head_ = 0x0000000105052000
+        name_ = 0x0000000101623a70 "../../src/ast/ast-value-factory.h:365"
+        sealed_ = false
+      }
+      string_table_ = {
+        v8::base::TemplateHashMapImpl<void *, void *, v8::base::HashEqualityThenKeyMatcher<void *, bool (*)(void *, void *)>, v8::base::DefaultAllocationPolicy> = {
+          map_ = 0x0000000105054000
+          capacity_ = 64
+          occupancy_ = 41
+          match_ = {
+            match_ = 0x000000010014b260 (libv8.dylib`v8::internal::AstRawString::Compare(void*, void*) at ast-value-factory.cc:122)
+          }
+        }
+      }
+      hash_seed_ = 500815076
+      anonymous_function_string_ = 0x0000000105052018
+      arguments_string_ = 0x0000000105052038
+      async_string_ = 0x0000000105052058
+      await_string_ = 0x0000000105052078
+      boolean_string_ = 0x0000000105052098
+      constructor_string_ = 0x00000001050520b8
+      default_string_ = 0x00000001050520d8
+      done_string_ = 0x00000001050520f8
+      dot_string_ = 0x0000000105052118
+      dot_for_string_ = 0x0000000105052138
+      dot_generator_object_string_ = 0x0000000105052158
+      dot_iterator_string_ = 0x0000000105052178
+      dot_result_string_ = 0x0000000105052198
+      dot_switch_tag_string_ = 0x00000001050521b8
+      dot_catch_string_ = 0x00000001050521d8
+      empty_string_ = 0x00000001050521f8
+      eval_string_ = 0x0000000105052218
+      function_string_ = 0x0000000105052238
+      get_space_string_ = 0x0000000105052258
+      length_string_ = 0x0000000105052278
+      let_string_ = 0x0000000105052298
+      name_string_ = 0x00000001050522b8
+      native_string_ = 0x00000001050522d8
+      new_target_string_ = 0x00000001050522f8
+      next_string_ = 0x0000000105052318
+      number_string_ = 0x0000000105052338
+      object_string_ = 0x0000000105052358
+      proto_string_ = 0x0000000105052378
+      prototype_string_ = 0x0000000105052398
+      return_string_ = 0x00000001050523b8
+      set_space_string_ = 0x00000001050523d8
+      star_default_star_string_ = 0x00000001050523f8
+      string_string_ = 0x0000000105052418
+      symbol_string_ = 0x0000000105052438
+      this_string_ = 0x0000000105052458
+      this_function_string_ = 0x0000000105052478
+      throw_string_ = 0x0000000105052498
+      undefined_string_ = 0x00000001050524b8
+      use_asm_string_ = 0x00000001050524d8
+      use_strict_string_ = 0x00000001050524f8
+      value_string_ = 0x0000000105052518
+    } 
+
+So these are constants that are set on the new ParseInfo instance using the values from the isolate. Not exactly sure what I 
+want with this but I might come back to it later.
+So, we are back in ParseInfo's constructor:
+
+    set_allow_lazy_parsing();
+    set_toplevel();
+    set_script(script);
+
+Script is of type v8::internal::Script which can be found in src/object/script.h
+
+Back now in compiler.cc and the GetSharedFunctionInfoForScript function:
+
+    Zone compile_zone(isolate->allocator(), ZONE_NAME);
+
+    ...
+   if (parse_info->literal() == nullptr && !parsing::ParseProgram(parse_info, isolate))
+
+`ParseProgram`:
+
+    Parser parser(info);
+    ...
+    FunctionLiteral* result = nullptr;
+    result = parser.ParseProgram(isolate, info);
+
+`parser.ParseProgram`: 
+
+    Handle<String> source(String::cast(info->script()->source()));
+    (lldb) job *source
+    "var user1 = new Person('Fletch');\x0avar user2 = new Person('Dr.Rosen');\x0aprint("user1 = " + user1.name);\x0aprint("user2 = " + user2.name);\x0a\x0a"
+
+So here we can see our JavaScript as a String.
+
+    std::unique_ptr<Utf16CharacterStream> stream(ScannerStream::For(source));
+    scanner_.Initialize(stream.get(), info->is_module());
+    result = DoParseProgram(info);
+
+`DoParseProgram`
+
+    (lldb) br s -f parser.cc -l 639
+    ...
+
+    this->scope()->SetLanguageMode(info->language_mode());
+    ParseStatementList(body, Token::EOS, &ok);
+
+This call will land in parser-base.h and its `ParseStatementList` function.
+
+    (lldb) br s -f parser-base.h -l 4695
+
+    StatementT stat = ParseStatementListItem(CHECK_OK_CUSTOM(Return, kLazyParsingComplete));
+
+    result = CompileToplevel(&parse_info, isolate, Handle<SharedFunctionInfo>::null());
+
+This will land in `CompileTopelevel` (in same file which is src/compiler.cc):
+
+    // Compile the code.
+    result = CompileUnoptimizedCode(parse_info, shared_info, isolate);
+
+This will land in `CompileUnoptimizedCode` (in same file which is src/compiler.cc):
+
+    // Prepare and execute compilation of the outer-most function.
+    std::unique_ptr<CompilationJob> outer_job(
+       PrepareAndExecuteUnoptimizedCompileJob(parse_info, parse_info->literal(),
+                                              shared_info, isolate));
+
+
+    std::unique_ptr<CompilationJob> job(
+        interpreter::Interpreter::NewCompilationJob(parse_info, literal, isolate));
+    if (job->PrepareJob() == CompilationJob::SUCCEEDED &&
+        job->ExecuteJob() == CompilationJob::SUCCEEDED) {
+      return job;
+    }
+
+PrepareJobImpl:
+
+    CodeGenerator::MakeCodePrologue(parse_info(), compilation_info(),
+                                    "interpreter");
+    return SUCCEEDED;
+
+codegen.cc `MakeCodePrologue`:
+
+interpreter.cc ExecuteJobImpl:
+ 
+    generator()->GenerateBytecode(stack_limit());    
+
+src/interpreter/bytecode-generator.cc
+
+     RegisterAllocationScope register_scope(this);
+
+The bytecode is register based (if that is the correct term) and we had an example previously. I'm guessing 
+that this is what this call is about.
+
+VisitDeclarations will iterate over all the declarations in the file which in our case are:
+
+    var user1 = new Person('Fletch');
+    var user2 = new Person('Dr.Rosen');
+
+    (lldb) p *variable->raw_name()
+    (const v8::internal::AstRawString) $33 = {
+       = {
+        next_ = 0x000000010600a280
+        string_ = 0x000000010600a280
+      }
+      literal_bytes_ = (start_ = "user1", length_ = 5)
+      hash_field_ = 1303438034
+      is_one_byte_ = true
+      has_string_ = false
+    }
+
+    // Perform a stack-check before the body.
+    builder()->StackCheck(info()->literal()->start_position());
+
+So that call we output a stackcheck instruction, like in the example above:
+
+    14 E> 0x2eef8d9b103e @    0 : 7f                StackCheck
 
 ### Performance
 Say you have the expression x + y the full-codegen compiler might produce:
