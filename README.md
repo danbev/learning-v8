@@ -307,12 +307,6 @@ The output of this out/Debug/obj/gen/libraries.cc. So how is this file actually 
 The `js2c` target produces the libraries.cc file which is used by other targets, for example by `v8_snapshot` which produces a 
 snapshot_blob.bin file.
 
-To see where these bin files are used lets step through and see:
-
-    $ . ./setenv.sh
-
-The above is only required once per shell. TODO: fix this using rpath or something.
-
     $ lldb hello_world
     (lldb) br s -n main
     (lldb) r
