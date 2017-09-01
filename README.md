@@ -20,21 +20,6 @@ the instructions found [here](https://developers.google.com/v8/build).
 
     gclient sync
 
-What I've been using the following target:
-
-    $ make x64.debug
-
-You should then be able to find the output in `out/x64.debug/`
-
-To run the tests:
-
-    $ make x64.check
-
-After this has been done you can set an environment variable named `V8_HOME` which points to the the checked
-out v8 directory. For example, :
-
-    $ export V8_HOME=~/work/google/javascript/v8
-
 ## Building chromium
 When making changes to V8 you might need to verify that your changes have not broken anything in Chromium. 
 
@@ -52,15 +37,15 @@ You'll have to run this once before building:
 
 ### Building using GN
 
-    $ gn gen out/Debug
+    $ gn args out.gn/learning
 
 ### Building using Ninja
 
-    $ ninja -C out/Debug chrome
+    $ ninja -C out.gn/learning 
 
 Building the tests:
 
-    $ ninja -C out/Debug chrome/test:unit_tests
+    $ ninja -C out.gn/learning chrome/test:unit_tests
 
 An error I got when building the first time:
 
@@ -83,6 +68,55 @@ An error I got when building the first time:
 I was able to get around this by:
 
     $ pip install -U pyobjc
+
+#### Using a specific version of V8
+So, we want to include our updated version of V8 so that we can verify that it builds correctly with our change to V8.
+While I'm not sure this is the proper way to do it, I was able to update DEPS in src (chromium) and set
+the v8 entry to git@github.com:danbev/v8.git@064718a8921608eaf9b5eadbb7d734ec04068a87:
+
+    "git@github.com:danbev/v8.git@064718a8921608eaf9b5eadbb7d734ec04068a87"
+
+You'll have to run `gclient sync` after this. 
+
+Another way is to not updated the `DEPS` file, which is a version controlled file, but instead update
+`.gclientrc` and add a `custom_deps` entry:
+
+    solutions = [{u'managed': False, u'name': u'src', u'url': u'https://chromium.googlesource.com/chromium/src.git', 
+    u'custom_deps': {
+      "src/v8": "git@github.com:danbev/v8.git@27a666f9be7ca3959c7372bdeeee14aef2a4b7ba"
+    }, u'deps_file': u'.DEPS.git', u'safesync_url': u''}]
+    
+## Buiding pdfium
+You may have to compile this project (in addition to chromium to verify that changes in v8 are not breaking
+code in pdfium.
+
+### Create/clone the project
+
+     $ mkdir pdfuim_reop
+     $ gclient config --unmanaged https://pdfium.googlesource.com/pdfium.git
+     $ gclient sync
+     $ cd pdfium
+
+### Building
+
+    $ ninja -C out/Default
+
+#### Using a branch of v8
+You should be able to update the .gclient file adding a custom_deps entry:
+
+    solutions = [
+    {
+      "name"        : "pdfium",
+      "url"         : "https://pdfium.googlesource.com/pdfium.git",
+      "deps_file"   : "DEPS",
+      "managed"     : False,
+      "custom_deps" : {
+        "v8": "git@github.com:danbev/v8.git@064718a8921608eaf9b5eadbb7d734ec04068a87"
+      },
+    },
+   ]
+   cache_dir = None
+You'll have to run `gclient sync` after this too.
 
 ### GN
 
@@ -164,10 +198,8 @@ These tests can be run using:
     $ make clean
 
 ## Contributing a change to V8
-1) Create a working branch as usual and fix/build/test etc.  
-2) Login to https://codereview.chromium.org/mine  
-3) depot-tools-auth login https://codereview.chromium.org  
-3) git cl upload  
+1) Create a working branch using `git new-branch name`
+2) git cl upload  
 
 See Googles [contributing-code](https://www.chromium.org/developers/contributing-code) for more details.
 
@@ -558,57 +590,6 @@ No space between these declarations:
 
     $ out/Default/unit_tests --gtest_filter="PushClientTest.*"
 
-
-#### Using a specific version of V8
-So, we want to include our updated version of V8 so that we can verify that it builds correctly with our change to V8.
-While I'm not sure this is the proper way to do it, I was able to update DEPS in src (chromium) and set
-the v8 entry to git@github.com:danbev/v8.git@064718a8921608eaf9b5eadbb7d734ec04068a87:
-
-    "git@github.com:danbev/v8.git@064718a8921608eaf9b5eadbb7d734ec04068a87"
-
-You'll have to run `gclient sync` after this. 
-
-Another way is to not updated the `DEPS` file, which is a version controlled file, but instead update
-`.gclientrc` and add a `custom_deps` entry:
-
-    solutions = [{u'managed': False, u'name': u'src', u'url': u'https://chromium.googlesource.com/chromium/src.git', 
-    u'custom_deps': {
-      "src/v8": "git@github.com:danbev/v8.git@27a666f9be7ca3959c7372bdeeee14aef2a4b7ba"
-    }, u'deps_file': u'.DEPS.git', u'safesync_url': u''}]
-    
-You'll have to run `gclient sync` after this too.
-
-
-## Buiding pdfium
-You may have to compile this project (in addition to chromium to verify that changes in v8 are not breaking
-code in pdfium.
-
-### Create/clone the project
-
-     $ mkdir pdfuim_reop
-     $ gclient config --unmanaged https://pdfium.googlesource.com/pdfium.git
-     $ gclient sync
-     $ cd pdfium
-
-### Building
-
-    $ ninja -C out/Default
-
-#### Using a branch of v8
-You should be able to update the .gclient file adding a custom_deps entry:
-
-    solutions = [
-    {
-      "name"        : "pdfium",
-      "url"         : "https://pdfium.googlesource.com/pdfium.git",
-      "deps_file"   : "DEPS",
-      "managed"     : False,
-      "custom_deps" : {
-        "v8": "git@github.com:danbev/v8.git@064718a8921608eaf9b5eadbb7d734ec04068a87"
-      },
-    },
-   ]
-   cache_dir = None
     
 #### Build failure
 After rebasing I've seen the following issue:
