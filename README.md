@@ -371,43 +371,6 @@ This is the source used for the following examples:
     print(p.age);
     print("after"); 
 
-#### Inline Caches
---trace-ic
-
-    $ out/x64.debug/d8 --trace-ic --trace-maps class.js
-
-    before
-    [TraceMaps: Normalize from= 0x19a314288b89 to= 0x19a31428aff9 reason= NormalizeAsPrototype ]
-    [TraceMaps: ReplaceDescriptors from= 0x19a31428aff9 to= 0x19a31428b051 reason= CopyAsPrototype ]
-    [TraceMaps: InitialMap map= 0x19a31428afa1 SFI= 34_Person ]
-
-    [StoreIC in ~Person+65 at class.js:2 (0->.) map=0x19a31428afa1 0x10e68ba83361 <String[4]: name>]
-    [TraceMaps: Transition from= 0x19a31428afa1 to= 0x19a31428b0a9 name= name ]
-    [StoreIC in ~Person+102 at class.js:3 (0->.) map=0x19a31428b0a9 0x2beaa25abd89 <String[3]: age>]
-    [TraceMaps: Transition from= 0x19a31428b0a9 to= 0x19a31428b101 name= age ]
-    [TraceMaps: SlowToFast from= 0x19a31428b051 to= 0x19a31428b159 reason= OptimizeAsPrototype ]
-    [StoreIC in ~Person+65 at class.js:2 (.->1) map=0x19a31428afa1 0x10e68ba83361 <String[4]: name>]
-    [StoreIC in ~Person+102 at class.js:3 (.->1) map=0x19a31428b0a9 0x2beaa25abd89 <String[3]: age>]
-    [LoadIC in ~+546 at class.js:9 (0->.) map=0x19a31428b101 0x10e68ba83361 <String[4]: name>]
-    [CallIC in ~+571 at class.js:9 (0->1) map=0x0 0x32f481082231 <String[5]: print>]
-    Daniel
-    [LoadIC in ~+642 at class.js:10 (0->.) map=0x19a31428b101 0x2beaa25abd89 <String[3]: age>]
-    [CallIC in ~+667 at class.js:10 (0->1) map=0x0 0x32f481082231 <String[5]: print>]
-    41
-    [LoadIC in ~+738 at class.js:11 (0->.) map=0x19a31428b101 0x10e68ba83361 <String[4]: name>]
-    [CallIC in ~+763 at class.js:11 (0->1) map=0x0 0x32f481082231 <String[5]: print>]
-    Tilda
-    [LoadIC in ~+834 at class.js:12 (0->.) map=0x19a31428b101 0x2beaa25abd89 <String[3]: age>]
-    [CallIC in ~+859 at class.js:12 (0->1) map=0x0 0x32f481082231 <String[5]: print>]
-    2
-    [CallIC in ~+927 at class.js:13 (0->1) map=0x0 0x32f481082231 <String[5]: print>]
-    after
-
-LoadIC (0->.) means that it has transitioned from unititialized state (0) to pre-monomophic state (.)
-monomorphic state is specified with a `1. These states can be found in [src/ic/ic.cc](https://github.com/v8/v8/blob/df1494d69deab472a1a709bd7e688297aa5cc655/src/ic/ic.cc#L33-L52).
-What we are doing caching knowledge about the layout of the previously seen object inside the StoreIC/LoadIC calls.
-
-    $ lldb -- out/x64.debug/d8 class.js
 
 ### Local
 
@@ -659,6 +622,111 @@ The "solution" was to remove the out directory and rebuild.
 ### Tasks
 To find suitable task you can use `label:HelpWanted` at [bugs.chromium.org](https://bugs.chromium.org/p/v8/issues/list?can=2&q=label%3AHelpWanted+&x=priority&y=owner&cells=ids).
 
+### Properties/Elements
+Take the following object:
+
+    { firstname: "Jon", lastname: "Doe' }
+
+The above object has two named properties. Named properties differ from integer indexed for 
+property names which is what you have when you are working with arrays.
+
+Memory layout of JavaScript Object:
+```
+Properties                  JavaScript Object               Elements
++-----------+              +-----------------+         +----------------+
+|property1  |<------+      | HiddenClass     |  +----->|                |
++-----------+       |      +-----------------+  |      +----------------+
+|...        |       +------| Properties      |  |      | element1       |
++-----------+              +-----------------+  |      +----------------+
+|...        |              | Elements        |--+      | ...            |<------+
++-----------+              +-----------------+         +----------------+       |
+|propertyN  | <---------------------+                  | elementN       |       |
++-----------+                       |                  +----------------+       |
+                                    |                                           |
+                                    |                                           |
+                                    |                                           | 
+Named properties:    { firstname: "Jon", lastname: "Doe' } Indexed Properties: {1: "Jon", 2: "Doe"}
+```
+We can see that properies and elements are stored in different data structures.
+The elements is usually implemented as a plain array and the indexes can be for fast access
+to the elements. 
+But for the properties this is not the case. Instead there is a mapping between the property names
+and the index into the properties.
+
+In `src/objects.h` we can find JSObject:
+
+    class JSObject: public JSReceiver {
+    ...
+    DECL_ACCESSORS(elements, FixedArrayBase)
+
+
+And looking a the `DECL_ACCESSOR` macro:
+
+    #define DECL_ACCESSORS(name, type)    \
+      inline type* name() const;          \
+      inline void set_##name(type* value, \
+                             WriteBarrierMode mode = UPDATE_WRITE_BARRIER);
+
+    inline FixedArrayBase* name() const;
+    inline void set_elements(FixedArrayBase* value, WriteBarrierMode = UPDATE_WRITE_BARRIER)
+
+Notice that JSObject extends JSReceiver which is extended by all types that can have properties defined on them. I think this includes all JSObjects and JSProxy. It is in JSReceiver that the properties array:
+
+    DECL_ACCESSORS(raw_properties_or_hash, Object)
+
+Now properties (named properties not elements) can be of different kind internally. These work just
+like simple dictionaries from the outside but a dictionary is only used in certain curcumstances
+at runtime.
+
+```
+Properties                  JavaScript Object             HiddenClass
++-----------+              +-----------------+         +----------------+
+|property1  |<------+      | HiddenClass     |-------->| bit field1     |
++-----------+       |      +-----------------+         +----------------+
+|...        |       +------| Properties      |         | bit field2     |
++-----------+              +-----------------+         +----------------+
+|...        |              | Elements        |         | bit field3     |
++-----------+              +-----------------+         +----------------+
+|propertyN  |              | property1       |         | elementN       |
++-----------+              +-----------------+         +----------------+
+                           | property2       |
+                           +-----------------+
+                           | ...             |
+                           +-----------------+
+
+Each JSObject has as its first field a pointer to the generated HiddenClass.
+
+`bit field3' contains information about the number of properties that this HiddenClass has,
+a pointer to an DescriptorArray. The DescriptorArray contains information like the name of the 
+property, and the posistion where the value is stored in the JSObject.
+I noticed that this information available in src/objects/map.h. 
+
+#### DescriptorArray
+Can be found in src/objects/descriptor-array.h. This class extends FixedArray and has the following
+entries:
+[0] the number of descriptors it contains
+[1] If uninitialized this will be Smi(0) otherwise an enum cache bridge which is a FixedArray of size 2: 
+  [0] enum cache: FixedArray containing all own enumerable keys
+  [1] either Smi(0) or a pointer to a FixedArray with indices
+[2] first key (and internalized String
+[3] first descriptor
+
+
+### Objects 
+All objects extend the abstract class Object (src/objects.h).
+
+#### Object 
+Has a number of inline bool IsXXXType functions.
+
+#### HeapObject
+Is the superclass for all heap allocated objects. 
+This class contains a Map pointer which can be accessed using map()
+
+
+#### Map
+Extends HeapObject and all heap objects have a Map which describes the objects structure.
+This is where you can find the size of the instance, access to the inobject_properties.
+
 ### Caching
 Are ways to optimize polymorphic function calls in dynamic languages, for example JavaScript.
 
@@ -673,15 +741,17 @@ Using a lookup cache as described above still takes a considerable amount of tim
 cache must be probed for each message. It can be observed that the type of the target does often
 not vary. If a call to type A is done at a particular call site it is very likely that the next
 time it is called the type will also be A.
-
 The method address looked up by the system lookup routine can be cached and the call instruction
-can be overwritten. Subsequent call for the same type can jump directly to the cached method and
+can be overwritten. Subsequent calls for the same type can jump directly to the cached method and
 completely avoid the lookup. The prolog of the called method must verify that the receivers
 type has not changed and do the lookup if it has changed (the type if incorrect, no longer A for
 example).
 
 The target methods address is stored in the callers code, or "inline" with the callers code, 
 hence the name "inline cache".
+
+If V8 is able to make a good assumption about the type of object that will be passed to a method,
+it can bypass the process of figuring out how to access the objects properties, and instead use the stored information from previous lookups to the objects hidden class.
 
 #### Polymorfic Inline cache (PIC)
 A polymorfic call site is one where there are many equally likely receiver types (and thus
@@ -718,6 +788,42 @@ answer is hidden classes which allow the VM to quickly check an object against a
 
 The inline caching source are located in `src/ic`.
 
+## --trace-ic
+
+    $ out/x64.debug/d8 --trace-ic --trace-maps class.js
+
+    before
+    [TraceMaps: Normalize from= 0x19a314288b89 to= 0x19a31428aff9 reason= NormalizeAsPrototype ]
+    [TraceMaps: ReplaceDescriptors from= 0x19a31428aff9 to= 0x19a31428b051 reason= CopyAsPrototype ]
+    [TraceMaps: InitialMap map= 0x19a31428afa1 SFI= 34_Person ]
+
+    [StoreIC in ~Person+65 at class.js:2 (0->.) map=0x19a31428afa1 0x10e68ba83361 <String[4]: name>]
+    [TraceMaps: Transition from= 0x19a31428afa1 to= 0x19a31428b0a9 name= name ]
+    [StoreIC in ~Person+102 at class.js:3 (0->.) map=0x19a31428b0a9 0x2beaa25abd89 <String[3]: age>]
+    [TraceMaps: Transition from= 0x19a31428b0a9 to= 0x19a31428b101 name= age ]
+    [TraceMaps: SlowToFast from= 0x19a31428b051 to= 0x19a31428b159 reason= OptimizeAsPrototype ]
+    [StoreIC in ~Person+65 at class.js:2 (.->1) map=0x19a31428afa1 0x10e68ba83361 <String[4]: name>]
+    [StoreIC in ~Person+102 at class.js:3 (.->1) map=0x19a31428b0a9 0x2beaa25abd89 <String[3]: age>]
+    [LoadIC in ~+546 at class.js:9 (0->.) map=0x19a31428b101 0x10e68ba83361 <String[4]: name>]
+    [CallIC in ~+571 at class.js:9 (0->1) map=0x0 0x32f481082231 <String[5]: print>]
+    Daniel
+    [LoadIC in ~+642 at class.js:10 (0->.) map=0x19a31428b101 0x2beaa25abd89 <String[3]: age>]
+    [CallIC in ~+667 at class.js:10 (0->1) map=0x0 0x32f481082231 <String[5]: print>]
+    41
+    [LoadIC in ~+738 at class.js:11 (0->.) map=0x19a31428b101 0x10e68ba83361 <String[4]: name>]
+    [CallIC in ~+763 at class.js:11 (0->1) map=0x0 0x32f481082231 <String[5]: print>]
+    Tilda
+    [LoadIC in ~+834 at class.js:12 (0->.) map=0x19a31428b101 0x2beaa25abd89 <String[3]: age>]
+    [CallIC in ~+859 at class.js:12 (0->1) map=0x0 0x32f481082231 <String[5]: print>]
+    2
+    [CallIC in ~+927 at class.js:13 (0->1) map=0x0 0x32f481082231 <String[5]: print>]
+    after
+
+LoadIC (0->.) means that it has transitioned from unititialized state (0) to pre-monomophic state (.)
+monomorphic state is specified with a `1. These states can be found in [src/ic/ic.cc](https://github.com/v8/v8/blob/df1494d69deab472a1a709bd7e688297aa5cc655/src/ic/ic.cc#L33-L52).
+What we are doing caching knowledge about the layout of the previously seen object inside the StoreIC/LoadIC calls.
+
+    $ lldb -- out/x64.debug/d8 class.js
 
 ### Performance Optimizations
 Code is optimized 1 function at a time, without knowledge of what other code is doing
@@ -1040,7 +1146,7 @@ The bytecode becomes the source of truth instead of as before the AST.
 ### bytecode
 Can be found in src/interpreter/bytecodes.h
 
-* StackCheck
+* StackCheck checks that stack limits are not exceeded to guard against overflow.
 * `Star` Stor content in accumulator regiser in register (the operand).
 * Ldar   LoaD accumulator from Register argument a1 which is b
 
@@ -1067,7 +1173,6 @@ This will land us in `api.cc`
     ScriptCompiler::Source script_source(source);
     return ScriptCompiler::Compile(context, &script_source);
 
-
     MaybeLocal<Script> ScriptCompiler::Compile(Local<Context> context, Source* source, CompileOptions options) {
     ...
     auto isolate = context->GetIsolate();
@@ -1090,7 +1195,7 @@ LanguageMode can be found in src/globals.h and it is an enum with three values:
 
     enum LanguageMode : uint32_t { SLOPPY, STRICT, LANGUAGE_END };
 
-SLOPPY mode I asume is the mode when there is no "use strict";. Remember that this can go inside a function and does not
+`SLOPPY` mode, I asume, is the mode when there is no "use strict";. Remember that this can go inside a function and does not
 have to be at the top level of the file.
 
     ParseInfo parse_info(script);
@@ -1224,12 +1329,12 @@ This call will land in parser-base.h and its `ParseStatementList` function.
 
     result = CompileToplevel(&parse_info, isolate, Handle<SharedFunctionInfo>::null());
 
-This will land in `CompileTopelevel` (in same file which is src/compiler.cc):
+This will land in `CompileTopelevel` (in the same file which is src/compiler.cc):
 
     // Compile the code.
     result = CompileUnoptimizedCode(parse_info, shared_info, isolate);
 
-This will land in `CompileUnoptimizedCode` (in same file which is src/compiler.cc):
+This will land in `CompileUnoptimizedCode` (in the same file which is src/compiler.cc):
 
     // Prepare and execute compilation of the outer-most function.
     std::unique_ptr<CompilationJob> outer_job(
@@ -1304,6 +1409,81 @@ If x and y are integers just using the `add` operation would be much quicker:
 Recall that functions are optimized so if the compiler has to bail out and unoptimize 
 part of a function then the whole functions will be affected and it will go back to 
 the unoptimized version.
+
+## Bytecode
+This section will examine the bytecode for the following JavaScript:
+
+   function beve() {
+     const p = new Promise((resolve, reject) => {
+       resolve('ok');
+     });
+
+     p.then(msg => {
+       console.log(msg);
+     });
+   }
+
+   beve(); 
+
+    $ d8 --print-bytecode promise.js
+
+First have have the main function which does not have a name:
+
+    [generating bytecode for function: ]
+  (The code that generated this can be found in src/objects.cc BytecodeArray::Dissassemble)
+    Parameter count 1
+    Frame size 32
+           // load what ever the FixedArray[4] is in the constant pool into the accumulator.
+           0x34423e7ac19e @    0 : 09 00             LdaConstant [0] 
+           // store the FixedArray[4] in register r1
+           0x34423e7ac1a0 @    2 : 1e f9             Star r1
+           // store zero into the accumulator.
+           0x34423e7ac1a2 @    4 : 02                LdaZero
+           // store zero (the contents of the accumulator) into register r2.
+           0x34423e7ac1a3 @    5 : 1e f8             Star r2
+           // 
+           0x34423e7ac1a5 @    7 : 1f fe f7          Mov <closure>, r3
+           0x34423e7ac1a8 @   10 : 53 96 01 f9 03    CallRuntime [DeclareGlobalsForInterpreter], r1-r3
+      0 E> 0x34423e7ac1ad @   15 : 90                StackCheck
+    141 S> 0x34423e7ac1ae @   16 : 0a 01 00          LdaGlobal [1], [0]
+           0x34423e7ac1b1 @   19 : 1e f9             Star r1
+    141 E> 0x34423e7ac1b3 @   21 : 4f f9 03          CallUndefinedReceiver0 r1, [3]
+           0x34423e7ac1b6 @   24 : 1e fa             Star r0
+    148 S> 0x34423e7ac1b8 @   26 : 94                Return
+
+    Constant pool (size = 2)
+    0x34423e7ac149: [FixedArray] in OldSpace
+     - map = 0x344252182309 <Map(HOLEY_ELEMENTS)>
+     - length: 2
+           0: 0x34423e7ac069 <FixedArray[4]>
+           1: 0x34423e7abf59 <String[4]: beve>
+
+    Handler Table (size = 16)
+
+LdaConstant <idx> Load the constant at index from the constant pool into the accumulator.
+Star <dst> Store the contents of the accumulator register in dst.
+Ldar <src> Load accumulator with value from register src.
+LdaGlobal <idx> <slot> Load the constant at index from the constant pool into the accumulator.
+Use FeedbackVector slot for this. 
+Mov <closure>, <r3> store the value of regist
+You can find the declarations for the these instructions in src/interpreter/interpreter-generator.cc.
+
+br s -f bytecode-register.cc -l 125
+
+## Unified code generation architecture
+
+## FeedbackVector
+Is attached to every function and is responsible for recording and managing all execution feedback, which is information about types enabling. 
+
+## BytecodeGenerator
+Is currently the only part of V8 that cares about the AST.
+
+## BytecodeGraphBuilder
+Produces high-level IR graph based on interpreter bytecodes.
+
+
+## TurboFan
+Is a compiler backend that gets fed a control flow graph and then does instruction selection, register allocation and code generation. The code generation generates 
 
  
 ### Execution/Runtime
@@ -1548,3 +1728,54 @@ These Strings located on the native heap. The ExternalString structure has a poi
 
 
 Looking at `String` I was not able to find any construtor for it, nor the other subtypes.
+
+## Builtins
+Are JavaScript functions/objects that are provided by V8. These are built using a C++ DSL and are 
+passed to the CodeStubAssembler -> CodeAssembler -> RawMachineAssembler.
+These need to have bytecode generated for them so that they can be run in TurboFan.
+
+All the builtins are declared in src/builtins/builtins-definitions.h by the BUILTIN_LIST_BASE macro.
+
+To see how this works in action we first need to disable snapshots. If we don't we won't be able to
+set breakpoints as the the heap will be serialized at compile time and deserialized upon startup of v8.
+
+To find the option to disable snapshots use:
+
+    $ gn args --list out.gn/learning --short | more
+    ...
+    v8_use_snapshot=true
+    $ gn args out.gn/learning
+    v8_use_snapshot=false
+    $ gn -C out.gn/learning
+
+After building we should be able to set a break point in bootstrapper.cc and its function 
+`Genesis::InitializeGlobal`:
+
+    (lldb) br s -f bootstrapper.cc -l 2567
+
+Lets take a look at how the `JSON` object is setup:
+
+    Handle<String> name = factory->InternalizeUtf8String("JSON");
+    Handle<JSObject> json_object = factory->NewJSObject(isolate->object_function(), TENURED);
+
+`TENURED` means that this object should be allocated directly in the old generation.
+
+    JSObject::AddProperty(global, name, json_object, DONT_ENUM);
+
+`DONT_ENUM` is checked by some builtin functions and if set this object will be ignored by thosee
+functions.
+
+    SimpleInstallFunction(json_object, "parse", Builtins::kJsonParse, 2, false);
+
+Here we can see that we are installing a function named `parse`, which takes 2 parameters. You can
+find the definition in src/builtins/builtins-json.cc.
+
+
+
+## Ignition interpreter
+User JavaScript also needs to have bytecode generated for them and they also use the C++ DLS
+and use the CodeStubAssembler -> CodeAssembler -> RawMachineAssembler just like builtins.
+
+## C++ Domain Specific Language (DLS)
+
+## CodeStubAssembler (CSA)
