@@ -675,6 +675,7 @@ Properties                  JavaScript Object             HiddenClass
                            | ...             |
                            +-----------------+
 
+```
 Each JSObject has as its first field a pointer to the generated HiddenClass.
 
 `bit field3' contains information about the number of properties that this HiddenClass has,
