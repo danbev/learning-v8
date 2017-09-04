@@ -647,7 +647,7 @@ And looking a the `DECL_ACCESSOR` macro:
     inline FixedArrayBase* name() const;
     inline void set_elements(FixedArrayBase* value, WriteBarrierMode = UPDATE_WRITE_BARRIER)
 
-Notice that JSObject extends JSReceiver which is extended by all types that can have properties defined on them. I think this includes all JSObjects and JSProxy. It is in JSReceiver that the properties array:
+Notice that JSObject extends JSReceiver which is extended by all types that can have properties defined on them. I think this includes all JSObjects and JSProxy. It is in JSReceiver that the we find the properties array:
 
     DECL_ACCESSORS(raw_properties_or_hash, Object)
 
@@ -656,7 +656,7 @@ like simple dictionaries from the outside but a dictionary is only used in certa
 at runtime.
 
 ```
-Properties                  JavaScript Object             HiddenClass
+Properties                  JSObject                    HiddenClass (Map)
 +-----------+              +-----------------+         +----------------+
 |property1  |<------+      | HiddenClass     |-------->| bit field1     |
 +-----------+       |      +-----------------+         +----------------+
@@ -672,12 +672,33 @@ Properties                  JavaScript Object             HiddenClass
                            +-----------------+
 
 ```
-Each JSObject has as its first field a pointer to the generated HiddenClass.
 
+#### JSObject
+Each JSObject has as its first field a pointer to the generated HiddenClass. A hiddenclass contain mappings from property names to indices into the properties data type. When an instance of JSObject is created a `Map` is passed in. 
+As mentioned earlier JSObject inherits from JSReceiver which inherits from HeapObject
+
+For example,in `tests/jsobject_test.cc` we first create a new Map using the internal Isolate Factory:
+
+    v8::internal::Handle<v8::internal::Map> map = factory->NewMap(v8::internal::JS_OBJECT_TYPE, 24);
+    v8::internal::Handle<v8::internal::JSObject> js_object = factory->NewJSObjectFromMap(map);
+    EXPECT_TRUE(js_object->HasFastProperties());
+
+When we call `js_object->HasFastProperties()` this will delegate to the map instance: 
+
+    return !map()->is_dictionary_map();
+
+
+#### HeapObject
+This class describes heap allocated objects. It is in this class we find information regarding the type of object. This 
+information is contained in `v8::internal::Map`.
+
+### v8::internal::Map
+`src/objects/map.h`
 `bit field3' contains information about the number of properties that this HiddenClass has,
 a pointer to an DescriptorArray. The DescriptorArray contains information like the name of the 
 property, and the posistion where the value is stored in the JSObject.
 I noticed that this information available in src/objects/map.h. 
+
 
 #### DescriptorArray
 Can be found in src/objects/descriptor-array.h. This class extends FixedArray and has the following
@@ -688,6 +709,10 @@ entries:
   [1] either Smi(0) or a pointer to a FixedArray with indices
 [2] first key (and internalized String
 [3] first descriptor
+
+### Factory
+Each Internal Isolate has a Factory which is used to create instances. This is because all handles needs to be allocated
+using the factory (src/factory.h)
 
 
 ### Objects 
