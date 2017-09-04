@@ -16,3 +16,4 @@ run-script
 exceptions
 tests/string_test
 ns
+tests/jsobject_test

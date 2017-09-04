@@ -1,12 +1,12 @@
 V8_HOME ?= /Users/danielbevenius/work/google/javascript/v8
-v8_build_dir = $(V8_HOME)/out.gn/beve
+v8_build_dir = $(V8_HOME)/out.gn/learning
 v8_include_dir = $(V8_HOME)/include
 v8_src_dir = $(V8_HOME)/src
 GTEST_FILTER ?= "*"
 
 v8_dylibs = -lv8 -lv8_libbase -lv8_libplatform -licuuc -licui18n 
 
-COMPILE_TEST = clang++ -std=c++11 -O0 -g -I`pwd`/deps/googletest/googletest/include -I$(v8_include_dir) $(v8_dylibs) -L$(v8_build_dir) -pthread tests/main.cc lib/gtest/libgtest.a -rpath $(v8_build_dir) -o
+COMPILE_TEST = clang++ -std=c++11 -O0 -g -I`pwd`/deps/googletest/googletest/include -I$(v8_include_dir) -I$(V8_HOME) $(v8_dylibs) -L$(v8_build_dir) -pthread  lib/gtest/libgtest.a -rpath $(v8_build_dir) 
 
 LD_LIBRARY_PATH=$(v8_build_dir)
 
@@ -36,23 +36,25 @@ natives_blob.bin:
 snapshot_blob.bin:
 	@cp $(v8_build_dir)/$@ .
 
-check: natives_blob.bin snapshot_blob.bin tests/local_test tests/persistent-object_test tests/maybe_test tests/smi_test
-	./tests/smi_test
+check: tests/local_test tests/persistent-object_test tests/maybe_test tests/smi_test tests/string_test
 
 tests/local_test: tests/local_test.cc
-	$(COMPILE_TEST) $@
+	$(COMPILE_TEST) tests/main.cc $< -o $@
 
 tests/persistent-object_test: tests/persistent-object_test.cc
-	$(COMPILE_TEST) $@
+	$(COMPILE_TEST) tests/main.cc $< -o $@
 
 tests/maybe_test: tests/maybe_test.cc
-	$(COMPILE_TEST) $@
+	$(COMPILE_TEST) tests/main.cc $< -o $@
 
 tests/smi_test: tests/smi_test.cc
-	$(COMPILE_TEST) $@
+	$(COMPILE_TEST) tests/main.cc $< -o $@
 
 tests/string_test: tests/string_test.cc
-	$(COMPILE_TEST) $@
+	$(COMPILE_TEST) tests/main.cc $< -o $@
+
+tests/jsobject_test: tests/jsobject_test.cc
+	$(COMPILE_TEST) tests/main.cc $< -o $@
 
 list-gtests:
 	./tests/smi_test --gtest_list_tests
@@ -72,3 +74,4 @@ clean:
 	rm -rf tests/maybe_test
 	rm -rf tests/smi_test
 	rm -rf tests/string_test
+	rm -rf tests/jsobject_test

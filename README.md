@@ -181,10 +181,6 @@ and run the script.
 #### tests
 The tests directory contains unit tests for individual classes/concepts in V8 to help understand them.
 
-These tests can be run using:
-
-    $ make check
-
 ## Building this projects code
 
     $ make
