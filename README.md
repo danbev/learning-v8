@@ -662,13 +662,14 @@ I noticed that this information available in src/objects/map.h.
 Can be found in src/objects/descriptor-array.h. This class extends FixedArray and has the following
 entries:
 
-[0] the number of descriptors it contains
+```
+[0] the number of descriptors it contains  
 [1] If uninitialized this will be Smi(0) otherwise an enum cache bridge which is a FixedArray of size 2: 
-  [0] enum cache: FixedArray containing all own enumerable keys
-  [1] either Smi(0) or a pointer to a FixedArray with indices
-[2] first key (and internalized String
-[3] first descriptor
-
+  [0] enum cache: FixedArray containing all own enumerable keys  
+  [1] either Smi(0) or a pointer to a FixedArray with indices  
+[2] first key (and internalized String  
+[3] first descriptor  
+```
 ### Factory
 Each Internal Isolate has a Factory which is used to create instances. This is because all handles needs to be allocated
 using the factory (src/factory.h)
