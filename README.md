@@ -1393,7 +1393,7 @@ This section will examine the bytecode for the following JavaScript:
 First have have the main function which does not have a name:
 
     [generating bytecode for function: ]
-  (The code that generated this can be found in src/objects.cc BytecodeArray::Dissassemble)
+    (The code that generated this can be found in src/objects.cc BytecodeArray::Dissassemble)
     Parameter count 1
     Frame size 32
            // load what ever the FixedArray[4] is in the constant pool into the accumulator.
