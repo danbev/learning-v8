@@ -1679,13 +1679,13 @@ These are string that are built using:
     const str = "one" + "two";
 
 This would be represented as:
-
+```
          +--------------+
          |              | 
    [str|one|two]     [one|...]   [two|...]
              |                       |
              +-----------------------+
-
+```
 So we can see that one and two in str are pointer so existing strings. 
 
 
