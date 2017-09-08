@@ -56,6 +56,9 @@ tests/string_test: tests/string_test.cc
 tests/jsobject_test: tests/jsobject_test.cc
 	$(COMPILE_TEST) tests/main.cc $< -o $@
 
+tests/ast_test: tests/ast_test.cc
+	$(COMPILE_TEST) -Wno-everything tests/main.cc $< -o $@
+
 list-gtests:
 	./tests/smi_test --gtest_list_tests
 
@@ -75,3 +78,4 @@ clean:
 	rm -rf tests/smi_test
 	rm -rf tests/string_test
 	rm -rf tests/jsobject_test
+	rm -rf tests/ast_test

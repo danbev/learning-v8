@@ -1142,6 +1142,19 @@ FUNC at 0
 . RETURN at -1
 . . VAR PROXY local[0] (0x7ffe5285b330) (mode = TEMPORARY) ".result"
 ```
+You can find the declaration of EXPRESSION in ast.h.
+
+
+### Zone
+Taken directly from src/zone/zone.h:
+```
+// The Zone supports very fast allocation of small chunks of
+// memory. The chunks cannot be deallocated individually, but instead
+// the Zone supports deallocating all chunks in one fast
+// operation. The Zone is used to hold temporary data structures like
+// the abstract syntax tree, which is deallocated after compilation.
+```
+
 
 ### Bytecode
 Can be found in src/interpreter/bytecodes.h
@@ -1199,6 +1212,9 @@ LanguageMode can be found in src/globals.h and it is an enum with three values:
 have to be at the top level of the file.
 
     ParseInfo parse_info(script);
+
+There is a [unit test](./tests/ast_test.cc) that shows how a ParseInfo instance can be created
+and inspected.
 
 This will call ParseInfo's constructor (in src/parsing/parse-info.cc), and which will call `ParseInfo::InitFromIsolate`:
 
