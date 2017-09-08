@@ -3,7 +3,7 @@ The sole purpose of this project is to aid me in leaning Google's V8 JavaScript 
 
 
 ## Contents
-1. [Building](#building-v8)
+1. [Building V8](#building-v8)
 2. [Contributing a change](#contributing-a-change)
 3. [Debugging](#debugging)
 4. [Introduction](#introduction)
@@ -19,6 +19,51 @@ the instructions found [here](https://developers.google.com/v8/build).
 ### [gclient](https://www.chromium.org/developers/how-tos/depottools) sync
 
     gclient sync
+
+### [GN](https://chromium.googlesource.com/chromium/src/+/master/tools/gn/docs/quick_start.md)
+
+    $ tools/dev/v8gen.py --help
+
+    $ ./tools/dev/v8gen.py list
+    ....
+    x64.debug
+    x64.optdebug
+    x64.release
+
+    $ vi out.gn/learning/args.gn
+
+Generate Ninja files:
+
+    $ gn args out.gn/learning
+
+This will open an editor where you can set configuration options. I've been using the following:
+
+    is_debug = true
+    target_cpu = "x64"
+    v8_enable_backtrace = true
+    v8_enable_slow_dchecks = true
+    v8_optimized_debug = false
+
+Note that for lldb command aliases to work `is_debug` must be set to true.
+
+List avaiable build arguments:
+
+    $ gn args --list out.gn/learning
+
+List all available targets:
+
+    $ ninja -C out.gn/learning/ -t targets all
+
+Building:
+
+    $ ninja -C out.gn/learning
+
+Running quickchecks:
+
+    $ ./tools/run-tests.py --outdir=out.gn/learning --quickcheck
+
+You can use `./tools-run-tests.py -h` to list all the opitions that can be passed
+to run-tests.
 
 ## Building chromium
 When making changes to V8 you might need to verify that your changes have not broken anything in Chromium. 
@@ -118,50 +163,6 @@ You should be able to update the .gclient file adding a custom_deps entry:
    cache_dir = None
 You'll have to run `gclient sync` after this too.
 
-### GN
-
-    $ tools/dev/v8gen.py --help
-
-    $ ./tools/dev/v8gen.py list
-    ....
-    x64.debug
-    x64.optdebug
-    x64.release
-
-    $ vi out.gn/learning/args.gn
-
-Generate Ninja files:
-
-    $ gn args out.gn/learning
-
-This will open an editor where you can set configuration options. I've been using the following:
-
-    is_debug = true
-    target_cpu = "x64"
-    v8_enable_backtrace = true
-    v8_enable_slow_dchecks = true
-    v8_optimized_debug = false
-
-Note that for lldb command aliases to work `is_debug` must be set to true.
-
-List avaiable build arguments:
-
-    $ gn args --list out.gn/learning
-
-List all available targets:
-
-    $ ninja -C out.gn/learning/ -t targets all
-
-Building:
-
-    $ ninja -C out.gn/learning
-
-Running quickchecks:
-
-    $ ./tools/run-tests.py --outdir=out.gn/learning --quickcheck
-
-You can use `./tools-run-tests.py -h` to list all the opitions that can be passed
-to run-tests.
 
 
 
@@ -546,42 +547,6 @@ with the `--trace-maps`` flag to show information about hidden classes (which ar
     [TraceMaps: Transition from= 0x37facd30b0a9 to= 0x37facd30b101 name= age ]
 
 
-### Tasks 
-
-No space between these declarations:
-
-    3322   /**
-    3323    * Returns zero based line number of function body and
-    3324    * kLineOffsetNotFound if no information available.
-    3325    */
-    3326   int GetScriptLineNumber() const;
-    3327   /**
-    3328    * Returns zero based column number of function body and
-    3329    * kLineOffsetNotFound if no information available.
-    3330    */
-    3331   int GetScriptColumnNumber() const;
-
-
-    3435 /**
-    3436  * An instance of the built-in Proxy constructor (ECMA-262, 6th Edition,
-    3437  * 26.2.1).
-    3438  */
-    3439 class V8_EXPORT Proxy : public Object {
-    3440  public:
-    3441   Local<Object> GetTarget();
-    3442   Local<Value> GetHandler();
-    3443   bool IsRevoked();
-    3444   void Revoke();
-    3445
-    3446   /**
-    3447    * Creates a new empty Map. <-- a Map???
-    3448    */
-    3449   static MaybeLocal<Proxy> New(Local<Context> context,
-    3450                                Local<Object> local_target,
-    3451                                Local<Object> local_handler);
-
-
-
 #### Testing
 
     $ out/Default/unit_tests --gtest_filter="PushClientTest.*"
@@ -687,14 +652,24 @@ When we call `js_object->HasFastProperties()` this will delegate to the map inst
 
     return !map()->is_dictionary_map();
 
+How do you add a property to a JSObject instance?  
+JSObject has a AddPropery function
+
+
+#### HasProperty
+What actually happens when you call this using:
+
+    JSReceiver::HasProperty(js_object, prop_name).FromJust()
 
 #### HeapObject
 This class describes heap allocated objects. It is in this class we find information regarding the type of object. This 
 information is contained in `v8::internal::Map`.
 
 ### v8::internal::Map
-`src/objects/map.h`
-`bit field3' contains information about the number of properties that this HiddenClass has,
+`src/objects/map.h`  
+* `bit_field1`  
+* `bit_field2`
+* `bit field3` contains information about the number of properties that this Map has,
 a pointer to an DescriptorArray. The DescriptorArray contains information like the name of the 
 property, and the posistion where the value is stored in the JSObject.
 I noticed that this information available in src/objects/map.h. 
@@ -703,6 +678,7 @@ I noticed that this information available in src/objects/map.h.
 #### DescriptorArray
 Can be found in src/objects/descriptor-array.h. This class extends FixedArray and has the following
 entries:
+
 [0] the number of descriptors it contains
 [1] If uninitialized this will be Smi(0) otherwise an enum cache bridge which is a FixedArray of size 2: 
   [0] enum cache: FixedArray containing all own enumerable keys
@@ -718,12 +694,12 @@ using the factory (src/factory.h)
 ### Objects 
 All objects extend the abstract class Object (src/objects.h).
 
-#### Object 
-Has a number of inline bool IsXXXType functions.
-
 #### HeapObject
 Is the superclass for all heap allocated objects. 
 This class contains a Map pointer which can be accessed using map()
+
+### Oddball
+This class extends HeapObject and  describes null, undefined, true, and false objects.
 
 
 #### Map
@@ -1676,13 +1652,16 @@ If we look in src/objects.h we can see the object hierarchy:
                 ExternalTwoByteInternalizedString
 ```
 
-Do not that v8::String is declared in include/v8.h
+Do note that v8::String is declared in include/v8.h
 
 `Name` as can be seen extends HeapObject and anything that can be used as a property name should extend Name.
 Looking at the declaration in include/v8.h we find the following:
 
     int GetIdentityHash();
     static Name* Cast(Value* obj)
+
+
+src/objects/string.h
 
 #### String
 A String extends Name and has a length and content. The content can be made up of 1 or 2 byte characters.
