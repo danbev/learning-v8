@@ -1106,7 +1106,44 @@ The bytecode becomes the source of truth instead of as before the AST.
      65 S> 0x2eef8d9b104e @   16 : 83                Return         // return the value in the accumulator?
 
 
-### bytecode
+### Abstract Syntax Tree (AST)
+In src/ast/ast.h. You can print the ast using the `--print-ast` option for d8.
+
+Lets take the following javascript and look at the ast:
+
+    const msg = 'testing';
+    console.log(msg);
+
+    
+```
+$ d8 --print-ast simple.js
+[generating interpreter code for user-defined function: ]
+--- AST ---
+FUNC at 0
+. KIND 0
+. SUSPEND COUNT 0
+. NAME ""
+. INFERRED NAME ""
+. DECLS
+. . VARIABLE (0x7ffe5285b0f8) (mode = CONST) "msg"
+. BLOCK NOCOMPLETIONS at -1
+. . EXPRESSION STATEMENT at 12
+. . . INIT at 12
+. . . . VAR PROXY context[4] (0x7ffe5285b0f8) (mode = CONST) "msg"
+. . . . LITERAL "testing"
+. EXPRESSION STATEMENT at 23
+. . ASSIGN at -1
+. . . VAR PROXY local[0] (0x7ffe5285b330) (mode = TEMPORARY) ".result"
+. . . CALL Slot(0)
+. . . . PROPERTY Slot(4) at 31
+. . . . . VAR PROXY Slot(2) unallocated (0x7ffe5285b3d8) (mode = DYNAMIC_GLOBAL) "console"
+. . . . . NAME log
+. . . . VAR PROXY context[4] (0x7ffe5285b0f8) (mode = CONST) "msg"
+. RETURN at -1
+. . VAR PROXY local[0] (0x7ffe5285b330) (mode = TEMPORARY) ".result"
+```
+
+### Bytecode
 Can be found in src/interpreter/bytecodes.h
 
 * StackCheck checks that stack limits are not exceeded to guard against overflow.
