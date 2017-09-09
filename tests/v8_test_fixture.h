@@ -31,6 +31,10 @@ class V8TestFixture : public ::testing::Test {
     platform_ = nullptr;
   }
 
+  v8::internal::Isolate* asInternal(v8::Isolate* isolate) {
+    return reinterpret_cast<v8::internal::Isolate*>(isolate);
+  }
+
  private:
   v8::Platform* platform_ = nullptr;
 };

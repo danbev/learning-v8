@@ -13,10 +13,6 @@ namespace i = v8::internal;
 class JSObjectTest : public V8TestFixture {
 };
 
-i::Isolate* asInternal(Isolate* isolate) {
-  return reinterpret_cast<i::Isolate*>(isolate);
-}
-
 TEST_F(JSObjectTest, FastProperties) {
   const v8::HandleScope handle_scope(isolate_);
   Isolate::Scope isolate_scope(isolate_);
