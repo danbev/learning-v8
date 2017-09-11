@@ -3,9 +3,11 @@
 #include "v8.h"
 #include "libplatform/libplatform.h"
 #include "v8_test_fixture.h"
-#include "src/parsing/parser.h"
 #include "src/parsing/parse-info.h"
+#include "src/parsing/parser.h"
+#include "src/parsing/parsing.h"
 #include "src/parsing/scanner-character-streams.h"
+#include "src/globals.h"
 
 using namespace v8;
 namespace i = v8::internal;
@@ -40,9 +42,11 @@ TEST_F(AstTest, Parser) {
       "const msg = 'testing'");
   i::Handle<i::Script> script = factory->NewScript(source);
   i::ParseInfo parse_info(script);
-  std::unique_ptr<i::Utf16CharacterStream> stream(i::ScannerStream::For(source));
-  parse_info.set_character_stream(std::move(stream));
-  ASSERT_TRUE(parse_info.character_stream());
-  i::Parser parser(&parse_info);
-  //parser.ast_value_factory();
+  bool result = i::parsing::ParseProgram(&parse_info, internal_isolate);
+  EXPECT_TRUE(result);
+  // ParseProgram set parse_info's literal_ which is a AST node
+  i::FunctionLiteral* function_literal = parse_info.literal();
+  EXPECT_EQ(function_literal->function_type(), i::FunctionLiteral::FunctionType::kAnonymousExpression);
+  EXPECT_EQ(function_literal->kind(), i::FunctionKind::kNormalFunction);
 }
+
