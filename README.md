@@ -65,6 +65,10 @@ Running quickchecks:
 You can use `./tools-run-tests.py -h` to list all the opitions that can be passed
 to run-tests.
 
+Running pre-submit checks:
+
+    $ ./tools/presubmit.py
+
 ## Building chromium
 When making changes to V8 you might need to verify that your changes have not broken anything in Chromium. 
 
@@ -1047,17 +1051,18 @@ bodies).
 
 The non top level code must be pre-parsed to check for syntax errors.
 The top level code is parsed and compiles by the full-codegen compiler. This compiler does not perform any optimizations and
-it's only task is to generate machine code as quickly as possible.
+it's only task is to generate machine code as quickly as possible (this is pre turbofan)
 
     Source ------> Parser  --------> Full-codegen ---------> Unoptimized Machine Code
 
 So the whole script is parsed even though we only generated code for the top-level code. The pre-parse (the syntax checking)
 was not stored in any way. The functions are lazy stubs that when/if the function gets called the function get compiled. This
 means that the function has to be parsed (again, the first time was the pre-parse remember).
+
 If a function is determined to be hot it will be optimized by one of the two optimizing compilers crankshaft for older parts oof JavaScript or Turbofan for Web Assembly (WASM) and some of the newer es6 features. 
 
 The first time V8 sees a function it will parse it into an AST but not do any further processing of that tree
-until that function is used. Processing will be running the full-codegen compiler.
+until that function is used. 
 
                          +-----> Full-codegen -----> Unoptimized code
                         /                               \/ /\       \
@@ -1104,6 +1109,10 @@ The bytecode becomes the source of truth instead of as before the AST.
      60 E> 0x2eef8d9b1048 @   10 : 2c fa 03          Mul r0, [3]    // multiply that is our local variable in r0
      56 E> 0x2eef8d9b104b @   13 : 2a 04 04          Add a0, [4]    // add that to our argument register 0 which is a 
      65 S> 0x2eef8d9b104e @   16 : 83                Return         // return the value in the accumulator?
+
+
+####
+
 
 
 ### Abstract Syntax Tree (AST)
@@ -1208,7 +1217,7 @@ LanguageMode can be found in src/globals.h and it is an enum with three values:
 
     enum LanguageMode : uint32_t { SLOPPY, STRICT, LANGUAGE_END };
 
-`SLOPPY` mode, I asume, is the mode when there is no "use strict";. Remember that this can go inside a function and does not
+`SLOPPY` mode, I assume, is the mode when there is no "use strict";. Remember that this can go inside a function and does not
 have to be at the top level of the file.
 
     ParseInfo parse_info(script);
@@ -1715,7 +1724,7 @@ Looking at the declaration in include/v8.h we find the following:
     bool IsOneByte() const;
 
 Example usages can be found in [tests/string_test.cc](./tests/string_test.cc).
-Looking at the functions I've get to see one that returns the actual bytes 
+Looking at the functions I've seen one that returns the actual bytes 
 from the String. You can get at the in utf8 format using:
 
     String::Utf8Value print_value(joined);
@@ -1739,12 +1748,11 @@ This would be represented as:
              |                       |
              +-----------------------+
 ```
-So we can see that one and two in str are pointer so existing strings. 
+So we can see that one and two in str are pointer to existing strings. 
 
 
 #### ExternalString
 These Strings located on the native heap. The ExternalString structure has a pointer to this external location and the usual length field for all Strings.
-
 
 Looking at `String` I was not able to find any construtor for it, nor the other subtypes.
 
@@ -1810,4 +1818,44 @@ The "solution" was to remove the out directory and rebuild.
 
 ### Tasks
 To find suitable task you can use `label:HelpWanted` at [bugs.chromium.org](https://bugs.chromium.org/p/v8/issues/list?can=2&q=label%3AHelpWanted+&x=priority&y=owner&cells=ids).
+
+
+### OpenHandle
+What does this call do: 
+
+    Utils::OpenHandle(*(source->source_string));
+
+    OPEN_HANDLE_LIST(MAKE_OPEN_HANDLE)
+
+Which is a macro defined in src/api.h:
+
+    #define MAKE_OPEN_HANDLE(From, To)                                             \
+      v8::internal::Handle<v8::internal::To> Utils::OpenHandle(                    \
+          const v8::From* that, bool allow_empty_handle) {                         \
+      DCHECK(allow_empty_handle || that != NULL);                                \
+      DCHECK(that == NULL ||                                                     \
+           (*reinterpret_cast<v8::internal::Object* const*>(that))->Is##To()); \
+      return v8::internal::Handle<v8::internal::To>(                             \
+          reinterpret_cast<v8::internal::To**>(const_cast<v8::From*>(that)));    \
+    }
+
+    OPEN_HANDLE_LIST(MAKE_OPEN_HANDLE)
+
+If we take a closer look at the macro is should expand to something like this in our case:
+
+     v8::internal::Handle<v8::internal::To> Utils::OpenHandle(const v8:String* that, false) {
+       DCHECK(allow_empty_handle || that != NULL);                                \
+       DCHECK(that == NULL ||                                                     \
+           (*reinterpret_cast<v8::internal::Object* const*>(that))->IsString()); \
+       return v8::internal::Handle<v8::internal::String>(                             \
+          reinterpret_cast<v8::internal::String**>(const_cast<v8::String*>(that)));    \
+     }
+
+So this is returning a new v8::internal::Handle, the constructor is defined in src/handles.h:95.
+     
+src/objects.cc
+Handle<WeakFixedArray> WeakFixedArray::Add(Handle<Object> maybe_array,
+10167                                            Handle<HeapObject> value,
+10168                                            int* assigned_index) {
+Notice the name of the first parameter `maybe_array` but it is not of type maybe?
 
