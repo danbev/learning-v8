@@ -3,228 +3,14 @@ The sole purpose of this project is to aid me in leaning Google's V8 JavaScript 
 
 
 ## Contents
-1. [Building V8](#building-v8)
-2. [Contributing a change](#contributing-a-change)
-3. [Debugging](#debugging)
-4. [Introduction](#introduction)
+1. [Introduction](#introduction)
+2. [Building V8](#building-v8)
+3. [Contributing a change](#contributing-a-change)
+4. [Debugging](#debugging)
 5. [Inline caches](#inline-caches)
 6. [Small Integers](#small-integers)
 7. [Building chromium](#building-chromium)
 8. [Compiler pipeline](#compiler-pipeline)
-
-## Building V8
-You'll need to have checked out the Google V8 sources to you local file system and build it by following 
-the instructions found [here](https://developers.google.com/v8/build).
-
-### [gclient](https://www.chromium.org/developers/how-tos/depottools) sync
-
-    gclient sync
-
-### [GN](https://chromium.googlesource.com/chromium/src/+/master/tools/gn/docs/quick_start.md)
-
-    $ tools/dev/v8gen.py --help
-
-    $ ./tools/dev/v8gen.py list
-    ....
-    x64.debug
-    x64.optdebug
-    x64.release
-
-    $ vi out.gn/learning/args.gn
-
-Generate Ninja files:
-
-    $ gn args out.gn/learning
-
-This will open an editor where you can set configuration options. I've been using the following:
-
-    is_debug = true
-    target_cpu = "x64"
-    v8_enable_backtrace = true
-    v8_enable_slow_dchecks = true
-    v8_optimized_debug = false
-
-Note that for lldb command aliases to work `is_debug` must be set to true.
-
-List avaiable build arguments:
-
-    $ gn args --list out.gn/learning
-
-List all available targets:
-
-    $ ninja -C out.gn/learning/ -t targets all
-
-Building:
-
-    $ ninja -C out.gn/learning
-
-Running quickchecks:
-
-    $ ./tools/run-tests.py --outdir=out.gn/learning --quickcheck
-
-You can use `./tools-run-tests.py -h` to list all the opitions that can be passed
-to run-tests.
-
-Running pre-submit checks:
-
-    $ ./tools/presubmit.py
-
-## Building chromium
-When making changes to V8 you might need to verify that your changes have not broken anything in Chromium. 
-
-Generate Your Project (gpy) :
-You'll have to run this once before building:
-
-    $ gclient sync
-    $ gclient runhooks
-
-#### Update the code base
-
-    $ git fetch origin master
-    $ git co master
-    $ git merge origin/master
-
-### Building using GN
-
-    $ gn args out.gn/learning
-
-### Building using Ninja
-
-    $ ninja -C out.gn/learning 
-
-Building the tests:
-
-    $ ninja -C out.gn/learning chrome/test:unit_tests
-
-An error I got when building the first time:
-
-    traceback (most recent call last):
-    File "./gyp-mac-tool", line 713, in <module>
-      sys.exit(main(sys.argv[1:]))
-    File "./gyp-mac-tool", line 29, in main
-      exit_code = executor.Dispatch(args)
-    File "./gyp-mac-tool", line 44, in Dispatch
-      return getattr(self, method)(*args[1:])
-    File "./gyp-mac-tool", line 68, in ExecCopyBundleResource
-      self._CopyStringsFile(source, dest)
-    File "./gyp-mac-tool", line 134, in _CopyStringsFile
-      import CoreFoundation
-    ImportError: No module named CoreFoundation
-    [6642/20987] CXX obj/base/debug/base.task_annotator.o
-    [6644/20987] ACTION base_nacl: build newlib plib_9b4f41e4158ebb93a5d28e6734a13e85
-    ninja: build stopped: subcommand failed.
-
-I was able to get around this by:
-
-    $ pip install -U pyobjc
-
-#### Using a specific version of V8
-So, we want to include our updated version of V8 so that we can verify that it builds correctly with our change to V8.
-While I'm not sure this is the proper way to do it, I was able to update DEPS in src (chromium) and set
-the v8 entry to git@github.com:danbev/v8.git@064718a8921608eaf9b5eadbb7d734ec04068a87:
-
-    "git@github.com:danbev/v8.git@064718a8921608eaf9b5eadbb7d734ec04068a87"
-
-You'll have to run `gclient sync` after this. 
-
-Another way is to not updated the `DEPS` file, which is a version controlled file, but instead update
-`.gclientrc` and add a `custom_deps` entry:
-
-    solutions = [{u'managed': False, u'name': u'src', u'url': u'https://chromium.googlesource.com/chromium/src.git', 
-    u'custom_deps': {
-      "src/v8": "git@github.com:danbev/v8.git@27a666f9be7ca3959c7372bdeeee14aef2a4b7ba"
-    }, u'deps_file': u'.DEPS.git', u'safesync_url': u''}]
-    
-## Buiding pdfium
-You may have to compile this project (in addition to chromium to verify that changes in v8 are not breaking
-code in pdfium.
-
-### Create/clone the project
-
-     $ mkdir pdfuim_reop
-     $ gclient config --unmanaged https://pdfium.googlesource.com/pdfium.git
-     $ gclient sync
-     $ cd pdfium
-
-### Building
-
-    $ ninja -C out/Default
-
-#### Using a branch of v8
-You should be able to update the .gclient file adding a custom_deps entry:
-
-    solutions = [
-    {
-      "name"        : "pdfium",
-      "url"         : "https://pdfium.googlesource.com/pdfium.git",
-      "deps_file"   : "DEPS",
-      "managed"     : False,
-      "custom_deps" : {
-        "v8": "git@github.com:danbev/v8.git@064718a8921608eaf9b5eadbb7d734ec04068a87"
-      },
-    },
-   ]
-   cache_dir = None
-You'll have to run `gclient sync` after this too.
-
-
-
-
-## Code in this repo
-
-#### hello-world
-[hello-world](./hello-world.cc) is heavily commented and show the usage of a static int being exposed and
-accessed from JavaScript.
-
-#### instances
-[instances](./instances.cc) shows the usage of creating new instances of a C++ class from JavaScript.
-
-#### run-script
-[run-script](./run-script.cc) is basically the same as instance but reads an external file, [script.js](./script.js)
-and run the script.
-
-#### tests
-The tests directory contains unit tests for individual classes/concepts in V8 to help understand them.
-
-## Building this projects code
-
-    $ make
-
-## Running
-
-    $ ./hello-world
-
-## Cleaning
-
-    $ make clean
-
-## Contributing a change to V8
-1) Create a working branch using `git new-branch name`
-2) git cl upload  
-
-See Googles [contributing-code](https://www.chromium.org/developers/contributing-code) for more details.
-
-### Find the current issue number
-
-    $ git cl issue
-
-## Debugging
-
-    $ lldb hello-world
-    (lldb) br s -f hello-world.cc -l 27
-
-There are a number of useful functions in `src/objects-printer.cc` which can also be used in lldb.
-
-#### Print value of a Local object
-
-    (lldb) print _v8_internal_Print_Object(*(v8::internal::Object**)(*init_fn))
-
-#### Print stacktrace
-
-    (lldb) p _v8_internal_Print_StackTrace()
-
-#### Creating command aliases in lldb
-Create a file named [.lldbinit](./.lldbinit) (in your project director or home directory). This file can now be found in v8's tools directory.
 
 ## Introduction
 V8 is bascially consists of the memory management of the heap and the execution stack (very simplified but helps
@@ -267,6 +53,14 @@ So that describes synchronous functions, what about asynchronous functions?
 Lets take for example that you call setTimeout, the setTimeout function will be
 pushed onto the call stack and executed. This is where the callback queue comes into play and the event loop. The setTimeout function can add functions to the callback queue. This queue will be processed by the event loop when the call stack is empty.
 
+### Isolate
+An Isolate is an independant copy of the V8 runtime which includes its own heap.
+Two different Isolates can run in parallel and can be seen as entierly different
+sandboxed instances of a V8 runtime.
+
+### Context
+To allow separate JavaScript applications to run in the same isolate a context must be specified for each one.
+This is to avoid them interfering with each other, for example by changing the builtin objects provided.
 
 #### Threads
 V8 is single threaded (the execution of the functions of the stack) but there are supporting threads used
@@ -307,10 +101,6 @@ This is all that `SetThreadPoolSize` does. After this we have:
 
 ThreadEntry can be found in src/base/platform/platform-posix.
 
-### Isolate
-An Isolate is an independant copy of the V8 runtime which includes its own heap.
-Two different Isolates can run in parallel and can be seen as entierly different
-sandboxed instances of a V8 runtime.
 
 ### International Component for Unicode (ICU)
 International Components for Unicode (ICU) deals with internationalization (i18n).
@@ -388,23 +178,6 @@ This file is then read and set by calling:
     }
 
 
-
-### Using d8
-This is the source used for the following examples:
-
-    $ cat class.js
-    function Person(name, age) {
-      this.name = name;
-      this.age = age;
-    }
-
-    print("before");
-    const p = new Person("Daniel", 41);
-    print(p.name);
-    print(p.age);
-    print("after"); 
-
-
 ### Local
 
 ```c++
@@ -463,6 +236,7 @@ In your header files, wherever you want an interface or API made public outside 
  With `-fvisibility=hidden`, you are telling GCC that every declaration not explicitly marked with a visibility attribute 
 has a hidden visibility. There is such a flag in build/common.gypi
 
+
 ### ToLocalChecked()
 You'll see a few of these calls in the hello_world example:
 
@@ -505,7 +279,7 @@ I was wondering where the Utils::ToLocal was defined but could not find it until
       return Convert<v8::internal::From, v8::To>(obj);                          \
     }
 
-The above can be found in src/api.h. The same goes for Local<Object>, Local<String> etc.
+The above can be found in src/api.h. The same goes for `Local<Object>, Local<String>` etc.
 
 
 ### Small Integers
@@ -520,35 +294,6 @@ case it has to follow the pointer to get the complete value. This is where the c
 Tagging involved borrowing one bit of the 32-bit, making it 31-bit and having the leftover bit represent a 
 tag. If the tag is zero then this is a plain value, but if tag is 1 then the pointer must be followed.
 This does not only have to be for numbers it could also be used for object (I think)
-
-
-### Types
-Most types can be found in src/objects.h
-
-    // Formats of Object*:
-    //  Smi:        [31 bit signed int] 0
-    //  HeapObject: [32 bit direct pointer] (4 byte aligned) | 01
-
-### v8::PersistentObject 
-
-
-### Hidden classes
-There is plenty of information about how these work but I was not aware that d8 could be used
-with the `--trace-maps` flag to show information about hidden classes (which are called maps in V8)
-
-    function Person(name, age) {
-      this.name = name;
-      this.age = age;
-    }
-
-    const p = new Person("Daniel", 41);
-
-
-    $ ./d8 --trace-maps class.js
-
-    [TraceMaps: InitialMap map= 0x37facd30afa1 SFI= 34_Person ]
-    [TraceMaps: Transition from= 0x37facd30afa1 to= 0x37facd30b0a9 name= name ]
-    [TraceMaps: Transition from= 0x37facd30b0a9 to= 0x37facd30b101 name= age ]
 
 
 ### Properties/Elements
@@ -643,57 +388,6 @@ How do you add a property to a JSObject instance?
 JSObject has a AddPropery function
 
 
-#### HasProperty
-What actually happens when you call this using:
-
-    JSReceiver::HasProperty(js_object, prop_name).FromJust()
-
-#### HeapObject
-This class describes heap allocated objects. It is in this class we find information regarding the type of object. This 
-information is contained in `v8::internal::Map`.
-
-### v8::internal::Map
-`src/objects/map.h`  
-* `bit_field1`  
-* `bit_field2`
-* `bit field3` contains information about the number of properties that this Map has,
-a pointer to an DescriptorArray. The DescriptorArray contains information like the name of the 
-property, and the posistion where the value is stored in the JSObject.
-I noticed that this information available in src/objects/map.h. 
-
-
-#### DescriptorArray
-Can be found in src/objects/descriptor-array.h. This class extends FixedArray and has the following
-entries:
-
-```
-[0] the number of descriptors it contains  
-[1] If uninitialized this will be Smi(0) otherwise an enum cache bridge which is a FixedArray of size 2: 
-  [0] enum cache: FixedArray containing all own enumerable keys  
-  [1] either Smi(0) or a pointer to a FixedArray with indices  
-[2] first key (and internalized String  
-[3] first descriptor  
-```
-### Factory
-Each Internal Isolate has a Factory which is used to create instances. This is because all handles needs to be allocated
-using the factory (src/factory.h)
-
-
-### Objects 
-All objects extend the abstract class Object (src/objects.h).
-
-#### HeapObject
-Is the superclass for all heap allocated objects. 
-This class contains a Map pointer which can be accessed using map()
-
-### Oddball
-This class extends HeapObject and  describes null, undefined, true, and false objects.
-
-
-#### Map
-Extends HeapObject and all heap objects have a Map which describes the objects structure.
-This is where you can find the size of the instance, access to the inobject_properties.
-
 ### Caching
 Are ways to optimize polymorphic function calls in dynamic languages, for example JavaScript.
 
@@ -724,7 +418,7 @@ it can bypass the process of figuring out how to access the objects properties, 
 A polymorfic call site is one where there are many equally likely receiver types (and thus
 call targets).
 
-- Monomorfic means there is onle one receiver type
+- Monomorfic means there is only one receiver type
 - Polymorfic a few receiver types
 - Megamorfic very many receiver types
 
@@ -738,7 +432,7 @@ routine called. In normal inline caching this would rebind the call, replacing t
 types target method. This would happen each time the type changes.
 
 With PIC the cache miss handler will generate a small stub routine and rebinds the call to this
-stub. The stub will check if the receiver is of a type that it was seen before and branch to 
+stub. The stub will check if the receiver is of a type that it has seen before and branch to 
 the correct targets. Since the type of the target is already known at this point it can directly
 branch to the target method body without the need for the prolog.
 If the type has not been seen before it will be added to the stub to handle that type. Eventually
@@ -792,246 +486,50 @@ What we are doing caching knowledge about the layout of the previously seen obje
 
     $ lldb -- out/x64.debug/d8 class.js
 
-### Performance Optimizations
-Code is optimized 1 function at a time, without knowledge of what other code is doing
-
-
-### V8_shell startup
-What happens when the v8_shell is run?   
-
-    $ lldb -- out/x64.debug/d8 --enable-inspector class.js
-    (lldb) breakpoint set --file d8.cc --line 2662
-    Breakpoint 1: where = d8`v8::Shell::Main(int, char**) + 96 at d8.cc:2662, address = 0x0000000100015150
-
-First v8::base::debug::EnableInProcessStackDumping() is called followed by some windows specific code guarded
-by macros. Next is all the options are set using `v8::Shell::SetOptions`
-
-SetOptions will call `v8::V8::SetFlagsFromCommandLine` which is found in src/api.cc:
-
-    i::FlagList::SetFlagsFromCommandLine(argc, argv, remove_flags);
-
-This function can be found in src/flags.cc. The flags themselves are defined in src/flag-definitions.h
-
-Next a new SourceGroup array is create:
-    
-    options.isolate_sources = new SourceGroup[options.num_isolates];
-    SourceGroup* current = options.isolate_sources;
-    current->Begin(argv, 1);
-    for (int i = 1; i < argc; i++) {
-      const char* str = argv[i];
-
-    (lldb) p str
-    (const char *) $6 = 0x00007fff5fbfed4d "manual.js"
-
-There are then checks performed to see if the args is `--isolate` or `--module`, or `-e` and if not (like in our case)
-
-    } else if (strncmp(str, "-", 1) != 0) {
-      // Not a flag, so it must be a script to execute.
-      options.script_executed = true;
-
-TODO: I'm not exactly sure what SourceGroups are about but just noting this and will revisit later.
-
-This will take us back `int Shell::Main` in src/d8.cc
-
-    ::V8::InitializeICUDefaultLocation(argv[0], options.icu_data_file);
-
-    (lldb) p argv[0]
-    (char *) $8 = 0x00007fff5fbfed48 "./d8"
-
-See [ICU](international-component-for-unicode) a little more details.
-
-Next the default V8 platform is initialized:
-
-    g_platform = i::FLAG_verify_predictable ? new PredictablePlatform() : v8::platform::CreateDefaultPlatform();
-
-v8::platform::CreateDefaultPlatform() will be called in our case.
-
-We are then back in Main and have the following lines:
-
-    2685 v8::V8::InitializePlatform(g_platform);
-    2686 v8::V8::Initialize();
-
-This is very similar to what I've seen in the [Node.js startup process](https://github.com/danbev/learning-nodejs#startint-argc-char-argv).
-
-We did not specify any natives_blob or snapshot_blob as an option on the command line so the defaults 
-will be used:
-
-    v8::V8::InitializeExternalStartupData(argv[0]);
-
-back in src/d8.cc line 2918:
-
-    Isolate* isolate = Isolate::New(create_params);
-
-this call will bring us into api.cc line 8185:
-   
-     i::Isolate* isolate = new i::Isolate(false);
-So, we are invoking the Isolate constructor (in src/isolate.cc).
-
-    isolate->set_snapshot_blob(i::Snapshot::DefaultSnapshotBlob());
-
-api.cc:
-
-    isolate->Init(NULL);
-    
-    compilation_cache_ = new CompilationCache(this);
-    context_slot_cache_ = new ContextSlotCache();
-    descriptor_lookup_cache_ = new DescriptorLookupCache();
-    unicode_cache_ = new UnicodeCache();
-    inner_pointer_to_code_cache_ = new InnerPointerToCodeCache(this);
-    global_handles_ = new GlobalHandles(this);
-    eternal_handles_ = new EternalHandles();
-    bootstrapper_ = new Bootstrapper(this);
-    handle_scope_implementer_ = new HandleScopeImplementer(this);
-    load_stub_cache_ = new StubCache(this, Code::LOAD_IC);
-    store_stub_cache_ = new StubCache(this, Code::STORE_IC);
-    materialized_object_store_ = new MaterializedObjectStore(this);
-    regexp_stack_ = new RegExpStack();
-    regexp_stack_->isolate_ = this;
-    date_cache_ = new DateCache();
-    call_descriptor_data_ =
-      new CallInterfaceDescriptorData[CallDescriptors::NUMBER_OF_DESCRIPTORS];
-    access_compiler_data_ = new AccessCompilerData();
-    cpu_profiler_ = new CpuProfiler(this);
-    heap_profiler_ = new HeapProfiler(heap());
-    interpreter_ = new interpreter::Interpreter(this);
-    compiler_dispatcher_ =
-      new CompilerDispatcher(this, V8::GetCurrentPlatform(), FLAG_stack_size);
-
-
-src/builtins/builtins.cc, this is where the builtins are defined.
-TODO: sort out what these macros do.
-
-In src/v8.cc we have a couple of checks for if the options passed are for a stress_run but since we 
-did not pass in any such flags this code path will be followed which will call RunMain:
-
-    result = RunMain(isolate, argc, argv, last_run);
-
-this will end up calling:
-
-    options.isolate_sources[0].Execute(isolate);
-
-Which will call SourceGroup::Execute(Isolate* isolate)
-
-    // Use all other arguments as names of files to load and run.
-    HandleScope handle_scope(isolate);
-    Local<String> file_name = String::NewFromUtf8(isolate, arg, NewStringType::kNormal).ToLocalChecked();
-    Local<String> source = ReadFile(isolate, arg);
-    if (source.IsEmpty()) {
-      printf("Error reading '%s'\n", arg);
-      Shell::Exit(1);
-    }
-    Shell::options.script_executed = true;
-    if (!Shell::ExecuteString(isolate, source, file_name, false, true)) {
-      exception_was_thrown = true;
-      break;
-    }
-
-    ScriptOrigin origin(name);
-    if (compile_options == ScriptCompiler::kNoCompileOptions) {
-      ScriptCompiler::Source script_source(source, origin);
-      return ScriptCompiler::Compile(context, &script_source, compile_options);
-    }
-
-Which will delegate to ScriptCompiler(Local<Context>, Source* source, CompileOptions options):
-
-    auto maybe = CompileUnboundInternal(isolate, source, options);
-
-CompileUnboundInternal
-
-    result = i::Compiler::GetSharedFunctionInfoForScript(
-        str, name_obj, line_offset, column_offset, source->resource_options,
-        source_map_url, isolate->native_context(), NULL, &script_data, options,
-        i::NOT_NATIVES_CODE);
-
-src/compiler.cc
-
-    // Compile the function and add it to the cache.
-    ParseInfo parse_info(script);
-    Zone compile_zone(isolate->allocator(), ZONE_NAME);
-    CompilationInfo info(&compile_zone, &parse_info, Handle<JSFunction>::null());
-
-
-Back in src/compiler.cc-info.cc:
-
-    result = CompileToplevel(&info);
-
-    (lldb) job *result
-    0x17df0df309f1: [SharedFunctionInfo]
-     - name = 0x1a7f12d82471 <String[0]: >
-     - formal_parameter_count = 0
-     - expected_nof_properties = 10
-     - ast_node_count = 23
-     - instance class name = #Object
-
-     - code = 0x1d8484d3661 <Code: BUILTIN>
-     - source code = function bajja(a, b, c) {
-      var d = c - 100;
-      return a + d * b;
-    }
-
-    var result = bajja(2, 2, 150);
-    print(result);
-
-     - anonymous expression
-     - function token position = -1
-     - start position = 0
-     - end position = 114
-     - no debug info
-     - length = 0
-     - optimized_code_map = 0x1a7f12d82241 <FixedArray[0]>
-     - feedback_metadata = 0x17df0df30d09: [FeedbackMetadata]
-     - length: 3
-     - slot_count: 11
-     Slot #0 LOAD_GLOBAL_NOT_INSIDE_TYPEOF_IC
-     Slot #2 kCreateClosure
-     Slot #3 LOAD_GLOBAL_NOT_INSIDE_TYPEOF_IC
-     Slot #5 CALL_IC
-     Slot #7 CALL_IC
-     Slot #9 LOAD_GLOBAL_NOT_INSIDE_TYPEOF_IC
-
-     - bytecode_array = 0x17df0df30c61
-
-
-Back in d8.cc:
-
-    maybe_result = script->Run(realm);
-
-
-src/api.cc
-   
-    auto fun = i::Handle<i::JSFunction>::cast(Utils::OpenHandle(this));
-
-    (lldb) job *fun
-    0x17df0df30e01: [Function]
-     - map = 0x19cfe0003859 [FastProperties]
-     - prototype = 0x17df0df043b1
-     - elements = 0x1a7f12d82241 <FixedArray[0]> [FAST_HOLEY_ELEMENTS]
-     - initial_map =
-     - shared_info = 0x17df0df309f1 <SharedFunctionInfo>
-     - name = 0x1a7f12d82471 <String[0]: >
-     - formal_parameter_count = 0
-     - context = 0x17df0df03bf9 <FixedArray[245]>
-     - feedback vector cell = 0x17df0df30ed1 Cell for 0x17df0df30e49 <FixedArray[13]>
-     - code = 0x1d8484d3661 <Code: BUILTIN>
-     - properties = 0x1a7f12d82241 <FixedArray[0]> {
-        #length: 0x2c35a5718089 <AccessorInfo> (const accessor descriptor)
-        #name: 0x2c35a57180f9 <AccessorInfo> (const accessor descriptor)
-        #arguments: 0x2c35a5718169 <AccessorInfo> (const accessor descriptor)
-        #caller: 0x2c35a57181d9 <AccessorInfo> (const accessor descriptor)
-        #prototype: 0x2c35a5718249 <AccessorInfo> (const accessor descriptor)
-
-      }
-
-    i::Handle<i::Object> receiver = isolate->global_proxy();
-    Local<Value> result;
-    has_pending_exception = !ToLocal<Value>(i::Execution::Call(isolate, fun, receiver, 0, nullptr), &result);
-
-src/execution.cc
-
-### Promises
-
-    (lldb) br s -f builtins-promise.cc -l 842
-
+#### HeapObject
+This class describes heap allocated objects. It is in this class we find information regarding the type of object. This 
+information is contained in `v8::internal::Map`.
+
+### v8::internal::Map
+`src/objects/map.h`  
+* `bit_field1`  
+* `bit_field2`
+* `bit field3` contains information about the number of properties that this Map has,
+a pointer to an DescriptorArray. The DescriptorArray contains information like the name of the 
+property, and the posistion where the value is stored in the JSObject.
+I noticed that this information available in src/objects/map.h. 
+
+#### DescriptorArray
+Can be found in src/objects/descriptor-array.h. This class extends FixedArray and has the following
+entries:
+
+```
+[0] the number of descriptors it contains  
+[1] If uninitialized this will be Smi(0) otherwise an enum cache bridge which is a FixedArray of size 2: 
+  [0] enum cache: FixedArray containing all own enumerable keys  
+  [1] either Smi(0) or a pointer to a FixedArray with indices  
+[2] first key (and internalized String  
+[3] first descriptor  
+```
+### Factory
+Each Internal Isolate has a Factory which is used to create instances. This is because all handles needs to be allocated
+using the factory (src/factory.h)
+
+
+### Objects 
+All objects extend the abstract class Object (src/objects.h).
+
+#### HeapObject
+Is the superclass for all heap allocated objects. 
+This class contains a Map pointer which can be accessed using map()
+
+### Oddball
+This class extends HeapObject and  describes null, undefined, true, and false objects.
+
+
+#### Map
+Extends HeapObject and all heap objects have a Map which describes the objects structure.
+This is where you can find the size of the instance, access to the inobject_properties.
 
 ### Compiler pipeline
 When a script is compiled all of the top level code is parsed. These are function declarartions (but not the function
@@ -1111,10 +609,6 @@ The bytecode becomes the source of truth instead of as before the AST.
      65 S> 0x2eef8d9b104e @   16 : 83                Return         // return the value in the accumulator?
 
 
-####
-
-
-
 ### Abstract Syntax Tree (AST)
 In src/ast/ast.h. You can print the ast using the `--print-ast` option for d8.
 
@@ -1152,18 +646,6 @@ FUNC at 0
 . . VAR PROXY local[0] (0x7ffe5285b330) (mode = TEMPORARY) ".result"
 ```
 You can find the declaration of EXPRESSION in ast.h.
-
-
-### Zone
-Taken directly from src/zone/zone.h:
-```
-// The Zone supports very fast allocation of small chunks of
-// memory. The chunks cannot be deallocated individually, but instead
-// the Zone supports deallocating all chunks in one fast
-// operation. The Zone is used to hold temporary data structures like
-// the abstract syntax tree, which is deallocated after compilation.
-```
-
 
 ### Bytecode
 Can be found in src/interpreter/bytecodes.h
@@ -1438,17 +920,17 @@ the unoptimized version.
 ## Bytecode
 This section will examine the bytecode for the following JavaScript:
 
-   function beve() {
-     const p = new Promise((resolve, reject) => {
-       resolve('ok');
-     });
+    function beve() {
+      const p = new Promise((resolve, reject) => {
+        resolve('ok');
+      });
 
-     p.then(msg => {
-       console.log(msg);
-     });
-   }
+      p.then(msg => {
+        console.log(msg);
+      });
+    }
 
-   beve(); 
+    beve(); 
 
     $ d8 --print-bytecode promise.js
 
@@ -1520,6 +1002,610 @@ only the syntax of the function declaration (parenthesis, arguments, brackets et
 
 ### Function methods
 The declaration of Function can be found in `include/v8.h` (just noting this as I've looked for it several times)
+
+## String types
+There are a number of different String types in V8 which are optimized for various situations.
+If we look in src/objects.h we can see the object hierarchy:
+```
+    Object
+      SMI
+      HeapObject    // superclass for every object instans allocated on the heap.
+        ...
+        Name
+          String
+            SeqString
+              SeqOneByteString
+              SeqTwoByteString
+            SlicedString
+            ConsString
+            ThinString
+            ExternalString
+              ExternalOneByteString
+              ExternalTwoByteString
+            InternalizedString
+              SeqInternalizedString
+                SeqOneByteInternalizedString
+                SeqTwoByteInternalizedString
+              ConsInternalizedString
+              ExternalInternalizedString
+                ExternalOneByteInternalizedString
+                ExternalTwoByteInternalizedString
+```
+
+Do note that v8::String is declared in include/v8.h
+
+`Name` as can be seen extends HeapObject and anything that can be used as a property name should extend Name.
+Looking at the declaration in include/v8.h we find the following:
+
+    int GetIdentityHash();
+    static Name* Cast(Value* obj)
+
+
+src/objects/string.h
+
+#### String
+A String extends Name and has a length and content. The content can be made up of 1 or 2 byte characters.
+Looking at the declaration in include/v8.h we find the following:
+
+    enum Encoding {
+      UNKNOWN_ENCODING = 0x1,
+      TWO_BYTE_ENCODING = 0x0,
+      ONE_BYTE_ENCODING = 0x8
+    }; 
+
+    int Length() const;
+    int Uft8Length const;
+    bool IsOneByte() const;
+
+Example usages can be found in [tests/string_test.cc](./tests/string_test.cc).
+Looking at the functions I've seen one that returns the actual bytes 
+from the String. You can get at the in utf8 format using:
+
+    String::Utf8Value print_value(joined);
+    std::cout << *print_value << '\n';
+
+So that is the only string class in include/v8.h, but there are a lot more implementations that we've seen above. There are used for various cases, for example for indexing, concatenation, and slicing).
+
+#### SeqString
+Represents a sequence of charaters which (the characters) are either one or two bytes in length
+
+#### ConsString
+These are string that are built using:
+
+    const str = "one" + "two";
+
+This would be represented as:
+```
+         +--------------+
+         |              | 
+   [str|one|two]     [one|...]   [two|...]
+             |                       |
+             +-----------------------+
+```
+So we can see that one and two in str are pointer to existing strings. 
+
+
+#### ExternalString
+These Strings located on the native heap. The ExternalString structure has a pointer to this external location and the usual length field for all Strings.
+
+Looking at `String` I was not able to find any construtor for it, nor the other subtypes.
+
+## Builtins
+Are JavaScript functions/objects that are provided by V8. These are built using a C++ DSL and are 
+passed to the CodeStubAssembler -> CodeAssembler -> RawMachineAssembler.
+These need to have bytecode generated for them so that they can be run in TurboFan.
+
+All the builtins are declared in src/builtins/builtins-definitions.h by the BUILTIN_LIST_BASE macro.
+
+To see how this works in action we first need to disable snapshots. If we don't we won't be able to
+set breakpoints as the the heap will be serialized at compile time and deserialized upon startup of v8.
+
+To find the option to disable snapshots use:
+
+    $ gn args --list out.gn/learning --short | more
+    ...
+    v8_use_snapshot=true
+    $ gn args out.gn/learning
+    v8_use_snapshot=false
+    $ gn -C out.gn/learning
+
+After building we should be able to set a break point in bootstrapper.cc and its function 
+`Genesis::InitializeGlobal`:
+
+    (lldb) br s -f bootstrapper.cc -l 2567
+
+Lets take a look at how the `JSON` object is setup:
+
+    Handle<String> name = factory->InternalizeUtf8String("JSON");
+    Handle<JSObject> json_object = factory->NewJSObject(isolate->object_function(), TENURED);
+
+`TENURED` means that this object should be allocated directly in the old generation.
+
+    JSObject::AddProperty(global, name, json_object, DONT_ENUM);
+
+`DONT_ENUM` is checked by some builtin functions and if set this object will be ignored by thosee
+functions.
+
+    SimpleInstallFunction(json_object, "parse", Builtins::kJsonParse, 2, false);
+
+Here we can see that we are installing a function named `parse`, which takes 2 parameters. You can
+find the definition in src/builtins/builtins-json.cc.
+
+
+## Building V8
+You'll need to have checked out the Google V8 sources to you local file system and build it by following 
+the instructions found [here](https://developers.google.com/v8/build).
+
+### [gclient](https://www.chromium.org/developers/how-tos/depottools) sync
+
+    gclient sync
+
+### [GN](https://chromium.googlesource.com/chromium/src/+/master/tools/gn/docs/quick_start.md)
+
+    $ tools/dev/v8gen.py --help
+
+    $ ./tools/dev/v8gen.py list
+    ....
+    x64.debug
+    x64.optdebug
+    x64.release
+
+    $ vi out.gn/learning/args.gn
+
+Generate Ninja files:
+
+    $ gn args out.gn/learning
+
+This will open an editor where you can set configuration options. I've been using the following:
+
+    is_debug = true
+    target_cpu = "x64"
+    v8_enable_backtrace = true
+    v8_enable_slow_dchecks = true
+    v8_optimized_debug = false
+
+Note that for lldb command aliases to work `is_debug` must be set to true.
+
+List avaiable build arguments:
+
+    $ gn args --list out.gn/learning
+
+List all available targets:
+
+    $ ninja -C out.gn/learning/ -t targets all
+
+Building:
+
+    $ ninja -C out.gn/learning
+
+Running quickchecks:
+
+    $ ./tools/run-tests.py --outdir=out.gn/learning --quickcheck
+
+You can use `./tools-run-tests.py -h` to list all the opitions that can be passed
+to run-tests.
+
+Running pre-submit checks:
+
+    $ ./tools/presubmit.py
+
+## Building chromium
+When making changes to V8 you might need to verify that your changes have not broken anything in Chromium. 
+
+Generate Your Project (gpy) :
+You'll have to run this once before building:
+
+    $ gclient sync
+    $ gclient runhooks
+
+#### Update the code base
+
+    $ git fetch origin master
+    $ git co master
+    $ git merge origin/master
+
+### Building using GN
+
+    $ gn args out.gn/learning
+
+### Building using Ninja
+
+    $ ninja -C out.gn/learning 
+
+Building the tests:
+
+    $ ninja -C out.gn/learning chrome/test:unit_tests
+
+An error I got when building the first time:
+
+    traceback (most recent call last):
+    File "./gyp-mac-tool", line 713, in <module>
+      sys.exit(main(sys.argv[1:]))
+    File "./gyp-mac-tool", line 29, in main
+      exit_code = executor.Dispatch(args)
+    File "./gyp-mac-tool", line 44, in Dispatch
+      return getattr(self, method)(*args[1:])
+    File "./gyp-mac-tool", line 68, in ExecCopyBundleResource
+      self._CopyStringsFile(source, dest)
+    File "./gyp-mac-tool", line 134, in _CopyStringsFile
+      import CoreFoundation
+    ImportError: No module named CoreFoundation
+    [6642/20987] CXX obj/base/debug/base.task_annotator.o
+    [6644/20987] ACTION base_nacl: build newlib plib_9b4f41e4158ebb93a5d28e6734a13e85
+    ninja: build stopped: subcommand failed.
+
+I was able to get around this by:
+
+    $ pip install -U pyobjc
+
+#### Using a specific version of V8
+So, we want to include our updated version of V8 so that we can verify that it builds correctly with our change to V8.
+While I'm not sure this is the proper way to do it, I was able to update DEPS in src (chromium) and set
+the v8 entry to git@github.com:danbev/v8.git@064718a8921608eaf9b5eadbb7d734ec04068a87:
+
+    "git@github.com:danbev/v8.git@064718a8921608eaf9b5eadbb7d734ec04068a87"
+
+You'll have to run `gclient sync` after this. 
+
+Another way is to not updated the `DEPS` file, which is a version controlled file, but instead update
+`.gclientrc` and add a `custom_deps` entry:
+
+    solutions = [{u'managed': False, u'name': u'src', u'url': u'https://chromium.googlesource.com/chromium/src.git', 
+    u'custom_deps': {
+      "src/v8": "git@github.com:danbev/v8.git@27a666f9be7ca3959c7372bdeeee14aef2a4b7ba"
+    }, u'deps_file': u'.DEPS.git', u'safesync_url': u''}]
+    
+## Buiding pdfium
+You may have to compile this project (in addition to chromium to verify that changes in v8 are not breaking
+code in pdfium.
+
+### Create/clone the project
+
+     $ mkdir pdfuim_reop
+     $ gclient config --unmanaged https://pdfium.googlesource.com/pdfium.git
+     $ gclient sync
+     $ cd pdfium
+
+### Building
+
+    $ ninja -C out/Default
+
+#### Using a branch of v8
+You should be able to update the .gclient file adding a custom_deps entry:
+
+    solutions = [
+    {
+      "name"        : "pdfium",
+      "url"         : "https://pdfium.googlesource.com/pdfium.git",
+      "deps_file"   : "DEPS",
+      "managed"     : False,
+      "custom_deps" : {
+        "v8": "git@github.com:danbev/v8.git@064718a8921608eaf9b5eadbb7d734ec04068a87"
+      },
+    },
+   ]
+   cache_dir = None
+You'll have to run `gclient sync` after this too.
+
+
+
+
+## Code in this repo
+
+#### hello-world
+[hello-world](./hello-world.cc) is heavily commented and show the usage of a static int being exposed and
+accessed from JavaScript.
+
+#### instances
+[instances](./instances.cc) shows the usage of creating new instances of a C++ class from JavaScript.
+
+#### run-script
+[run-script](./run-script.cc) is basically the same as instance but reads an external file, [script.js](./script.js)
+and run the script.
+
+#### tests
+The tests directory contains unit tests for individual classes/concepts in V8 to help understand them.
+
+## Building this projects code
+
+    $ make
+
+## Running
+
+    $ ./hello-world
+
+## Cleaning
+
+    $ make clean
+
+## Contributing a change to V8
+1) Create a working branch using `git new-branch name`
+2) git cl upload  
+
+See Googles [contributing-code](https://www.chromium.org/developers/contributing-code) for more details.
+
+### Find the current issue number
+
+    $ git cl issue
+
+## Debugging
+
+    $ lldb hello-world
+    (lldb) br s -f hello-world.cc -l 27
+
+There are a number of useful functions in `src/objects-printer.cc` which can also be used in lldb.
+
+#### Print value of a Local object
+
+    (lldb) print _v8_internal_Print_Object(*(v8::internal::Object**)(*init_fn))
+
+#### Print stacktrace
+
+    (lldb) p _v8_internal_Print_StackTrace()
+
+#### Creating command aliases in lldb
+Create a file named [.lldbinit](./.lldbinit) (in your project director or home directory). This file can now be found in v8's tools directory.
+
+
+
+### Using d8
+This is the source used for the following examples:
+
+    $ cat class.js
+    function Person(name, age) {
+      this.name = name;
+      this.age = age;
+    }
+
+    print("before");
+    const p = new Person("Daniel", 41);
+    print(p.name);
+    print(p.age);
+    print("after"); 
+
+
+### V8_shell startup
+What happens when the v8_shell is run?   
+
+    $ lldb -- out/x64.debug/d8 --enable-inspector class.js
+    (lldb) breakpoint set --file d8.cc --line 2662
+    Breakpoint 1: where = d8`v8::Shell::Main(int, char**) + 96 at d8.cc:2662, address = 0x0000000100015150
+
+First v8::base::debug::EnableInProcessStackDumping() is called followed by some windows specific code guarded
+by macros. Next is all the options are set using `v8::Shell::SetOptions`
+
+SetOptions will call `v8::V8::SetFlagsFromCommandLine` which is found in src/api.cc:
+
+    i::FlagList::SetFlagsFromCommandLine(argc, argv, remove_flags);
+
+This function can be found in src/flags.cc. The flags themselves are defined in src/flag-definitions.h
+
+Next a new SourceGroup array is create:
+    
+    options.isolate_sources = new SourceGroup[options.num_isolates];
+    SourceGroup* current = options.isolate_sources;
+    current->Begin(argv, 1);
+    for (int i = 1; i < argc; i++) {
+      const char* str = argv[i];
+
+    (lldb) p str
+    (const char *) $6 = 0x00007fff5fbfed4d "manual.js"
+
+There are then checks performed to see if the args is `--isolate` or `--module`, or `-e` and if not (like in our case)
+
+    } else if (strncmp(str, "-", 1) != 0) {
+      // Not a flag, so it must be a script to execute.
+      options.script_executed = true;
+
+TODO: I'm not exactly sure what SourceGroups are about but just noting this and will revisit later.
+
+This will take us back `int Shell::Main` in src/d8.cc
+
+    ::V8::InitializeICUDefaultLocation(argv[0], options.icu_data_file);
+
+    (lldb) p argv[0]
+    (char *) $8 = 0x00007fff5fbfed48 "./d8"
+
+See [ICU](international-component-for-unicode) a little more details.
+
+Next the default V8 platform is initialized:
+
+    g_platform = i::FLAG_verify_predictable ? new PredictablePlatform() : v8::platform::CreateDefaultPlatform();
+
+v8::platform::CreateDefaultPlatform() will be called in our case.
+
+We are then back in Main and have the following lines:
+
+    2685 v8::V8::InitializePlatform(g_platform);
+    2686 v8::V8::Initialize();
+
+This is very similar to what I've seen in the [Node.js startup process](https://github.com/danbev/learning-nodejs#startint-argc-char-argv).
+
+We did not specify any natives_blob or snapshot_blob as an option on the command line so the defaults 
+will be used:
+
+    v8::V8::InitializeExternalStartupData(argv[0]);
+
+back in src/d8.cc line 2918:
+
+    Isolate* isolate = Isolate::New(create_params);
+
+this call will bring us into api.cc line 8185:
+   
+     i::Isolate* isolate = new i::Isolate(false);
+So, we are invoking the Isolate constructor (in src/isolate.cc).
+
+    isolate->set_snapshot_blob(i::Snapshot::DefaultSnapshotBlob());
+
+api.cc:
+
+    isolate->Init(NULL);
+    
+    compilation_cache_ = new CompilationCache(this);
+    context_slot_cache_ = new ContextSlotCache();
+    descriptor_lookup_cache_ = new DescriptorLookupCache();
+    unicode_cache_ = new UnicodeCache();
+    inner_pointer_to_code_cache_ = new InnerPointerToCodeCache(this);
+    global_handles_ = new GlobalHandles(this);
+    eternal_handles_ = new EternalHandles();
+    bootstrapper_ = new Bootstrapper(this);
+    handle_scope_implementer_ = new HandleScopeImplementer(this);
+    load_stub_cache_ = new StubCache(this, Code::LOAD_IC);
+    store_stub_cache_ = new StubCache(this, Code::STORE_IC);
+    materialized_object_store_ = new MaterializedObjectStore(this);
+    regexp_stack_ = new RegExpStack();
+    regexp_stack_->isolate_ = this;
+    date_cache_ = new DateCache();
+    call_descriptor_data_ =
+      new CallInterfaceDescriptorData[CallDescriptors::NUMBER_OF_DESCRIPTORS];
+    access_compiler_data_ = new AccessCompilerData();
+    cpu_profiler_ = new CpuProfiler(this);
+    heap_profiler_ = new HeapProfiler(heap());
+    interpreter_ = new interpreter::Interpreter(this);
+    compiler_dispatcher_ =
+      new CompilerDispatcher(this, V8::GetCurrentPlatform(), FLAG_stack_size);
+
+
+src/builtins/builtins.cc, this is where the builtins are defined.
+TODO: sort out what these macros do.
+
+In src/v8.cc we have a couple of checks for if the options passed are for a stress_run but since we 
+did not pass in any such flags this code path will be followed which will call RunMain:
+
+    result = RunMain(isolate, argc, argv, last_run);
+
+this will end up calling:
+
+    options.isolate_sources[0].Execute(isolate);
+
+Which will call SourceGroup::Execute(Isolate* isolate)
+
+    // Use all other arguments as names of files to load and run.
+    HandleScope handle_scope(isolate);
+    Local<String> file_name = String::NewFromUtf8(isolate, arg, NewStringType::kNormal).ToLocalChecked();
+    Local<String> source = ReadFile(isolate, arg);
+    if (source.IsEmpty()) {
+      printf("Error reading '%s'\n", arg);
+      Shell::Exit(1);
+    }
+    Shell::options.script_executed = true;
+    if (!Shell::ExecuteString(isolate, source, file_name, false, true)) {
+      exception_was_thrown = true;
+      break;
+    }
+
+    ScriptOrigin origin(name);
+    if (compile_options == ScriptCompiler::kNoCompileOptions) {
+      ScriptCompiler::Source script_source(source, origin);
+      return ScriptCompiler::Compile(context, &script_source, compile_options);
+    }
+
+Which will delegate to ScriptCompiler(Local<Context>, Source* source, CompileOptions options):
+
+    auto maybe = CompileUnboundInternal(isolate, source, options);
+
+CompileUnboundInternal
+
+    result = i::Compiler::GetSharedFunctionInfoForScript(
+        str, name_obj, line_offset, column_offset, source->resource_options,
+        source_map_url, isolate->native_context(), NULL, &script_data, options,
+        i::NOT_NATIVES_CODE);
+
+src/compiler.cc
+
+    // Compile the function and add it to the cache.
+    ParseInfo parse_info(script);
+    Zone compile_zone(isolate->allocator(), ZONE_NAME);
+    CompilationInfo info(&compile_zone, &parse_info, Handle<JSFunction>::null());
+
+
+Back in src/compiler.cc-info.cc:
+
+    result = CompileToplevel(&info);
+
+    (lldb) job *result
+    0x17df0df309f1: [SharedFunctionInfo]
+     - name = 0x1a7f12d82471 <String[0]: >
+     - formal_parameter_count = 0
+     - expected_nof_properties = 10
+     - ast_node_count = 23
+     - instance class name = #Object
+
+     - code = 0x1d8484d3661 <Code: BUILTIN>
+     - source code = function bajja(a, b, c) {
+      var d = c - 100;
+      return a + d * b;
+    }
+
+    var result = bajja(2, 2, 150);
+    print(result);
+
+     - anonymous expression
+     - function token position = -1
+     - start position = 0
+     - end position = 114
+     - no debug info
+     - length = 0
+     - optimized_code_map = 0x1a7f12d82241 <FixedArray[0]>
+     - feedback_metadata = 0x17df0df30d09: [FeedbackMetadata]
+     - length: 3
+     - slot_count: 11
+     Slot #0 LOAD_GLOBAL_NOT_INSIDE_TYPEOF_IC
+     Slot #2 kCreateClosure
+     Slot #3 LOAD_GLOBAL_NOT_INSIDE_TYPEOF_IC
+     Slot #5 CALL_IC
+     Slot #7 CALL_IC
+     Slot #9 LOAD_GLOBAL_NOT_INSIDE_TYPEOF_IC
+
+     - bytecode_array = 0x17df0df30c61
+
+
+Back in d8.cc:
+
+    maybe_result = script->Run(realm);
+
+
+src/api.cc
+   
+    auto fun = i::Handle<i::JSFunction>::cast(Utils::OpenHandle(this));
+
+    (lldb) job *fun
+    0x17df0df30e01: [Function]
+     - map = 0x19cfe0003859 [FastProperties]
+     - prototype = 0x17df0df043b1
+     - elements = 0x1a7f12d82241 <FixedArray[0]> [FAST_HOLEY_ELEMENTS]
+     - initial_map =
+     - shared_info = 0x17df0df309f1 <SharedFunctionInfo>
+     - name = 0x1a7f12d82471 <String[0]: >
+     - formal_parameter_count = 0
+     - context = 0x17df0df03bf9 <FixedArray[245]>
+     - feedback vector cell = 0x17df0df30ed1 Cell for 0x17df0df30e49 <FixedArray[13]>
+     - code = 0x1d8484d3661 <Code: BUILTIN>
+     - properties = 0x1a7f12d82241 <FixedArray[0]> {
+        #length: 0x2c35a5718089 <AccessorInfo> (const accessor descriptor)
+        #name: 0x2c35a57180f9 <AccessorInfo> (const accessor descriptor)
+        #arguments: 0x2c35a5718169 <AccessorInfo> (const accessor descriptor)
+        #caller: 0x2c35a57181d9 <AccessorInfo> (const accessor descriptor)
+        #prototype: 0x2c35a5718249 <AccessorInfo> (const accessor descriptor)
+
+      }
+
+    i::Handle<i::Object> receiver = isolate->global_proxy();
+    Local<Value> result;
+    has_pending_exception = !ToLocal<Value>(i::Execution::Call(isolate, fun, receiver, 0, nullptr), &result);
+
+src/execution.cc
+
+### Zone
+Taken directly from src/zone/zone.h:
+```
+// The Zone supports very fast allocation of small chunks of
+// memory. The chunks cannot be deallocated individually, but instead
+// the Zone supports deallocating all chunks in one fast
+// operation. The Zone is used to hold temporary data structures like
+// the abstract syntax tree, which is deallocated after compilation.
+```
+
 
 
 ### V8 flags
@@ -1669,133 +1755,6 @@ So where is JSFunction declared?
 It is defined in objects.h
 
 
-## String types
-There are a number of different String types in V8 which are optimized for various situations.
-If we look in src/objects.h we can see the object hierarchy:
-```
-    Object
-      SMI
-      HeapObject    // superclass for every object instans allocated on the heap.
-        ...
-        Name
-          String
-            SeqString
-              SeqOneByteString
-              SeqTwoByteString
-            SlicedString
-            ConsString
-            ThinString
-            ExternalString
-              ExternalOneByteString
-              ExternalTwoByteString
-            InternalizedString
-              SeqInternalizedString
-                SeqOneByteInternalizedString
-                SeqTwoByteInternalizedString
-              ConsInternalizedString
-              ExternalInternalizedString
-                ExternalOneByteInternalizedString
-                ExternalTwoByteInternalizedString
-```
-
-Do note that v8::String is declared in include/v8.h
-
-`Name` as can be seen extends HeapObject and anything that can be used as a property name should extend Name.
-Looking at the declaration in include/v8.h we find the following:
-
-    int GetIdentityHash();
-    static Name* Cast(Value* obj)
-
-
-src/objects/string.h
-
-#### String
-A String extends Name and has a length and content. The content can be made up of 1 or 2 byte characters.
-Looking at the declaration in include/v8.h we find the following:
-
-    enum Encoding {
-      UNKNOWN_ENCODING = 0x1,
-      TWO_BYTE_ENCODING = 0x0,
-      ONE_BYTE_ENCODING = 0x8
-    }; 
-
-    int Length() const;
-    int Uft8Length const;
-    bool IsOneByte() const;
-
-Example usages can be found in [tests/string_test.cc](./tests/string_test.cc).
-Looking at the functions I've seen one that returns the actual bytes 
-from the String. You can get at the in utf8 format using:
-
-    String::Utf8Value print_value(joined);
-    std::cout << *print_value << '\n';
-
-So that is the only string class in include/v8.h, but there are a lot more implementations that we've seen above. There are used for various cases, for example for indexing, concatenation, and slicing).
-
-#### SeqString
-Represents a sequence of charaters which (the characters) are either one or two bytes in length
-
-#### ConsString
-These are string that are built using:
-
-    const str = "one" + "two";
-
-This would be represented as:
-```
-         +--------------+
-         |              | 
-   [str|one|two]     [one|...]   [two|...]
-             |                       |
-             +-----------------------+
-```
-So we can see that one and two in str are pointer to existing strings. 
-
-
-#### ExternalString
-These Strings located on the native heap. The ExternalString structure has a pointer to this external location and the usual length field for all Strings.
-
-Looking at `String` I was not able to find any construtor for it, nor the other subtypes.
-
-## Builtins
-Are JavaScript functions/objects that are provided by V8. These are built using a C++ DSL and are 
-passed to the CodeStubAssembler -> CodeAssembler -> RawMachineAssembler.
-These need to have bytecode generated for them so that they can be run in TurboFan.
-
-All the builtins are declared in src/builtins/builtins-definitions.h by the BUILTIN_LIST_BASE macro.
-
-To see how this works in action we first need to disable snapshots. If we don't we won't be able to
-set breakpoints as the the heap will be serialized at compile time and deserialized upon startup of v8.
-
-To find the option to disable snapshots use:
-
-    $ gn args --list out.gn/learning --short | more
-    ...
-    v8_use_snapshot=true
-    $ gn args out.gn/learning
-    v8_use_snapshot=false
-    $ gn -C out.gn/learning
-
-After building we should be able to set a break point in bootstrapper.cc and its function 
-`Genesis::InitializeGlobal`:
-
-    (lldb) br s -f bootstrapper.cc -l 2567
-
-Lets take a look at how the `JSON` object is setup:
-
-    Handle<String> name = factory->InternalizeUtf8String("JSON");
-    Handle<JSObject> json_object = factory->NewJSObject(isolate->object_function(), TENURED);
-
-`TENURED` means that this object should be allocated directly in the old generation.
-
-    JSObject::AddProperty(global, name, json_object, DONT_ENUM);
-
-`DONT_ENUM` is checked by some builtin functions and if set this object will be ignored by thosee
-functions.
-
-    SimpleInstallFunction(json_object, "parse", Builtins::kJsonParse, 2, false);
-
-Here we can see that we are installing a function named `parse`, which takes 2 parameters. You can
-find the definition in src/builtins/builtins-json.cc.
 
 
 
