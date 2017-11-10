@@ -187,7 +187,10 @@ So what is script_name. Well it is an object reference that is managed by the v8
 The GC needs to be able to move things (pointers around) and also track if things should be GC'd. Local handles
 as opposed to persistent handles are light weight and mostly used local operations. These handles are managed by
 HandleScopes so you must have a handlescope on the stack and the local is only valid as long as the handlescope is
-valid. You can find the available operations for a Local in `include/v8.h`.
+valid. This uses Resource Acquisition Is Initialization (RAII) so when the HandleScope instance goes out of scope
+it will remove all the Local instances.
+
+You can find the available operations for a Local in `include/v8.h`.
 
 ```shell
 (lldb) p script_name.IsEmpty()
@@ -322,7 +325,7 @@ Properties                  JavaScript Object               Elements
 Named properties:    { firstname: "Jon", lastname: "Doe' } Indexed Properties: {1: "Jon", 2: "Doe"}
 ```
 We can see that properies and elements are stored in different data structures.
-The elements is usually implemented as a plain array and the indexes can be for fast access
+Elements is usually implemented as a plain array and the indexes can be for fast access
 to the elements. 
 But for the properties this is not the case. Instead there is a mapping between the property names
 and the index into the properties.
@@ -348,7 +351,7 @@ Notice that JSObject extends JSReceiver which is extended by all types that can 
 
     DECL_ACCESSORS(raw_properties_or_hash, Object)
 
-Now properties (named properties not elements) can be of different kind internally. These work just
+Now properties (named properties not elements) can be of different kinds internally. These work just
 like simple dictionaries from the outside but a dictionary is only used in certain curcumstances
 at runtime.
 
@@ -385,7 +388,7 @@ When we call `js_object->HasFastProperties()` this will delegate to the map inst
     return !map()->is_dictionary_map();
 
 How do you add a property to a JSObject instance?  
-JSObject has a AddPropery function
+Take a look at [jsobject_test.cc](./tests/jsobject_test.cc) for an example.
 
 
 ### Caching
