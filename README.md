@@ -304,8 +304,8 @@ Take the following object:
 
     { firstname: "Jon", lastname: "Doe' }
 
-The above object has two named properties. Named properties differ from integer indexed for 
-property names which is what you have when you are working with arrays.
+The above object has two named properties. Named properties differ from integer indexed 
+which is what you have when you are working with arrays.
 
 Memory layout of JavaScript Object:
 ```
@@ -325,7 +325,7 @@ Properties                  JavaScript Object               Elements
 Named properties:    { firstname: "Jon", lastname: "Doe' } Indexed Properties: {1: "Jon", 2: "Doe"}
 ```
 We can see that properies and elements are stored in different data structures.
-Elements is usually implemented as a plain array and the indexes can be for fast access
+Elements are usually implemented as a plain array and the indexes can be used for fast access
 to the elements. 
 But for the properties this is not the case. Instead there is a mapping between the property names
 and the index into the properties.
@@ -377,7 +377,7 @@ Properties                  JSObject                    HiddenClass (Map)
 Each JSObject has as its first field a pointer to the generated HiddenClass. A hiddenclass contain mappings from property names to indices into the properties data type. When an instance of JSObject is created a `Map` is passed in. 
 As mentioned earlier JSObject inherits from JSReceiver which inherits from HeapObject
 
-For example,in `tests/jsobject_test.cc` we first create a new Map using the internal Isolate Factory:
+For example,in [jsobject_test.cc](./tests/jsobject_test.cc) we first create a new Map using the internal Isolate Factory:
 
     v8::internal::Handle<v8::internal::Map> map = factory->NewMap(v8::internal::JS_OBJECT_TYPE, 24);
     v8::internal::Handle<v8::internal::JSObject> js_object = factory->NewJSObjectFromMap(map);
@@ -1779,7 +1779,7 @@ After rebasing I've seen the following issue:
 The "solution" was to remove the out directory and rebuild.
 
 ### Tasks
-To find suitable task you can use `label:HelpWanted` at [bugs.chromium.org](https://bugs.chromium.org/p/v8/issues/list?can=2&q=label%3AHelpWanted+&x=priority&y=owner&cells=ids).
+To find suitable task you can use `label:HelpWanted` at [bugs.chromium.org](https://bugs.chromium.org/p/v8/issues/list?can=2&q=label%3AHelpWanted+&colspec=ID+Type+Status+Priority+Owner+Summary+HW+OS+Component+Stars&x=priority&y=owner&cells=ids).
 
 
 ### OpenHandle
