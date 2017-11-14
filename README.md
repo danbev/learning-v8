@@ -654,7 +654,7 @@ You can find the declaration of EXPRESSION in ast.h.
 Can be found in src/interpreter/bytecodes.h
 
 * StackCheck checks that stack limits are not exceeded to guard against overflow.
-* `Star` Stor content in accumulator regiser in register (the operand).
+* `Star` Store content in accumulator regiser in register (the operand).
 * Ldar   LoaD accumulator from Register argument a1 which is b
 
 The registers are not machine registers, apart from the accumlator as I understand it, but would instead be stack allocated.
@@ -802,7 +802,7 @@ Back now in compiler.cc and the GetSharedFunctionInfoForScript function:
     Zone compile_zone(isolate->allocator(), ZONE_NAME);
 
     ...
-   if (parse_info->literal() == nullptr && !parsing::ParseProgram(parse_info, isolate))
+    if (parse_info->literal() == nullptr && !parsing::ParseProgram(parse_info, isolate))
 
 `ParseProgram`:
 
