@@ -814,6 +814,8 @@ Back now in compiler.cc and the GetSharedFunctionInfoForScript function:
 `parser.ParseProgram`: 
 
     Handle<String> source(String::cast(info->script()->source()));
+
+
     (lldb) job *source
     "var user1 = new Person('Fletch');\x0avar user2 = new Person('Dr.Rosen');\x0aprint("user1 = " + user1.name);\x0aprint("user2 = " + user2.name);\x0a\x0a"
 
@@ -898,7 +900,7 @@ VisitDeclarations will iterate over all the declarations in the file which in ou
     // Perform a stack-check before the body.
     builder()->StackCheck(info()->literal()->start_position());
 
-So that call we output a stackcheck instruction, like in the example above:
+So that call will output a stackcheck instruction, like in the example above:
 
     14 E> 0x2eef8d9b103e @    0 : 7f                StackCheck
 
