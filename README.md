@@ -972,12 +972,12 @@ First have have the main function which does not have a name:
 
     Handler Table (size = 16)
 
-LdaConstant <idx> Load the constant at index from the constant pool into the accumulator.
-Star <dst> Store the contents of the accumulator register in dst.
-Ldar <src> Load accumulator with value from register src.
-LdaGlobal <idx> <slot> Load the constant at index from the constant pool into the accumulator.
-Use FeedbackVector slot for this. 
-Mov <closure>, <r3> store the value of regist
+LdaConstant <idx> Load the constant at index from the constant pool into the accumulator.  
+Star <dst> Store the contents of the accumulator register in dst.  
+Ldar <src> Load accumulator with value from register src.  
+LdaGlobal <idx> <slot> Load the constant at index from the constant pool into the accumulator.  
+Mov <closure>, <r3> store the value of register  
+
 You can find the declarations for the these instructions in src/interpreter/interpreter-generator.cc.
 
 br s -f bytecode-register.cc -l 125
@@ -986,6 +986,8 @@ br s -f bytecode-register.cc -l 125
 
 ## FeedbackVector
 Is attached to every function and is responsible for recording and managing all execution feedback, which is information about types enabling. 
+You can find the declaration for this class in `src/feedback-vector.h`
+
 
 ## BytecodeGenerator
 Is currently the only part of V8 that cares about the AST.
@@ -1100,9 +1102,20 @@ Are JavaScript functions/objects that are provided by V8. These are built using 
 passed to the CodeStubAssembler -> CodeAssembler -> RawMachineAssembler.
 These need to have bytecode generated for them so that they can be run in TurboFan.
 
-All the builtins are declared in src/builtins/builtins-definitions.h by the BUILTIN_LIST_BASE macro.
+`src/code-stub-assembler.h` j
 
-To see how this works in action we first need to disable snapshots. If we don't we won't be able to
+All the builtins are declared in src/builtins/builtins-definitions.h by the BUILTIN_LIST_BASE macro.
+There are different type of builtins (TF = Turbo Fan):
+TFJ: JavaScript linkage which means it is callable as a JavaScript function  
+TFS: CodeStub linkage. 
+A builtin with stub linkage can be used to extract common code into a separate code object which can
+then be used by multiple callers. These is useful because builtins are generated at compile time and
+included in the V8 snapshot. This means that they are part of every isolate that is created. Being 
+able to share common code for multiple builtins will save space.
+
+TFC: CodeStub linkage with custom descriptor
+
+To see how this works in action we first need to disable snapshots. If we don't, we won't be able to
 set breakpoints as the the heap will be serialized at compile time and deserialized upon startup of v8.
 
 To find the option to disable snapshots use:
@@ -1117,7 +1130,7 @@ To find the option to disable snapshots use:
 After building we should be able to set a break point in bootstrapper.cc and its function 
 `Genesis::InitializeGlobal`:
 
-    (lldb) br s -f bootstrapper.cc -l 2567
+    (lldb) br s -f bootstrapper.cc -l 2684
 
 Lets take a look at how the `JSON` object is setup:
 
@@ -1128,13 +1141,124 @@ Lets take a look at how the `JSON` object is setup:
 
     JSObject::AddProperty(global, name, json_object, DONT_ENUM);
 
-`DONT_ENUM` is checked by some builtin functions and if set this object will be ignored by thosee
+`DONT_ENUM` is checked by some builtin functions and if set this object will be ignored by those
 functions.
 
     SimpleInstallFunction(json_object, "parse", Builtins::kJsonParse, 2, false);
 
 Here we can see that we are installing a function named `parse`, which takes 2 parameters. You can
 find the definition in src/builtins/builtins-json.cc.
+What does the `SimpleInstallFunction` do?
+
+Lets take console as an example which was created using:
+
+    Handle<JSObject> console = factory->NewJSObject(cons, TENURED);
+    JSObject::AddProperty(global, name, console, DONT_ENUM);
+    SimpleInstallFunction(console, "debug", Builtins::kConsoleDebug, 1, false,
+                          NONE);
+
+    V8_NOINLINE Handle<JSFunction> SimpleInstallFunction(
+      Handle<JSObject> base, 
+      const char* name, 
+      Builtins::Name call, 
+      int len,
+      bool adapt, 
+      PropertyAttributes attrs = DONT_ENUM,
+      BuiltinFunctionId id = kInvalidBuiltinFunctionId) {
+
+So we can see that base is our Handle to a JSObject, and name is "console".
+Buildtins::Name is is Builtins:kConsoleDebug. Where is this defined?  
+You can find a macro named CPP in src/builtins/builtins-definitions.h:
+
+   CPP(ConsoleDebug)
+
+What does this macro expand to?  
+It is part of the BUILTIN_LIST_BASE macro in builtin-definitions.h
+We have to look at where BUILTIN_LIST is used with we can find in builtins.cc.
+In builtins.cc we have an array of BuiltinMetadata which is declared as:
+
+    const BuiltinMetadata builtin_metadata[] = {
+      BUILTIN_LIST(DECL_CPP, DECL_API, DECL_TFJ, DECL_TFC, DECL_TFS, DECL_TFH,
+                  DECL_ASM)
+    };
+
+    #define DECL_CPP(Name, ...) { #Name, Builtins::CPP, \
+                                { FUNCTION_ADDR(Builtin_##Name) }},
+
+Which will expand to the creation of a BuiltinMetadata struct entry in the array. The
+BuildintMetadata struct looks like this which might help understand what is going on:
+
+    struct BuiltinMetadata {
+      const char* name;
+      Builtins::Kind kind;
+      union {
+        Address cpp_entry;       // For CPP and API builtins.
+        int8_t parameter_count;  // For TFJ builtins.
+      } kind_specific_data;
+    };
+
+So the CPP(ConsoleDebug) will expand to an entry in the array which would look something like
+this:
+
+    { ConsoleDebug, 
+      Builtings::CPP, 
+      {
+        reinterpret_cast<v8::internal::Address>(reinterpret_cast<intptr_t>(Builtin_ConsoleDebug))
+      }
+    },
+
+The third paramter is the creation on the union which might not be obvious.
+Back to the question I'm trying to answer which is:
+"Buildtins::Name is is Builtins:kConsoleDebug. Where is this defined?"
+For this we have to look at builtins.h and the enum Name:
+
+    enum Name : int32_t {
+    #define DEF_ENUM(Name, ...) k##Name,
+        BUILTIN_LIST_ALL(DEF_ENUM)
+    #undef DEF_ENUM
+        builtin_count
+     };
+
+This will expand to the complete list of builtins in builtin-definitions.h using the DEF_ENUM
+macro. So the expansion for ConsoleDebug will look like:
+
+    enum Name: int32_t {
+      ...
+      kDebugConole,
+      ...
+    };
+
+So back to looking at the arguments to SimpleInstallFunction which looks like this:
+
+    SimpleInstallFunction(console, "debug", Builtins::kConsoleDebug, 1, false,
+                          NONE);
+
+    V8_NOINLINE Handle<JSFunction> SimpleInstallFunction(
+      Handle<JSObject> base, 
+      const char* name, 
+      Builtins::Name call, 
+      int len,
+      bool adapt, 
+      PropertyAttributes attrs = DONT_ENUM,
+      BuiltinFunctionId id = kInvalidBuiltinFunctionId) {
+
+We know know about Builtins::Name, so lets look at len which is one, what is this?
+SimpleInstallFunction will call:
+
+    Handle<JSFunction> fun =
+      SimpleCreateFunction(base->GetIsolate(), function_name, call, len, adapt);
+
+len would be used if adapt was true but it is false in our case. This is what it would 
+be used for if adapt was true:
+
+    fun->shared()->set_internal_formal_parameter_count(len);
+
+I'm not exatly sure what adapt is referring to here.
+
+PropertyAttributes is not specified so it will get the default value of DONT_ENUM.
+The last parameter which is of type BuiltinFunctionId is not specified either so the
+default value of kInvalidBuiltinFunctionId will be used. This is an enum defined in 
+src/objects.h.
 
 
 ## Building V8
