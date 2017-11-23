@@ -1253,12 +1253,154 @@ be used for if adapt was true:
 
     fun->shared()->set_internal_formal_parameter_count(len);
 
-I'm not exatly sure what adapt is referring to here.
+I'm not exactly sure what adapt is referring to here.
 
 PropertyAttributes is not specified so it will get the default value of DONT_ENUM.
 The last parameter which is of type BuiltinFunctionId is not specified either so the
 default value of kInvalidBuiltinFunctionId will be used. This is an enum defined in 
 src/objects.h.
+
+So we have returned from SimpleInstallFunction and are back in
+
+
+This [blog](https://v8project.blogspot.se/2017/11/csa.html) provides an example of adding
+a function to the String object. 
+
+    $ out.gn/learning/mksnapshot --print-code > output
+
+You can then see the generated code from this. This will produce a code stub that can 
+be called through C++. Lets update this to have it be called from JavaScript:
+
+Update builtins/builtins-string-get.cc :
+
+    TF_BUILTIN(GetStringLength, StringBuiltinsAssembler) {
+      Node* const str = Parameter(Descriptor::kReceiver);
+      Return(LoadStringLength(str));
+    }
+
+We also have to update builtins/builtins-definitions.h:
+
+    TFJ(GetStringLength, 0)
+
+And bootstrapper.cc:
+
+    SimpleInstallFunction(prototype, "len", Builtins::kGetStringLength, 0, true);
+
+If you now build using 'ninja -C out.gn/learning' you should be able to run d8 and try this out:
+
+    d8> const s = 'testing'
+    undefined
+    d8> s.len()
+    7
+
+Now lets take a closer look at the code that is generated for this:
+
+    $ out.gn/learning/mksnapshot --print-code > output
+
+Looking at the output generated I was surprised to see two entries for GetStringLength (I changed the name
+just to make sure there was not something else generating the second one). Why two?
+
+The following used Intel Assembly syntax which means that no register/immediate prefixes and the first operand is the 
+destination and the second operand the source.
+```
+--- Code ---
+kind = BUILTIN
+name = BeveStringLength
+compiler = turbofan
+Instructions (size = 136)
+0x1fafde09b3a0     0  55             push rbp
+0x1fafde09b3a1     1  4889e5         REX.W movq rbp,rsp                  // movq rsp into rbp
+
+0x1fafde09b3a4     4  56             push rsi                            // push the value of rsi (first parameter) onto the stack 
+0x1fafde09b3a5     5  57             push rdi                            // push the value of rdi (second parameter) onto the stack
+0x1fafde09b3a6     6  50             push rax                            // push the value of rax (accumulator) onto the stack
+
+0x1fafde09b3a7     7  4883ec08       REX.W subq rsp,0x8                  // make room for a 8 byte value on the stack
+0x1fafde09b3ab     b  488b4510       REX.W movq rax,[rbp+0x10]
+0x1fafde09b3af     f  488b58ff       REX.W movq rbx,[rax-0x1]
+0x1fafde09b3b3    13  807b0b80       cmpb [rbx+0xb],0x80
+
+0x1fafde09b3b7    17  0f8350000000   jnc 0x1fafde09b40d  <+0x6d>
+0x1fafde09b3bd    1d  488b400f       REX.W movq rax,[rax+0xf]
+0x1fafde09b3c1    21  4989e2         REX.W movq r10,rsp
+0x1fafde09b3c4    24  4883ec08       REX.W subq rsp,0x8
+0x1fafde09b3c8    28  4883e4f0       REX.W andq rsp,0xf0
+0x1fafde09b3cc    2c  4c891424       REX.W movq [rsp],r10
+0x1fafde09b3d0    30  488945e0       REX.W movq [rbp-0x20],rax
+0x1fafde09b3d4    34  48be0000000001000000 REX.W movq rsi,0x100000000
+0x1fafde09b3de    3e  48bad9c228dfa8090000 REX.W movq rdx,0x9a8df28c2d9    ;; object: 0x9a8df28c2d9 <String[101]: CAST(LoadObjectField(object, offset, MachineTypeOf<T>::value)) at ../../src/code-stub-assembler.h:432>
+0x1fafde09b3e8    48  488bf8         REX.W movq rdi,rax
+0x1fafde09b3eb    4b  48b830726d0a01000000 REX.W movq rax,0x10a6d7230    ;; external reference (check_object_type)
+0x1fafde09b3f5    55  40f6c40f       testb rsp,0xf
+0x1fafde09b3f9    59  7401           jz 0x1fafde09b3fc  <+0x5c>
+0x1fafde09b3fb    5b  cc             int3l
+0x1fafde09b3fc    5c  ffd0           call rax
+0x1fafde09b3fe    5e  488b2424       REX.W movq rsp,[rsp]
+0x1fafde09b402    62  488b45e0       REX.W movq rax,[rbp-0x20]
+0x1fafde09b406    66  488be5         REX.W movq rsp,rbp
+0x1fafde09b409    69  5d             pop rbp
+0x1fafde09b40a    6a  c20800         ret 0x8
+0x1fafde09b40d    6d  48ba71c228dfa8090000 REX.W movq rdx,0x9a8df28c271    ;; object: 0x9a8df28c271 <String[76]\: CSA_ASSERT failed: IsString(object) [../../src/code-stub-assembler.cc:1498]\n>
+0x1fafde09b417    77  e8e4d1feff     call 0x1fafde088600     ;; code: BUILTIN
+0x1fafde09b41c    7c  cc             int3l
+0x1fafde09b41d    7d  cc             int3l
+0x1fafde09b41e    7e  90             nop
+0x1fafde09b41f    7f  90             nop
+
+
+Safepoints (size = 8)
+
+RelocInfo (size = 7)
+0x1fafde09b3e0  embedded object  (0x9a8df28c2d9 <String[101]: CAST(LoadObjectField(object, offset, MachineTypeOf<T>::value)) at ../../src/code-stub-assembler.h:432>)
+0x1fafde09b3ed  external reference (check_object_type)  (0x10a6d7230)
+0x1fafde09b40f  embedded object  (0x9a8df28c271 <String[76]\: CSA_ASSERT failed: IsString(object) [../../src/code-stub-assembler.cc:1498]\n>)
+0x1fafde09b418  code target (BUILTIN)  (0x1fafde088600)
+
+--- End code --- 
+```
+
+
+### TF_BUILTIN macro
+Is a macro to defining Turbofan (TF) builtins and can be found in builtins/builtins-utils-gen.h
+
+    TF_BUILTIN(BeveStringLength, StringBuiltinsAssembler) {
+      Node* const str = Parameter(Descriptor::kReceiver);
+      Return(LoadStringLength(str));
+    }
+
+Let's take our GetStringLength example from above and see what this will be expanded to after
+processing this macro:
+
+    class GetStringLengthAssembler : public StringBuiltinsAssembler {
+      public:
+       typedef Builtin_GetStringLength_InterfaceDescriptor Descriptor;
+
+       explicit GetStringLengthAssembler(compiler::CodeAssemblerState* state) : AssemblerBase(state) {}
+
+       void GenerateGetStringLengthImpl();
+
+       Node* Parameter(Descriptor::ParameterIndices index) {
+         return CodeAssembler::Parameter(static_cast<int>(index));
+       }
+
+       Node* Parameter(BuiltinDescriptor::ParameterIndices index) {
+         return CodeAssembler::Parameter(static_cast<int>(index));
+       }
+    };
+
+    void Builtins::Generate_GetStringLength(compiler::CodeAssemblerState* state) {
+      GetStringLengthAssembler assembler(state);
+      state->SetInitialDebugInformation(GetStringLength, __FILE__, __LINE__);
+      assembler.GenerateGetStringLenghtImpl();
+    }
+
+    void GetStringLengthAssembler::GenerateGetStringLengthImpl() {
+      Node* const str = Parameter(Descriptor::kReceiver);
+      Return(LoadStringLength(str));
+    }
+
+From the resulting class you can see how Parameter can be used.
+
 
 
 ## Building V8
@@ -1368,6 +1510,9 @@ I was able to get around this by:
     $ pip install -U pyobjc
 
 #### Using a specific version of V8
+The instructions below work but it is also possible to create a soft link from chromium/src/v8
+to local v8 repository and the build/test. 
+
 So, we want to include our updated version of V8 so that we can verify that it builds correctly with our change to V8.
 While I'm not sure this is the proper way to do it, I was able to update DEPS in src (chromium) and set
 the v8 entry to git@github.com:danbev/v8.git@064718a8921608eaf9b5eadbb7d734ec04068a87:
