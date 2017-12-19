@@ -527,7 +527,7 @@ Is the superclass for all heap allocated objects.
 This class contains a Map pointer which can be accessed using map()
 
 ### Oddball
-This class extends HeapObject and  describes null, undefined, true, and false objects.
+This class extends HeapObject and  describes `null`, `undefined`, `true`, and `false` objects.
 
 
 #### Map
@@ -698,11 +698,11 @@ This will land us in `api.cc`
     (lldb) p language_mode
     (v8::internal::LanguageMode) $10 = SLOPPY
 
-LanguageMode can be found in src/globals.h and it is an enum with three values:
+`LanguageMode` can be found in src/globals.h and it is an enum with three values:
 
     enum LanguageMode : uint32_t { SLOPPY, STRICT, LANGUAGE_END };
 
-`SLOPPY` mode, I assume, is the mode when there is no "use strict";. Remember that this can go inside a function and does not
+`SLOPPY` mode, I assume, is the mode when there is no `"use strict";`. Remember that this can go inside a function and does not
 have to be at the top level of the file.
 
     ParseInfo parse_info(script);
@@ -825,7 +825,7 @@ So here we can see our JavaScript as a String.
     scanner_.Initialize(stream.get(), info->is_module());
     result = DoParseProgram(info);
 
-`DoParseProgram`
+`DoParseProgram`:
 
     (lldb) br s -f parser.cc -l 639
     ...
@@ -972,15 +972,19 @@ First have have the main function which does not have a name:
 
     Handler Table (size = 16)
 
-LdaConstant <idx> Load the constant at index from the constant pool into the accumulator.  
-Star <dst> Store the contents of the accumulator register in dst.  
-Ldar <src> Load accumulator with value from register src.  
-LdaGlobal <idx> <slot> Load the constant at index from the constant pool into the accumulator.  
-Mov <closure>, <r3> store the value of register  
+* LdaConstant <idx> 
+Load the constant at index from the constant pool into the accumulator.  
+* Star <dst>
+Store the contents of the accumulator register in dst.  
+* Ldar <src>
+Load accumulator with value from register src.  
+* LdaGlobal <idx> <slot>
+Load the constant at index from the constant pool into the accumulator.  
+* Mov <closure>, <r3>
+Store the value of register  
 
-You can find the declarations for the these instructions in src/interpreter/interpreter-generator.cc.
+You can find the declarations for the these instructions in `src/interpreter/interpreter-generator.cc`.
 
-br s -f bytecode-register.cc -l 125
 
 ## Unified code generation architecture
 
@@ -1039,7 +1043,7 @@ If we look in src/objects.h we can see the object hierarchy:
                 ExternalTwoByteInternalizedString
 ```
 
-Do note that v8::String is declared in include/v8.h
+Do note that v8::String is declared in `include/v8.h`.
 
 `Name` as can be seen extends HeapObject and anything that can be used as a property name should extend Name.
 Looking at the declaration in include/v8.h we find the following:
@@ -1048,10 +1052,9 @@ Looking at the declaration in include/v8.h we find the following:
     static Name* Cast(Value* obj)
 
 
-src/objects/string.h
 
 #### String
-A String extends Name and has a length and content. The content can be made up of 1 or 2 byte characters.
+A String extends `Name` and has a length and content. The content can be made up of 1 or 2 byte characters.
 Looking at the declaration in include/v8.h we find the following:
 
     enum Encoding {
@@ -1099,21 +1102,26 @@ Looking at `String` I was not able to find any construtor for it, nor the other 
 
 ## Builtins
 Are JavaScript functions/objects that are provided by V8. These are built using a C++ DSL and are 
-passed to the CodeStubAssembler -> CodeAssembler -> RawMachineAssembler.
-These need to have bytecode generated for them so that they can be run in TurboFan.
+passed through:
 
-`src/code-stub-assembler.h` j
+    CodeStubAssembler -> CodeAssembler -> RawMachineAssembler.
+    
+Builtins need to have bytecode generated for them so that they can be run in TurboFan.
 
-All the builtins are declared in src/builtins/builtins-definitions.h by the BUILTIN_LIST_BASE macro.
+`src/code-stub-assembler.h`
+
+All the builtins are declared in `src/builtins/builtins-definitions.h` by the `BUILTIN_LIST_BASE` macro.
 There are different type of builtins (TF = Turbo Fan):
-TFJ: JavaScript linkage which means it is callable as a JavaScript function  
-TFS: CodeStub linkage. 
-A builtin with stub linkage can be used to extract common code into a separate code object which can
+* TFJ 
+JavaScript linkage which means it is callable as a JavaScript function  
+* TFS
+CodeStub linkage. A builtin with stub linkage can be used to extract common code into a separate code object which can
 then be used by multiple callers. These is useful because builtins are generated at compile time and
 included in the V8 snapshot. This means that they are part of every isolate that is created. Being 
 able to share common code for multiple builtins will save space.
 
-TFC: CodeStub linkage with custom descriptor
+* TFC 
+CodeStub linkage with custom descriptor
 
 To see how this works in action we first need to disable snapshots. If we don't, we won't be able to
 set breakpoints as the the heap will be serialized at compile time and deserialized upon startup of v8.
@@ -1150,7 +1158,7 @@ Here we can see that we are installing a function named `parse`, which takes 2 p
 find the definition in src/builtins/builtins-json.cc.
 What does the `SimpleInstallFunction` do?
 
-Lets take console as an example which was created using:
+Lets take `console` as an example which was created using:
 
     Handle<JSObject> console = factory->NewJSObject(cons, TENURED);
     JSObject::AddProperty(global, name, console, DONT_ENUM);
@@ -1168,12 +1176,12 @@ Lets take console as an example which was created using:
 
 So we can see that base is our Handle to a JSObject, and name is "console".
 Buildtins::Name is is Builtins:kConsoleDebug. Where is this defined?  
-You can find a macro named CPP in src/builtins/builtins-definitions.h:
+You can find a macro named `CPP` in `src/builtins/builtins-definitions.h`:
 
    CPP(ConsoleDebug)
 
 What does this macro expand to?  
-It is part of the BUILTIN_LIST_BASE macro in builtin-definitions.h
+It is part of the `BUILTIN_LIST_BASE` macro in builtin-definitions.h
 We have to look at where BUILTIN_LIST is used with we can find in builtins.cc.
 In builtins.cc we have an array of BuiltinMetadata which is declared as:
 
@@ -1197,7 +1205,7 @@ BuildintMetadata struct looks like this which might help understand what is goin
       } kind_specific_data;
     };
 
-So the CPP(ConsoleDebug) will expand to an entry in the array which would look something like
+So the `CPP(ConsoleDebug)` will expand to an entry in the array which would look something like
 this:
 
     { ConsoleDebug, 
@@ -1208,9 +1216,10 @@ this:
     },
 
 The third paramter is the creation on the union which might not be obvious.
-Back to the question I'm trying to answer which is:
-"Buildtins::Name is is Builtins:kConsoleDebug. Where is this defined?"
-For this we have to look at builtins.h and the enum Name:
+
+Back to the question I'm trying to answer which is:  
+"Buildtins::Name is is Builtins:kConsoleDebug. Where is this defined?"  
+For this we have to look at `builtins.h` and the enum Name:
 
     enum Name : int32_t {
     #define DEF_ENUM(Name, ...) k##Name,
@@ -1242,22 +1251,22 @@ So back to looking at the arguments to SimpleInstallFunction which looks like th
       PropertyAttributes attrs = DONT_ENUM,
       BuiltinFunctionId id = kInvalidBuiltinFunctionId) {
 
-We know know about Builtins::Name, so lets look at len which is one, what is this?
+We know about `Builtins::Name`, so lets look at len which is one, what is this?  
 SimpleInstallFunction will call:
 
     Handle<JSFunction> fun =
       SimpleCreateFunction(base->GetIsolate(), function_name, call, len, adapt);
 
-len would be used if adapt was true but it is false in our case. This is what it would 
+`len` would be used if adapt was true but it is false in our case. This is what it would 
 be used for if adapt was true:
 
     fun->shared()->set_internal_formal_parameter_count(len);
 
 I'm not exactly sure what adapt is referring to here.
 
-PropertyAttributes is not specified so it will get the default value of DONT_ENUM.
+PropertyAttributes is not specified so it will get the default value of `DONT_ENUM`.
 The last parameter which is of type BuiltinFunctionId is not specified either so the
-default value of kInvalidBuiltinFunctionId will be used. This is an enum defined in 
+default value of `kInvalidBuiltinFunctionId` will be used. This is an enum defined in 
 src/objects.h.
 
 So we have returned from SimpleInstallFunction and are back in
@@ -1300,7 +1309,7 @@ Now lets take a closer look at the code that is generated for this:
 Looking at the output generated I was surprised to see two entries for GetStringLength (I changed the name
 just to make sure there was not something else generating the second one). Why two?
 
-The following used Intel Assembly syntax which means that no register/immediate prefixes and the first operand is the 
+The following uses Intel Assembly syntax which means that no register/immediate prefixes and the first operand is the 
 destination and the second operand the source.
 ```
 --- Code ---
@@ -1316,11 +1325,11 @@ Instructions (size = 136)
 0x1fafde09b3a6     6  50             push rax                            // push the value of rax (accumulator) onto the stack
 
 0x1fafde09b3a7     7  4883ec08       REX.W subq rsp,0x8                  // make room for a 8 byte value on the stack
-0x1fafde09b3ab     b  488b4510       REX.W movq rax,[rbp+0x10]
+0x1fafde09b3ab     b  488b4510       REX.W movq rax,[rbp+0x10]           // move the value rpm + 10 to rax
 0x1fafde09b3af     f  488b58ff       REX.W movq rbx,[rax-0x1]
-0x1fafde09b3b3    13  807b0b80       cmpb [rbx+0xb],0x80
+0x1fafde09b3b3    13  807b0b80       cmpb [rbx+0xb],0x80                // IsString(object). compare byte to zero
+0x1fafde09b3b7    17  0f8350000000   jnc 0x1fafde09b40d  <+0x6d>        // jump it carry flag was not set
 
-0x1fafde09b3b7    17  0f8350000000   jnc 0x1fafde09b40d  <+0x6d>
 0x1fafde09b3bd    1d  488b400f       REX.W movq rax,[rax+0xf]
 0x1fafde09b3c1    21  4989e2         REX.W movq r10,rsp
 0x1fafde09b3c4    24  4883ec08       REX.W subq rsp,0x8
@@ -1340,6 +1349,8 @@ Instructions (size = 136)
 0x1fafde09b406    66  488be5         REX.W movq rsp,rbp
 0x1fafde09b409    69  5d             pop rbp
 0x1fafde09b40a    6a  c20800         ret 0x8
+
+// this is where we jump to if IsString failed
 0x1fafde09b40d    6d  48ba71c228dfa8090000 REX.W movq rdx,0x9a8df28c271    ;; object: 0x9a8df28c271 <String[76]\: CSA_ASSERT failed: IsString(object) [../../src/code-stub-assembler.cc:1498]\n>
 0x1fafde09b417    77  e8e4d1feff     call 0x1fafde088600     ;; code: BUILTIN
 0x1fafde09b41c    7c  cc             int3l
@@ -1399,7 +1410,7 @@ processing this macro:
       Return(LoadStringLength(str));
     }
 
-From the resulting class you can see how Parameter can be used.
+From the resulting class you can see how `Parameter` can be used from within `TF_BUILTIN` macro.
 
 
 
