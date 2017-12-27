@@ -358,11 +358,11 @@ at runtime.
 ```
 Properties                  JSObject                    HiddenClass (Map)
 +-----------+              +-----------------+         +----------------+
-|property1  |<------+      | HiddenClass     |-------->| bit field1     |
+|property1  |<------+      | HiddenClass     |-------->| bit field1      |
 +-----------+       |      +-----------------+         +----------------+
-|...        |       +------| Properties      |         | bit field2     |
+|...        |       +------| Properties      |         | bit field2      |
 +-----------+              +-----------------+         +----------------+
-|...        |              | Elements        |         | bit field3     |
+|...        |              | Elements        |         | bit field3      |
 +-----------+              +-----------------+         +----------------+
 |propertyN  |              | property1       |         | elementN       |
 +-----------+              +-----------------+         +----------------+
