@@ -522,10 +522,6 @@ using the factory (src/factory.h)
 ### Objects 
 All objects extend the abstract class Object (src/objects.h).
 
-#### HeapObject
-Is the superclass for all heap allocated objects. 
-This class contains a Map pointer which can be accessed using map()
-
 ### Oddball
 This class extends HeapObject and  describes `null`, `undefined`, `true`, and `false` objects.
 
