@@ -18,3 +18,4 @@ tests/string_test
 ns
 tests/jsobject_test
 tests/ast_test
+tests/context_test

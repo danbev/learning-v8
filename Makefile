@@ -36,7 +36,7 @@ natives_blob.bin:
 snapshot_blob.bin:
 	@cp $(v8_build_dir)/$@ .
 
-check: tests/local_test tests/persistent-object_test tests/maybe_test tests/smi_test tests/string_test
+check: tests/local_test tests/persistent-object_test tests/maybe_test tests/smi_test tests/string_test tests/context_test
 
 tests/local_test: tests/local_test.cc
 	$(COMPILE_TEST) tests/main.cc $< -o $@
@@ -59,6 +59,9 @@ tests/jsobject_test: tests/jsobject_test.cc
 tests/ast_test: tests/ast_test.cc
 	$(COMPILE_TEST) -Wno-everything tests/main.cc $< -o $@
 
+tests/context_test: tests/context_test.cc
+	$(COMPILE_TEST) tests/main.cc $< -o $@
+
 list-gtests:
 	./tests/smi_test --gtest_list_tests
 
@@ -79,3 +82,4 @@ clean:
 	rm -rf tests/string_test
 	rm -rf tests/jsobject_test
 	rm -rf tests/ast_test
+	rm -rf tests/context_test
