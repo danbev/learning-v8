@@ -31,14 +31,6 @@ void propertyListener(Local<String> name, const PropertyCallbackInfo<Value>& inf
 }
 
 int main(int argc, char* argv[]) {
-    // International Components for Unicode (ICU) deals with internationalization (i18n)
-    // ICU provides support locale-sensitve string comparisons, date/time/number/currency formatting
-    // etc. There is an optional API called ECMAScript 402 which V8 suppports and which is enabled by
-    // default.
-    // https://github.com/v8/v8/wiki/i18n-support says that even if your application does not use ICU
-    // you still need to call InitializeICU.
-    V8::InitializeICU();
-    
     // Now this is where the files 'natives_blob.bin' and snapshot_blob.bin' come into play. But what
     // are these bin files?
     // JavaScript specifies a lot of built-in functionality which every V8 context must provide.

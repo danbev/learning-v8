@@ -55,7 +55,6 @@ static void OnFatalError(const char* location, const char* message) {
 
 
 int main(int argc, char* argv[]) {
-  V8::InitializeICU();
   V8::InitializeExternalStartupData(argv[0]);
   Platform* platform = platform::CreateDefaultPlatform();
   V8::InitializePlatform(platform);

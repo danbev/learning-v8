@@ -42,7 +42,6 @@ void GetName(Local<String> property, const PropertyCallbackInfo<Value>& info) {
 }
 
 int main(int argc, char* argv[]) {
-  V8::InitializeICU();
   V8::InitializeExternalStartupData(argv[0]);
 
   Platform* platform = platform::CreateDefaultPlatform();
