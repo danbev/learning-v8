@@ -8,27 +8,30 @@
 
 class V8TestFixture : public ::testing::Test {
  protected:
+  static std::unique_ptr<v8::Platform> platform_;
+  static std::unique_ptr<v8::ArrayBuffer::Allocator> allocator_;
+  static v8::Isolate::CreateParams create_params_;
   v8::Isolate* isolate_;
 
-  ~V8TestFixture() {
-    TearDown();
+  static void SetUpTestCase() {
+    v8::V8::InitializeExternalStartupData("fixture");
+    platform_.reset(v8::platform::CreateDefaultPlatform());
+    allocator_.reset(v8::ArrayBuffer::Allocator::NewDefaultAllocator());
+    create_params_.array_buffer_allocator = allocator_.get();
+    v8::V8::InitializePlatform(platform_.get());
+    v8::V8::Initialize();
+  }
+
+  static void TearDownTestCase() {
+    v8::V8::ShutdownPlatform();
   }
 
   virtual void SetUp() {
-    v8::V8::InitializeExternalStartupData("fixture");
-    platform_ = v8::platform::CreateDefaultPlatform();
-    v8::V8::InitializePlatform(platform_);
-    v8::V8::Initialize();
-    v8::Isolate::CreateParams create_params;
-    create_params.array_buffer_allocator = v8::ArrayBuffer::Allocator::NewDefaultAllocator();
-    isolate_ = v8::Isolate::New(create_params);
+    isolate_ = v8::Isolate::New(create_params_);
   }
 
   virtual void TearDown() {
-    if (platform_ == nullptr) return;
-    v8::V8::ShutdownPlatform();
-    delete platform_;
-    platform_ = nullptr;
+    isolate_->Dispose();
   }
 
   v8::internal::Isolate* asInternal(v8::Isolate* isolate) {
@@ -36,7 +39,10 @@ class V8TestFixture : public ::testing::Test {
   }
 
  private:
-  v8::Platform* platform_ = nullptr;
 };
+
+std::unique_ptr<v8::Platform> V8TestFixture::platform_;
+v8::Isolate::CreateParams V8TestFixture::create_params_;
+std::unique_ptr<v8::ArrayBuffer::Allocator> V8TestFixture::allocator_;
 
 #endif  // TEST_V8_TEST_FIXTURE_H_
