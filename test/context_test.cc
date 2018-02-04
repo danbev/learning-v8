@@ -8,24 +8,21 @@
 #include "src/objects-inl.h"
 #include "src/api.h"
 
-using namespace v8;
-namespace i = v8::internal;
-
 class ContextTest : public V8TestFixture {
 };
 
 TEST_F(ContextTest, Scopes) {
-  const Local<v8::ObjectTemplate> obt = v8::Local<v8::ObjectTemplate>();
+  const v8::Local<v8::ObjectTemplate> obt = v8::Local<v8::ObjectTemplate>();
   const v8::HandleScope handle_scope(V8TestFixture::isolate_);
   {
-    Handle<Context> context1 = Context::New(V8TestFixture::isolate_, nullptr, obt);
-    Context::Scope contextScope1(context1);
+    v8::Handle<v8::Context> context1 = v8::Context::New(V8TestFixture::isolate_, nullptr, obt);
+    v8::Context::Scope contextScope1(context1);
     // entered_contexts_ [context1], saved_contexts_[isolateContext]
     EXPECT_EQ(context1, V8TestFixture::isolate_->GetEnteredContext());
     EXPECT_EQ(context1, V8TestFixture::isolate_->GetCurrentContext());
     {
-      Handle<Context> context2 = Context::New(V8TestFixture::isolate_, nullptr, obt);
-      Context::Scope contextScope2(context2);
+      v8::Handle<v8::Context> context2 = v8::Context::New(V8TestFixture::isolate_, nullptr, obt);
+      v8::Context::Scope contextScope2(context2);
       // entered_contexts_ [context1, context2], saved_contexts[isolateContext, context1]
       EXPECT_EQ(context2, V8TestFixture::isolate_->GetEnteredContext());
       EXPECT_EQ(context2, V8TestFixture::isolate_->GetCurrentContext());
@@ -45,9 +42,9 @@ TEST_F(ContextTest, ExtensionConfiguration) {
 
   std::unique_ptr<MockExtension> mock_extension {new MockExtension{name}};
   v8::RegisterExtension(mock_extension.get());
-  std::unique_ptr<v8::ExtensionConfiguration> ext{new ExtensionConfiguration(1, names)};
+  std::unique_ptr<v8::ExtensionConfiguration> ext{new v8::ExtensionConfiguration(1, names)};
   bool found = false;
-  Handle<Context> context = Context::New(isolate_,
+  v8::Handle<v8::Context> context = v8::Context::New(isolate_,
                                          ext.get(),
                                          v8::Local<v8::ObjectTemplate>());
 
@@ -60,21 +57,24 @@ TEST_F(ContextTest, ExtensionConfiguration) {
   EXPECT_TRUE(found);
 }
 
-TEST_F(ContextTest, DISABLED_EmbedderData) {
+TEST_F(ContextTest, EmbedderData) {
   const v8::HandleScope handle_scope(isolate_);
-  Handle<Context> context = Context::New(isolate_,
+  v8::Handle<v8::Context> context = v8::Context::New(isolate_,
                                          nullptr,
                                          v8::Local<v8::ObjectTemplate>());
   
-  Local<String> str = String::NewFromOneByte(isolate_, 
+  v8::Local<v8::String> str = v8::String::NewFromOneByte(isolate_, 
       reinterpret_cast<const uint8_t*>("embdata"),
-      NewStringType::kNormal,
+      v8::NewStringType::kNormal,
       7).ToLocalChecked();
   context->SetEmbedderData(0, str);
   EXPECT_EQ(context->GetEmbedderData(0), str);
 
-  Handle<Context> context2 = Context::New(isolate_,
+  v8::Handle<v8::Context> context2 = v8::Context::New(isolate_,
                                           nullptr,
                                           v8::Local<v8::ObjectTemplate>());
-  EXPECT_TRUE(*context2->GetEmbedderData(0) == nullptr);
+  // Note that the embedder data FixedArray is of length 3 initially and
+  // and not zeroed out, wo we can't just check for null which I was my 
+  // first thought. This is mainly to verify that context are indeed separate.
+  EXPECT_NE(context2->GetEmbedderData(0), str);
 }

@@ -2320,3 +2320,93 @@ void Context::Exit() {
 }
 ```
 
+
+#### EmbedderData
+A context can have embedder data set on it. Like decsribed above a Context is
+internally A FixedArray. `SetEmbedderData` in Context is implemented in `src/api.cc`:
+```c++
+const char* location = "v8::Context::SetEmbedderData()";
+i::Handle<i::FixedArray> data = EmbedderDataFor(this, index, true, location);
+i::Handle<i::FixedArray> data(env->embedder_data());
+```
+`location` is only used for logging and we can ignore it for now.
+`EmbedderDataFor`:
+`c++
+i::Handle<i::Context> env = Utils::OpenHandle(context);
+...
+i::Handle<i::FixedArray> data(env->embedder_data());
+```
+We can find `embedder_data` in `src/contexts-inl.h
+
+```c++
+#define NATIVE_CONTEXT_FIELD_ACCESSORS(index, type, name) \
+  inline void set_##name(type* value);                    \
+  inline bool is_##name(type* value) const;               \
+  inline type* name() const;
+  NATIVE_CONTEXT_FIELDS(NATIVE_CONTEXT_FIELD_ACCESSORS)
+```
+And `NATIVE_CONTEXT_FIELDS` in context.h:
+```c++
+#define NATIVE_CONTEXT_FIELDS(V)                                               \
+  V(GLOBAL_PROXY_INDEX, JSObject, global_proxy_object)                         \
+  V(EMBEDDER_DATA_INDEX, FixedArray, embedder_data)                            \
+...
+
+#define NATIVE_CONTEXT_FIELD_ACCESSORS(index, type, name) \
+  void Context::set_##name(type* value) {                 \
+    DCHECK(IsNativeContext());                            \
+    set(index, value);                                    \
+  }                                                       \
+  bool Context::is_##name(type* value) const {            \
+    DCHECK(IsNativeContext());                            \
+    return type::cast(get(index)) == value;               \
+  }                                                       \
+  type* Context::name() const {                           \
+    DCHECK(IsNativeContext());                            \
+    return type::cast(get(index));                        \
+  }
+NATIVE_CONTEXT_FIELDS(NATIVE_CONTEXT_FIELD_ACCESSORS)
+#undef NATIVE_CONTEXT_FIELD_ACCESSORS
+```
+So the preprocessor would expand this to:
+```c++
+FixedArray embedder_data() const;
+
+void Context::set_embedder_data(FixedArray value) {
+  DCHECK(IsNativeContext());
+  set(EMBEDDER_DATA_INDEX, value);
+}
+
+bool Context::is_embedder_data(FixedArray value) const {
+  DCHECK(IsNativeContext());
+  return FixedArray::cast(get(EMBEDDER_DATA_INDEX)) == value;
+}
+
+FixedArray Context::embedder_data() const {
+  DCHECK(IsNativeContext());
+  return FixedArray::cast(get(EMBEDDER_DATA_INDEX));
+}
+```
+We can take a look at the initial data:
+```console
+lldb) expr data->Print()
+0x2fac3e896439: [FixedArray] in OldSpace
+ - map = 0x2fac9de82341 <Map(HOLEY_ELEMENTS)>
+ - length: 3
+         0-2: 0x2fac1cb822e1 <undefined>
+(lldb) expr data->length()
+(int) $5 = 3
+```
+And after setting:
+```console
+(lldb) expr data->Print()
+0x2fac3e896439: [FixedArray] in OldSpace
+ - map = 0x2fac9de82341 <Map(HOLEY_ELEMENTS)>
+ - length: 3
+           0: 0x2fac20c866e1 <String[7]: embdata>
+         1-2: 0x2fac1cb822e1 <undefined>
+
+(lldb) expr v8::internal::String::cast(data->get(0))->Print()
+"embdata"
+```
+This was taken while debugging [ContextTest::EmbedderData](./test/context_test.cc).
