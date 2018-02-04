@@ -6,6 +6,7 @@
 #include "src/factory.h"
 #include "src/objects.h"
 #include "src/objects-inl.h"
+#include "src/api.h"
 
 using namespace v8;
 namespace i = v8::internal;
@@ -32,7 +33,34 @@ TEST_F(ContextTest, Scopes) {
   }
 }
 
-TEST_F(ContextTest, EmbedderData) {
+class MockExtension : public v8::Extension {
+ public:
+   MockExtension(const char* name) : v8::Extension(name) {}
+};
+
+TEST_F(ContextTest, ExtensionConfiguration) {
+  const v8::HandleScope handle_scope(isolate_);
+  const char* name = "mock";
+  const char* names[] = {name};
+
+  std::unique_ptr<MockExtension> mock_extension {new MockExtension{name}};
+  v8::RegisterExtension(mock_extension.get());
+  std::unique_ptr<v8::ExtensionConfiguration> ext{new ExtensionConfiguration(1, names)};
+  bool found = false;
+  Handle<Context> context = Context::New(isolate_,
+                                         ext.get(),
+                                         v8::Local<v8::ObjectTemplate>());
+
+  for (v8::RegisteredExtension* it = v8::RegisteredExtension::first_extension(); it != nullptr; it = it->next()) {
+    if (it->extension()->name() == name) {
+      found = true;
+      break;
+    }
+  }
+  EXPECT_TRUE(found);
+}
+
+TEST_F(ContextTest, DISABLED_EmbedderData) {
   const v8::HandleScope handle_scope(isolate_);
   Handle<Context> context = Context::New(isolate_,
                                          nullptr,
@@ -44,4 +72,9 @@ TEST_F(ContextTest, EmbedderData) {
       7).ToLocalChecked();
   context->SetEmbedderData(0, str);
   EXPECT_EQ(context->GetEmbedderData(0), str);
+
+  Handle<Context> context2 = Context::New(isolate_,
+                                          nullptr,
+                                          v8::Local<v8::ObjectTemplate>());
+  EXPECT_TRUE(*context2->GetEmbedderData(0) == nullptr);
 }

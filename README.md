@@ -1178,12 +1178,11 @@ You can find a macro named `CPP` in `src/builtins/builtins-definitions.h`:
 
 What does this macro expand to?  
 It is part of the `BUILTIN_LIST_BASE` macro in builtin-definitions.h
-We have to look at where BUILTIN_LIST is used with we can find in builtins.cc.
-In builtins.cc we have an array of BuiltinMetadata which is declared as:
+We have to look at where BUILTIN_LIST is used which we can find in builtins.cc.
+In `builtins.cc` we have an array of `BuiltinMetadata` which is declared as:
 
     const BuiltinMetadata builtin_metadata[] = {
-      BUILTIN_LIST(DECL_CPP, DECL_API, DECL_TFJ, DECL_TFC, DECL_TFS, DECL_TFH,
-                  DECL_ASM)
+      BUILTIN_LIST(DECL_CPP, DECL_API, DECL_TFJ, DECL_TFC, DECL_TFS, DECL_TFH, DECL_ASM)
     };
 
     #define DECL_CPP(Name, ...) { #Name, Builtins::CPP, \
@@ -1233,7 +1232,7 @@ macro. So the expansion for ConsoleDebug will look like:
       ...
     };
 
-So back to looking at the arguments to SimpleInstallFunction which looks like this:
+So backing up to looking at the arguments to SimpleInstallFunction which are:
 
     SimpleInstallFunction(console, "debug", Builtins::kConsoleDebug, 1, false,
                           NONE);
@@ -1263,9 +1262,7 @@ I'm not exactly sure what adapt is referring to here.
 PropertyAttributes is not specified so it will get the default value of `DONT_ENUM`.
 The last parameter which is of type BuiltinFunctionId is not specified either so the
 default value of `kInvalidBuiltinFunctionId` will be used. This is an enum defined in 
-src/objects.h.
-
-So we have returned from SimpleInstallFunction and are back in
+`src/objects.h`.
 
 
 This [blog](https://v8project.blogspot.se/2017/11/csa.html) provides an example of adding
@@ -1368,9 +1365,9 @@ RelocInfo (size = 7)
 
 
 ### TF_BUILTIN macro
-Is a macro to defining Turbofan (TF) builtins and can be found in builtins/builtins-utils-gen.h
+Is a macro to defining Turbofan (TF) builtins and can be found in `builtins/builtins-utils-gen.h`
 
-    TF_BUILTIN(BeveStringLength, StringBuiltinsAssembler) {
+    TF_BUILTIN(GetStringLength, StringBuiltinsAssembler) {
       Node* const str = Parameter(Descriptor::kReceiver);
       Return(LoadStringLength(str));
     }
@@ -1407,8 +1404,6 @@ processing this macro:
     }
 
 From the resulting class you can see how `Parameter` can be used from within `TF_BUILTIN` macro.
-
-
 
 ## Building V8
 You'll need to have checked out the Google V8 sources to you local file system and build it by following 
@@ -2098,4 +2093,230 @@ Handle<WeakFixedArray> WeakFixedArray::Add(Handle<Object> maybe_array,
 10167                                            Handle<HeapObject> value,
 10168                                            int* assigned_index) {
 Notice the name of the first parameter `maybe_array` but it is not of type maybe?
+
+### Context
+JavaScript provides a set of builtin functions and objects. These functions and objects can be changed by user code. Each context
+is separate collection of these objects and functions.
+
+And internal::Context is declared in `deps/v8/src/contexts.h` and extends FixedArray
+```console
+class Context: public FixedArray {
+```
+
+A Context can be create by calling:
+```console
+const v8::HandleScope handle_scope(isolate_);
+Handle<Context> context = Context::New(isolate_,
+                                       nullptr,
+                                       v8::Local<v8::ObjectTemplate>());
+```
+`Context::New` can be found in `src/api.cc:6405`:
+```c++
+Local<Context> v8::Context::New(
+    v8::Isolate* external_isolate, v8::ExtensionConfiguration* extensions,
+    v8::MaybeLocal<ObjectTemplate> global_template,
+    v8::MaybeLocal<Value> global_object,
+    DeserializeInternalFieldsCallback internal_fields_deserializer) {
+  return NewContext(external_isolate, extensions, global_template,
+                    global_object, 0, internal_fields_deserializer);
+}
+```
+The declaration of this function can be found in `include/v8.h`:
+```c++
+static Local<Context> New(
+      Isolate* isolate, ExtensionConfiguration* extensions = NULL,
+      MaybeLocal<ObjectTemplate> global_template = MaybeLocal<ObjectTemplate>(),
+      MaybeLocal<Value> global_object = MaybeLocal<Value>(),
+      DeserializeInternalFieldsCallback internal_fields_deserializer =
+          DeserializeInternalFieldsCallback());
+```
+So we can see the reason why we did not have to specify `internal_fields_deserialize`.
+What is `ExtensionConfiguration`?  
+This class can be found in `include/v8.h` and only has two members, a count of the extension names 
+and an array with the names.
+
+If specified these will be installed by `Boostrapper::InstallExtensions` which will delegate to 
+`Genesis::InstallExtensions`, both can be found in `src/boostrapper.cc`.
+Where are extensions registered?   
+This is done once per process and called from `V8::Initialize()`:
+```c++
+void Bootstrapper::InitializeOncePerProcess() {
+  free_buffer_extension_ = new FreeBufferExtension;
+  v8::RegisterExtension(free_buffer_extension_);
+  gc_extension_ = new GCExtension(GCFunctionName());
+  v8::RegisterExtension(gc_extension_);
+  externalize_string_extension_ = new ExternalizeStringExtension;
+  v8::RegisterExtension(externalize_string_extension_);
+  statistics_extension_ = new StatisticsExtension;
+  v8::RegisterExtension(statistics_extension_);
+  trigger_failure_extension_ = new TriggerFailureExtension;
+  v8::RegisterExtension(trigger_failure_extension_);
+  ignition_statistics_extension_ = new IgnitionStatisticsExtension;
+  v8::RegisterExtension(ignition_statistics_extension_);
+}
+```
+The extensions can be found in `src/extensions`. You register your own extensions and an example of this
+can be found in [test/context_test.cc](./test/context_test.cc).
+
+
+```console
+(lldb) br s -f node.cc -l 4439
+(lldb) expr context->length()
+(int) $522 = 281
+```
+This output was taken
+
+Creating a new Context is done by `v8::CreateEnvironment`
+```console
+(lldb) br s -f api.cc -l 6565
+```
+```c++
+InvokeBootstrapper<ObjectType> invoke;
+   6635    result =
+-> 6636        invoke.Invoke(isolate, maybe_proxy, proxy_template, extensions,
+   6637                      context_snapshot_index, embedder_fields_deserializer);
+```
+This will later end up in `Snapshot::NewContextFromSnapshot`:
+```c++
+Vector<const byte> context_data =
+      ExtractContextData(blob, static_cast<uint32_t>(context_index));
+  SnapshotData snapshot_data(context_data);
+
+  MaybeHandle<Context> maybe_result = PartialDeserializer::DeserializeContext(
+      isolate, &snapshot_data, can_rehash, global_proxy,
+      embedder_fields_deserializer);
+```
+So we can see here that the Context is deserialized from the snapshot. What does the Context contain at this stage:
+```console
+(lldb) expr result->length()
+(int) $650 = 281
+(lldb) expr result->Print()
+// not inlcuding the complete output
+```
+Lets take a look at an entry:
+```console
+(lldb) expr result->get(0)->Print()
+0xc201584331: [Function] in OldSpace
+ - map = 0xc24c002251 [FastProperties]
+ - prototype = 0xc201584371
+ - elements = 0xc2b2882251 <FixedArray[0]> [HOLEY_ELEMENTS]
+ - initial_map =
+ - shared_info = 0xc2b2887521 <SharedFunctionInfo>
+ - name = 0xc2b2882441 <String[0]: >
+ - formal_parameter_count = -1
+ - kind = [ NormalFunction ]
+ - context = 0xc201583a59 <FixedArray[281]>
+ - code = 0x2df1f9865a61 <Code BUILTIN>
+ - source code = () {}
+ - properties = 0xc2b2882251 <FixedArray[0]> {
+    #length: 0xc2cca83729 <AccessorInfo> (const accessor descriptor)
+    #name: 0xc2cca83799 <AccessorInfo> (const accessor descriptor)
+    #arguments: 0xc201587fd1 <AccessorPair> (const accessor descriptor)
+    #caller: 0xc201587fd1 <AccessorPair> (const accessor descriptor)
+    #constructor: 0xc201584c29 <JSFunction Function (sfi = 0xc2b28a6fb1)> (const data descriptor)
+    #apply: 0xc201588079 <JSFunction apply (sfi = 0xc2b28a7051)> (const data descriptor)
+    #bind: 0xc2015880b9 <JSFunction bind (sfi = 0xc2b28a70f1)> (const data descriptor)
+    #call: 0xc2015880f9 <JSFunction call (sfi = 0xc2b28a7191)> (const data descriptor)
+    #toString: 0xc201588139 <JSFunction toString (sfi = 0xc2b28a7231)> (const data descriptor)
+    0xc2b28bc669 <Symbol: Symbol.hasInstance>: 0xc201588179 <JSFunction [Symbol.hasInstance] (sfi = 0xc2b28a72d1)> (const data descriptor)
+ }
+
+ - feedback vector: not available
+```
+So we can see that this is of type `[Function]` which we can cast using:
+```
+(lldb) expr JSFunction::cast(result->get(0))->code()->Print()
+0x2df1f9865a61: [Code]
+kind = BUILTIN
+name = EmptyFunction
+```
+
+```console
+(lldb) expr JSFunction::cast(result->closure())->Print()
+0xc201584331: [Function] in OldSpace
+ - map = 0xc24c002251 [FastProperties]
+ - prototype = 0xc201584371
+ - elements = 0xc2b2882251 <FixedArray[0]> [HOLEY_ELEMENTS]
+ - initial_map =
+ - shared_info = 0xc2b2887521 <SharedFunctionInfo>
+ - name = 0xc2b2882441 <String[0]: >
+ - formal_parameter_count = -1
+ - kind = [ NormalFunction ]
+ - context = 0xc201583a59 <FixedArray[281]>
+ - code = 0x2df1f9865a61 <Code BUILTIN>
+ - source code = () {}
+ - properties = 0xc2b2882251 <FixedArray[0]> {
+    #length: 0xc2cca83729 <AccessorInfo> (const accessor descriptor)
+    #name: 0xc2cca83799 <AccessorInfo> (const accessor descriptor)
+    #arguments: 0xc201587fd1 <AccessorPair> (const accessor descriptor)
+    #caller: 0xc201587fd1 <AccessorPair> (const accessor descriptor)
+    #constructor: 0xc201584c29 <JSFunction Function (sfi = 0xc2b28a6fb1)> (const data descriptor)
+    #apply: 0xc201588079 <JSFunction apply (sfi = 0xc2b28a7051)> (const data descriptor)
+    #bind: 0xc2015880b9 <JSFunction bind (sfi = 0xc2b28a70f1)> (const data descriptor)
+    #call: 0xc2015880f9 <JSFunction call (sfi = 0xc2b28a7191)> (const data descriptor)
+    #toString: 0xc201588139 <JSFunction toString (sfi = 0xc2b28a7231)> (const data descriptor)
+    0xc2b28bc669 <Symbol: Symbol.hasInstance>: 0xc201588179 <JSFunction [Symbol.hasInstance] (sfi = 0xc2b28a72d1)> (const data descriptor)
+ }
+
+ - feedback vector: not available
+```
+So this is the JSFunction associated with the deserialized context. Not sure what this is about as looking at the source code it looks like
+an empty function. A function can also be set on the context so I'm guessing that this give access to the function of a context once set.
+Where is function set, well it is probably deserialized but we can see it be used in `deps/v8/src/bootstrapper.cc`:
+```c++
+{
+  Handle<JSFunction> function = SimpleCreateFunction(isolate, factory->empty_string(), Builtins::kAsyncFunctionAwaitCaught, 2, false);
+  native_context->set_async_function_await_caught(*function);
+}
+```console
+(lldb) expr isolate()->builtins()->builtin_handle(Builtins::Name::kAsyncFunctionAwaitCaught)->Print()
+```
+
+`Context::Scope` is a RAII class used to Enter/Exit a context. Lets take a closer look at `Enter`:
+```c++
+void Context::Enter() {
+  i::Handle<i::Context> env = Utils::OpenHandle(this);
+  i::Isolate* isolate = env->GetIsolate();
+  ENTER_V8_NO_SCRIPT_NO_EXCEPTION(isolate);
+  i::HandleScopeImplementer* impl = isolate->handle_scope_implementer();
+  impl->EnterContext(env);
+  impl->SaveContext(isolate->context());
+  isolate->set_context(*env);
+}
+```
+So the current context is saved and then the this context `env` is set as the current on the isolate.
+`EnterContext` will push the passed-in context (deps/v8/src/api.cc):
+```c++
+void HandleScopeImplementer::EnterContext(Handle<Context> context) {
+  entered_contexts_.push_back(*context);
+}
+...
+DetachableVector<Context*> entered_contexts_;
+```
+DetachableVector is a delegate/adaptor with some additonaly features on a std::vector.
+Handle<Context> context1 = NewContext(isolate);
+Handle<Context> context2 = NewContext(isolate);
+Context::Scope context_scope1(context1);        // entered_contexts_ [context1], saved_contexts_[isolateContext]
+Context::Scope context_scope2(context2);        // entered_contexts_ [context1, context2], saved_contexts[isolateContext, context1]
+
+Now, `SaveContext` is using the current context, not `this` context (`env`) and pushing that to the end of the saved_contexts_ vector.
+We can look at this as we entered context_scope2 from context_scope1:
+
+
+And `Exit` looks like:
+```c++
+void Context::Exit() {
+  i::Handle<i::Context> env = Utils::OpenHandle(this);
+  i::Isolate* isolate = env->GetIsolate();
+  ENTER_V8_NO_SCRIPT_NO_EXCEPTION(isolate);
+  i::HandleScopeImplementer* impl = isolate->handle_scope_implementer();
+  if (!Utils::ApiCheck(impl->LastEnteredContextWas(env),
+                       "v8::Context::Exit()",
+                       "Cannot exit non-entered context")) {
+    return;
+  }
+  impl->LeaveContext();
+  isolate->set_context(impl->RestoreContext());
+}
+```
 
