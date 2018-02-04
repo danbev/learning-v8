@@ -2331,7 +2331,7 @@ i::Handle<i::FixedArray> data(env->embedder_data());
 ```
 `location` is only used for logging and we can ignore it for now.
 `EmbedderDataFor`:
-`c++
+```c++
 i::Handle<i::Context> env = Utils::OpenHandle(context);
 ...
 i::Handle<i::FixedArray> data(env->embedder_data());
