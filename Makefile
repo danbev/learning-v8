@@ -36,36 +36,36 @@ natives_blob.bin:
 snapshot_blob.bin:
 	@cp $(v8_build_dir)/$@ .
 
-check: tests/local_test tests/persistent-object_test tests/maybe_test tests/smi_test tests/string_test tests/context_test
+check: test/local_test test/persistent-object_test test/maybe_test test/smi_test test/string_test test/context_test
 
-tests/local_test: tests/local_test.cc
-	$(COMPILE_TEST) tests/main.cc $< -o $@
+test/local_test: test/local_test.cc
+	$(COMPILE_TEST) test/main.cc $< -o $@
 
-tests/persistent-object_test: tests/persistent-object_test.cc
-	$(COMPILE_TEST) tests/main.cc $< -o $@
+test/persistent-object_test: test/persistent-object_test.cc
+	$(COMPILE_TEST) test/main.cc $< -o $@
 
-tests/maybe_test: tests/maybe_test.cc
-	$(COMPILE_TEST) tests/main.cc $< -o $@
+test/maybe_test: test/maybe_test.cc
+	$(COMPILE_TEST) test/main.cc $< -o $@
 
-tests/smi_test: tests/smi_test.cc
-	$(COMPILE_TEST) tests/main.cc $< -o $@
+test/smi_test: test/smi_test.cc
+	$(COMPILE_TEST) test/main.cc $< -o $@
 
-tests/string_test: tests/string_test.cc
-	$(COMPILE_TEST) tests/main.cc $< -o $@
+test/string_test: test/string_test.cc
+	$(COMPILE_TEST) test/main.cc $< -o $@
 
-tests/jsobject_test: tests/jsobject_test.cc
-	$(COMPILE_TEST) tests/main.cc $< -o $@
+test/jsobject_test: test/jsobject_test.cc
+	$(COMPILE_TEST) test/main.cc $< -o $@
 
-tests/ast_test: tests/ast_test.cc
-	$(COMPILE_TEST) -Wno-everything tests/main.cc $< -o $@
+test/ast_test: test/ast_test.cc
+	$(COMPILE_TEST) -Wno-everything test/main.cc $< -o $@
 
-tests/context_test: tests/context_test.cc
-	$(COMPILE_TEST) tests/main.cc $< -o $@
+test/context_test: test/context_test.cc
+	$(COMPILE_TEST) test/main.cc $< -o $@
 
-list-gtests:
-	./tests/smi_test --gtest_list_tests
+list-gtest:
+	./test/smi_test --gtest_list_test
 
-.PHONY: clean list-gtests
+.PHONY: clean list-gtest
 
 clean: 
 	rm -f hello-world
@@ -75,11 +75,11 @@ clean:
 	rm -f natives_blob.bin
 	rm -f snapshot_blob.bin
 	rm -rf hello-world.dSYM
-	rm -rf tests/local_test
-	rm -rf tests/persistent-object_test
-	rm -rf tests/maybe_test
-	rm -rf tests/smi_test
-	rm -rf tests/string_test
-	rm -rf tests/jsobject_test
-	rm -rf tests/ast_test
-	rm -rf tests/context_test
+	rm -rf test/local_test
+	rm -rf test/persistent-object_test
+	rm -rf test/maybe_test
+	rm -rf test/smi_test
+	rm -rf test/string_test
+	rm -rf test/jsobject_test
+	rm -rf test/ast_test
+	rm -rf test/context_test
