@@ -72,8 +72,8 @@ int main(int argc, char* argv[]) {
     Context::Scope context_scope(context);
 
     Local<String> source = ReadFile(isolate, "script.js").ToLocalChecked();
-    Local<Script> script = Script::Compile(context, source).ToLocalChecked();
-    script->Run(context).ToLocalChecked();
+    MaybeLocal<Script> script = Script::Compile(context, source).ToLocalChecked();
+    MaybeLocal<Value> result = script.ToLocalChecked()->Run(context);
   }
 
   // Dispose the isolate and tear down V8.
