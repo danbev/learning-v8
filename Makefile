@@ -2,11 +2,12 @@ V8_HOME ?= /Users/danielbevenius/work/google/javascript/v8
 v8_build_dir = $(V8_HOME)/out.gn/learning
 v8_include_dir = $(V8_HOME)/include
 v8_src_dir = $(V8_HOME)/src
+v8_gen_dir = $(v8_build_dir)/gen
 GTEST_FILTER ?= "*"
 
 v8_dylibs = -lv8 -lv8_libbase -lv8_libplatform -licuuc -licui18n 
 
-COMPILE_TEST = clang++ -std=c++11 -O0 -g -I`pwd`/deps/googletest/googletest/include -I$(v8_include_dir) -I$(V8_HOME) $(v8_dylibs) -L$(v8_build_dir) -pthread  lib/gtest/libgtest.a -rpath $(v8_build_dir) 
+COMPILE_TEST = clang++ -std=c++11 -O0 -g -I`pwd`/deps/googletest/googletest/include -I$(v8_include_dir) -I$(v8_gen_dir) -I$(V8_HOME) $(v8_dylibs) -L$(v8_build_dir) -pthread  lib/gtest/libgtest.a -rpath $(v8_build_dir) 
 
 LD_LIBRARY_PATH=$(v8_build_dir)
 
@@ -60,6 +61,9 @@ test/ast_test: test/ast_test.cc
 	$(COMPILE_TEST) -Wno-everything test/main.cc $< -o $@
 
 test/context_test: test/context_test.cc
+	$(COMPILE_TEST) test/main.cc $< -o $@
+
+test/heap_test: test/heap_test.cc
 	$(COMPILE_TEST) test/main.cc $< -o $@
 
 list-gtest:
