@@ -49,3 +49,19 @@ TEST_F(StringTest, concat) {
   Local<String> joined = String::Concat(left, right);
   EXPECT_EQ(joined->Length(), 12);
 }
+
+TEST_F(StringTest, compare) {
+  const v8::HandleScope handle_scope(isolate_);
+  Isolate::Scope isolate_scope(isolate_);
+  Local<String> first = String::NewFromOneByte(isolate_,
+      reinterpret_cast<const uint8_t*>("hey"),
+      NewStringType::kNormal,
+      6).ToLocalChecked();
+  Local<String> second = String::NewFromOneByte(isolate_,
+      reinterpret_cast<const uint8_t*>("hey"),
+      NewStringType::kNormal,
+      6).ToLocalChecked();
+  v8::String::Utf8Value first_utf8(isolate_, first);
+  v8::String::Utf8Value second_utf8(isolate_, second);
+  EXPECT_STREQ(*first_utf8, *second_utf8);
+}
