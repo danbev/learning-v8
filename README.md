@@ -14,7 +14,7 @@ The sole purpose of this project is to aid me in leaning Google's V8 JavaScript 
 
 ## Introduction
 V8 is bascially consists of the memory management of the heap and the execution stack (very simplified but helps
-make my point). Things like the callback queue, the event loop and other things like the WebAPIs (DOM, ajax, 
+make my point). Things like the callback queue, the event loop and other things like the WebAPIs (DOM, ajax,
 setTimeout etc) are found inside Chrome or in the case of Node the APIs are Node.js APIs:
 
     +------------------------------------------------------------------------------------------+
@@ -42,14 +42,14 @@ setTimeout etc) are found inside Chrome or in the case of Node the APIs are Node
     |                                                                                          |
     +------------------------------------------------------------------------------------------+
 
-The execution stack is a stack of frame pointers. For each function called that function will be pushed onto 
+The execution stack is a stack of frame pointers. For each function called that function will be pushed onto
 the stack. When that function returns it will be removed. If that function calls other functions
-they will be pushed onto the stack. When they have all returned execution can proceed from the returned to 
-point. If one of the functions performs an operation that takes time progress will not be made until it 
-completes as the only way to complete is that the function returns and is popped off the stack. This is 
+they will be pushed onto the stack. When they have all returned execution can proceed from the returned to
+point. If one of the functions performs an operation that takes time progress will not be made until it
+completes as the only way to complete is that the function returns and is popped off the stack. This is
 what happens when you have a single threaded programming language.
 
-So that describes synchronous functions, what about asynchronous functions?  
+So that describes synchronous functions, what about asynchronous functions?
 Lets take for example that you call setTimeout, the setTimeout function will be
 pushed onto the call stack and executed. This is where the callback queue comes into play and the event loop. The setTimeout function can add functions to the callback queue. This queue will be processed by the event loop when the call stack is empty.
 
@@ -105,10 +105,10 @@ ThreadEntry can be found in src/base/platform/platform-posix.
 ### International Component for Unicode (ICU)
 International Components for Unicode (ICU) deals with internationalization (i18n).
 ICU provides support locale-sensitve string comparisons, date/time/number/currency formatting
-etc. 
+etc.
 
 There is an optional API called ECMAScript 402 which V8 suppports and which is enabled by
-default. [i18n-support](https://github.com/v8/v8/wiki/i18n-support) says that even if your application does 
+default. [i18n-support](https://github.com/v8/v8/wiki/i18n-support) says that even if your application does
 not use ICU you still need to call InitializeICU :
 
     V8::InitializeICU();
@@ -120,14 +120,14 @@ and all the built-in functionality must be setup and initialized into the V8 hea
 consuming and affect runtime performance if this has to be done every time. The blobs above are prepared
 snapshots that get directly deserialized into the heap to provide an initilized context.
 
-Now this is where the files `natives_blob.bin` and `snapshot_blob.bin` come into play. But what are these bin files?  
+Now this is where the files `natives_blob.bin` and `snapshot_blob.bin` come into play. But what are these bin files?
 If you take a look in src/js you'll find a number of javascript files. These files referenced in src/v8.gyp and are used
 by the target `js2c`. This target calls tools/js2c.py which is a tool for converting
 JavaScript source code into C-Style char arrays. This target will process all the library_files specified in the variables section.
 For a GN build you'll find the configuration in BUILD.GN.
 
 The output of this out/Debug/obj/gen/libraries.cc. So how is this file actually used?
-The `js2c` target produces the libraries.cc file which is used by other targets, for example by `v8_snapshot` which produces a 
+The `js2c` target produces the libraries.cc file which is used by other targets, for example by `v8_snapshot` which produces a
 snapshot_blob.bin file.
 
     $ lldb hello_world
@@ -209,7 +209,7 @@ This can be found in quite a few places in v8 source code. For example:
 
     class V8_EXPORT ArrayBuffer : public Object {
 
-What is this?  
+What is this?
 It is a preprocessor macro which looks like this:
 
     #if V8_HAS_ATTRIBUTE_VISIBILITY && defined(V8_SHARED)
@@ -220,23 +220,23 @@ It is a preprocessor macro which looks like this:
     # endif
     #else
     # define V8_EXPORT
-    #endif 
+    #endif
 
-So we can see that if V8_HAS_ATTRIBUTE_VISIBILITY and defined(V8_SHARED) and also 
+So we can see that if V8_HAS_ATTRIBUTE_VISIBILITY and defined(V8_SHARED) and also
 if BUILDING_V8_SHARED V8_EXPORT is set to `__attribute__ ((visibility("default"))`.
-But in all other cases V8_EXPORT is empty and the preprocessor does not insert 
-anything (nothing will be there come compile time). 
-But what about the `__attribute__ ((visibility("default"))` what is this?  
+But in all other cases V8_EXPORT is empty and the preprocessor does not insert
+anything (nothing will be there come compile time).
+But what about the `__attribute__ ((visibility("default"))` what is this?
 
-In the GNU compiler collection (GCC) environment, the term that is used for exporting is visibility. As it 
-applies to functions and variables in a shared object, visibility refers to the ability of other shared objects 
-to call a C/C++ function. Functions with default visibility have a global scope and can be called from other 
+In the GNU compiler collection (GCC) environment, the term that is used for exporting is visibility. As it
+applies to functions and variables in a shared object, visibility refers to the ability of other shared objects
+to call a C/C++ function. Functions with default visibility have a global scope and can be called from other
 shared objects. Functions with hidden visibility have a local scope and cannot be called from other shared objects.
 
 Visibility can be controlled by using either compiler options or visibility attributes.
 In your header files, wherever you want an interface or API made public outside the current Dynamic Shared Object (DSO)
 , place `__attribute__ ((visibility ("default")))` in struct, class and function declarations you wish to make public.
- With `-fvisibility=hidden`, you are telling GCC that every declaration not explicitly marked with a visibility attribute 
+ With `-fvisibility=hidden`, you are telling GCC that every declaration not explicitly marked with a visibility attribute
 has a hidden visibility. There is such a flag in build/common.gypi
 
 
@@ -245,8 +245,8 @@ You'll see a few of these calls in the hello_world example:
 
      Local<String> source = String::NewFromUtf8(isolate, js, NewStringType::kNormal).ToLocalChecked();
 
-NewFromUtf8 actually returns a Local<String> wrapped in a MaybeLocal which forces a check to see if 
-the Local<> is empty before using it. 
+NewFromUtf8 actually returns a Local<String> wrapped in a MaybeLocal which forces a check to see if
+the Local<> is empty before using it.
 NewStringType is an enum which can be kNormalString (k for constant) or kInternalized.
 
 The following is after running the preprocessor (clang -E src/api.cc):
@@ -256,19 +256,19 @@ The following is after running the preprocessor (clang -E src/api.cc):
                                   const char* data,
                                   NewStringType type,
                                   int length) {
-      MaybeLocal<String> result; 
-      if (length == 0) { 
-        result = String::Empty(isolate); 
-      } else if (length > i::String::kMaxLength) { 
-        result = MaybeLocal<String>(); 
-      } else { 
-        i::Isolate* i_isolate = reinterpret_cast<internal::Isolate*>(isolate); 
-        i::VMState<v8::OTHER> __state__((i_isolate)); 
-        i::RuntimeCallTimerScope _runtime_timer( i_isolate, &i::RuntimeCallStats::API_String_NewFromUtf8); 
-        LOG(i_isolate, ApiEntryCall("v8::" "String" "::" "NewFromUtf8")); 
-        if (length < 0) length = StringLength(data); 
-        i::Handle<i::String> handle_result = NewString(i_isolate->factory(), static_cast<v8::NewStringType>(type), i::Vector<const char>(data, length)) .ToHandleChecked(); 
-        result = Utils::ToLocal(handle_result); 
+      MaybeLocal<String> result;
+      if (length == 0) {
+        result = String::Empty(isolate);
+      } else if (length > i::String::kMaxLength) {
+        result = MaybeLocal<String>();
+      } else {
+        i::Isolate* i_isolate = reinterpret_cast<internal::Isolate*>(isolate);
+        i::VMState<v8::OTHER> __state__((i_isolate));
+        i::RuntimeCallTimerScope _runtime_timer( i_isolate, &i::RuntimeCallStats::API_String_NewFromUtf8);
+        LOG(i_isolate, ApiEntryCall("v8::" "String" "::" "NewFromUtf8"));
+        if (length < 0) length = StringLength(data);
+        i::Handle<i::String> handle_result = NewString(i_isolate->factory(), static_cast<v8::NewStringType>(type), i::Vector<const char>(data, length)) .ToHandleChecked();
+        result = Utils::ToLocal(handle_result);
      };
      return result.FromMaybe(Local<String>());;
     }
@@ -289,12 +289,12 @@ The above can be found in src/api.h. The same goes for `Local<Object>, Local<Str
 Reading through v8.h I came accross `// Tag information for Smi`
 Smi stands for small integers. It turns out that ECMA Number is defined as a 64-bit binary double-precision
 but internally V8 uses 32-bit to represent all values. How can that work, how can you represent a 64-bit value
-using only 32-bits?   
+using only 32-bits?
 
 Instead the small integer is represented by the 32 bits plus a pointer to the 64-bit number. V8 needs to
 know if a value stored in memory represents a 32-bit integer, or if it is really a 64-bit number, in which
 case it has to follow the pointer to get the complete value. This is where the concept of tagging comes in.
-Tagging involved borrowing one bit of the 32-bit, making it 31-bit and having the leftover bit represent a 
+Tagging involved borrowing one bit of the 32-bit, making it 31-bit and having the leftover bit represent a
 tag. If the tag is zero then this is a plain value, but if tag is 1 then the pointer must be followed.
 This does not only have to be for numbers it could also be used for object (I think)
 
@@ -304,7 +304,7 @@ Take the following object:
 
     { firstname: "Jon", lastname: "Doe' }
 
-The above object has two named properties. Named properties differ from integer indexed 
+The above object has two named properties. Named properties differ from integer indexed
 which is what you have when you are working with arrays.
 
 Memory layout of JavaScript Object:
@@ -321,12 +321,12 @@ Properties                  JavaScript Object               Elements
 +-----------+                       |                  +----------------+       |
                                     |                                           |
                                     |                                           |
-                                    |                                           | 
+                                    |                                           |
 Named properties:    { firstname: "Jon", lastname: "Doe' } Indexed Properties: {1: "Jon", 2: "Doe"}
 ```
 We can see that properies and elements are stored in different data structures.
 Elements are usually implemented as a plain array and the indexes can be used for fast access
-to the elements. 
+to the elements.
 But for the properties this is not the case. Instead there is a mapping between the property names
 and the index into the properties.
 
@@ -374,21 +374,21 @@ Properties                  JSObject                    HiddenClass (Map)
 ```
 
 #### JSObject
-Each JSObject has as its first field a pointer to the generated HiddenClass. A hiddenclass contain mappings from property names to indices into the properties data type. When an instance of JSObject is created a `Map` is passed in. 
+Each JSObject has as its first field a pointer to the generated HiddenClass. A hiddenclass contain mappings from property names to indices into the properties data type. When an instance of JSObject is created a `Map` is passed in.
 As mentioned earlier JSObject inherits from JSReceiver which inherits from HeapObject
 
-For example,in [jsobject_test.cc](./tests/jsobject_test.cc) we first create a new Map using the internal Isolate Factory:
+For example,in [jsobject_test.cc](./test/jsobject_test.cc) we first create a new Map using the internal Isolate Factory:
 
     v8::internal::Handle<v8::internal::Map> map = factory->NewMap(v8::internal::JS_OBJECT_TYPE, 24);
     v8::internal::Handle<v8::internal::JSObject> js_object = factory->NewJSObjectFromMap(map);
     EXPECT_TRUE(js_object->HasFastProperties());
 
-When we call `js_object->HasFastProperties()` this will delegate to the map instance: 
+When we call `js_object->HasFastProperties()` this will delegate to the map instance:
 
     return !map()->is_dictionary_map();
 
-How do you add a property to a JSObject instance?  
-Take a look at [jsobject_test.cc](./tests/jsobject_test.cc) for an example.
+How do you add a property to a JSObject instance?
+Take a look at [jsobject_test.cc](./test/jsobject_test.cc) for an example.
 
 
 ### Caching
@@ -411,7 +411,7 @@ completely avoid the lookup. The prolog of the called method must verify that th
 type has not changed and do the lookup if it has changed (the type if incorrect, no longer A for
 example).
 
-The target methods address is stored in the callers code, or "inline" with the callers code, 
+The target methods address is stored in the callers code, or "inline" with the callers code,
 hence the name "inline cache".
 
 If V8 is able to make a good assumption about the type of object that will be passed to a method,
@@ -427,7 +427,7 @@ call targets).
 
 This type of caching extends inline caching to not just cache the last lookup, but cache
 all lookup results for a given polymorfic call site using a specially generated stub.
-Lets say we have a method that iterates through a list of types and calls a method. If 
+Lets say we have a method that iterates through a list of types and calls a method. If
 all the types are the same (monomorfic) a PIC acts just like an inline cache. The calls will
 directly call the target method (with the method prolog followed by the method body).
 If a different type exists in the list there will be a cache miss in the prolog and the lookup
@@ -435,13 +435,13 @@ routine called. In normal inline caching this would rebind the call, replacing t
 types target method. This would happen each time the type changes.
 
 With PIC the cache miss handler will generate a small stub routine and rebinds the call to this
-stub. The stub will check if the receiver is of a type that it has seen before and branch to 
+stub. The stub will check if the receiver is of a type that it has seen before and branch to
 the correct targets. Since the type of the target is already known at this point it can directly
 branch to the target method body without the need for the prolog.
 If the type has not been seen before it will be added to the stub to handle that type. Eventually
 the stub will contain all types used and there will be no more cache misses/lookups.
 
-The problem is that we don't have type information so methods cannot be called directly, but 
+The problem is that we don't have type information so methods cannot be called directly, but
 instead be looked up. In a static language a virtual table might have been used. In JavaScript
 there is no inheritance relationship so it is not possible to know a vtable offset ahead of time.
 What can be done is to observe and learn about the "types" used in the program. When an object
@@ -490,36 +490,36 @@ What we are doing caching knowledge about the layout of the previously seen obje
     $ lldb -- out/x64.debug/d8 class.js
 
 #### HeapObject
-This class describes heap allocated objects. It is in this class we find information regarding the type of object. This 
+This class describes heap allocated objects. It is in this class we find information regarding the type of object. This
 information is contained in `v8::internal::Map`.
 
 ### v8::internal::Map
-`src/objects/map.h`  
-* `bit_field1`  
+`src/objects/map.h`
+* `bit_field1`
 * `bit_field2`
 * `bit field3` contains information about the number of properties that this Map has,
-a pointer to an DescriptorArray. The DescriptorArray contains information like the name of the 
+a pointer to an DescriptorArray. The DescriptorArray contains information like the name of the
 property, and the posistion where the value is stored in the JSObject.
-I noticed that this information available in src/objects/map.h. 
+I noticed that this information available in src/objects/map.h.
 
 #### DescriptorArray
 Can be found in src/objects/descriptor-array.h. This class extends FixedArray and has the following
 entries:
 
 ```
-[0] the number of descriptors it contains  
-[1] If uninitialized this will be Smi(0) otherwise an enum cache bridge which is a FixedArray of size 2: 
-  [0] enum cache: FixedArray containing all own enumerable keys  
-  [1] either Smi(0) or a pointer to a FixedArray with indices  
-[2] first key (and internalized String  
-[3] first descriptor  
+[0] the number of descriptors it contains
+[1] If uninitialized this will be Smi(0) otherwise an enum cache bridge which is a FixedArray of size 2:
+  [0] enum cache: FixedArray containing all own enumerable keys
+  [1] either Smi(0) or a pointer to a FixedArray with indices
+[2] first key (and internalized String
+[3] first descriptor
 ```
 ### Factory
 Each Internal Isolate has a Factory which is used to create instances. This is because all handles needs to be allocated
 using the factory (src/factory.h)
 
 
-### Objects 
+### Objects
 All objects extend the abstract class Object (src/objects.h).
 
 ### Oddball
@@ -532,7 +532,7 @@ This is where you can find the size of the instance, access to the inobject_prop
 
 ### Compiler pipeline
 When a script is compiled all of the top level code is parsed. These are function declarartions (but not the function
-bodies). 
+bodies).
 
     function f1() {       <- top level code
       console.log('f1');  <- non top level
@@ -556,10 +556,10 @@ So the whole script is parsed even though we only generated code for the top-lev
 was not stored in any way. The functions are lazy stubs that when/if the function gets called the function get compiled. This
 means that the function has to be parsed (again, the first time was the pre-parse remember).
 
-If a function is determined to be hot it will be optimized by one of the two optimizing compilers crankshaft for older parts oof JavaScript or Turbofan for Web Assembly (WASM) and some of the newer es6 features. 
+If a function is determined to be hot it will be optimized by one of the two optimizing compilers crankshaft for older parts oof JavaScript or Turbofan for Web Assembly (WASM) and some of the newer es6 features.
 
 The first time V8 sees a function it will parse it into an AST but not do any further processing of that tree
-until that function is used. 
+until that function is used.
 
                          +-----> Full-codegen -----> Unoptimized code
                         /                               \/ /\       \
@@ -570,7 +570,7 @@ until that function is used.
 Inline Cachine (IC) is done here which also help to gather type information.
 V8 also has a profiler thread which monitors which functions are hot and should be optimized. This profiling
 also allows V8 to find out information about types using IC. This type information can then be fed to Crankshaft/Turbofan.
-The type information is stored as a 8 bit value. 
+The type information is stored as a 8 bit value.
 
 When a function is optimized the unoptimized code cannot be thrown away as it might be needed since JavaScript is highly
 dynamic the optimzed function migth change and the in that case we fallback to the unoptimzed code. This takes up
@@ -591,7 +591,7 @@ The bytecode becomes the source of truth instead of as before the AST.
     }
 
     var result = bajja(2, 2, 150);
-    print(result); 
+    print(result);
 
     $ ./d8 test.js --ignition  --print_bytecode
 
@@ -604,7 +604,7 @@ The bytecode becomes the source of truth instead of as before the AST.
            0x2eef8d9b1044 @    6 : 1f fa             Star r0        // r0 is a register for local variables. We only have one which is d
      47 S> 0x2eef8d9b1046 @    8 : 1e 03             Ldar a1        // LoaD accumulator from Register argument a1 which is b
      60 E> 0x2eef8d9b1048 @   10 : 2c fa 03          Mul r0, [3]    // multiply that is our local variable in r0
-     56 E> 0x2eef8d9b104b @   13 : 2a 04 04          Add a0, [4]    // add that to our argument register 0 which is a 
+     56 E> 0x2eef8d9b104b @   13 : 2a 04 04          Add a0, [4]    // add that to our argument register 0 which is a
      65 S> 0x2eef8d9b104e @   16 : 83                Return         // return the value in the accumulator?
 
 
@@ -616,7 +616,7 @@ Lets take the following javascript and look at the ast:
     const msg = 'testing';
     console.log(msg);
 
-    
+
 ```
 $ d8 --print-ast simple.js
 [generating interpreter code for user-defined function: ]
@@ -657,7 +657,7 @@ The registers are not machine registers, apart from the accumlator as I understa
 
 
 #### Parsing
-Parsing is the parsing of the JavaScript and the generation of the abstract syntax tree. That tree is then visited and 
+Parsing is the parsing of the JavaScript and the generation of the abstract syntax tree. That tree is then visited and
 bytecode generated from it. This section tries to figure out where in the code these operations are performed.
 
 For example, take the script example.
@@ -672,7 +672,7 @@ Lets take a look at the following line:
     Local<Script> script = Script::Compile(context, source).ToLocalChecked();
 
 This will land us in `api.cc`
- 
+
     ScriptCompiler::Source script_source(source);
     return ScriptCompiler::Compile(context, &script_source);
 
@@ -689,7 +689,7 @@ This will land us in `api.cc`
           i::NOT_NATIVES_CODE);
 
     (lldb) br s -f compiler.cc -l 1259
-   
+
     LanguageMode language_mode = construct_language_mode(FLAG_use_strict);
     (lldb) p language_mode
     (v8::internal::LanguageMode) $10 = SLOPPY
@@ -703,7 +703,7 @@ have to be at the top level of the file.
 
     ParseInfo parse_info(script);
 
-There is a [unit test](./tests/ast_test.cc) that shows how a ParseInfo instance can be created
+There is a [unit test](./test/ast_test.cc) that shows how a ParseInfo instance can be created
 and inspected.
 
 This will call ParseInfo's constructor (in src/parsing/parse-info.cc), and which will call `ParseInfo::InitFromIsolate`:
@@ -781,9 +781,9 @@ I was curious about these ast_string_constants:
       use_asm_string_ = 0x00000001050524d8
       use_strict_string_ = 0x00000001050524f8
       value_string_ = 0x0000000105052518
-    } 
+    }
 
-So these are constants that are set on the new ParseInfo instance using the values from the isolate. Not exactly sure what I 
+So these are constants that are set on the new ParseInfo instance using the values from the isolate. Not exactly sure what I
 want with this but I might come back to it later.
 So, we are back in ParseInfo's constructor:
 
@@ -807,7 +807,7 @@ Back now in compiler.cc and the GetSharedFunctionInfoForScript function:
     FunctionLiteral* result = nullptr;
     result = parser.ParseProgram(isolate, info);
 
-`parser.ParseProgram`: 
+`parser.ParseProgram`:
 
     Handle<String> source(String::cast(info->script()->source()));
 
@@ -866,14 +866,14 @@ PrepareJobImpl:
 codegen.cc `MakeCodePrologue`:
 
 interpreter.cc ExecuteJobImpl:
- 
-    generator()->GenerateBytecode(stack_limit());    
+
+    generator()->GenerateBytecode(stack_limit());
 
 src/interpreter/bytecode-generator.cc
 
      RegisterAllocationScope register_scope(this);
 
-The bytecode is register based (if that is the correct term) and we had an example previously. I'm guessing 
+The bytecode is register based (if that is the correct term) and we had an example previously. I'm guessing
 that this is what this call is about.
 
 VisitDeclarations will iterate over all the declarations in the file which in our case are:
@@ -914,8 +914,8 @@ If x and y are integers just using the `add` operation would be much quicker:
     add rax, rbx
 
 
-Recall that functions are optimized so if the compiler has to bail out and unoptimize 
-part of a function then the whole functions will be affected and it will go back to 
+Recall that functions are optimized so if the compiler has to bail out and unoptimize
+part of a function then the whole functions will be affected and it will go back to
 the unoptimized version.
 
 ## Bytecode
@@ -931,7 +931,7 @@ This section will examine the bytecode for the following JavaScript:
       });
     }
 
-    beve(); 
+    beve();
 
     $ d8 --print-bytecode promise.js
 
@@ -942,14 +942,14 @@ First have have the main function which does not have a name:
     Parameter count 1
     Frame size 32
            // load what ever the FixedArray[4] is in the constant pool into the accumulator.
-           0x34423e7ac19e @    0 : 09 00             LdaConstant [0] 
+           0x34423e7ac19e @    0 : 09 00             LdaConstant [0]
            // store the FixedArray[4] in register r1
            0x34423e7ac1a0 @    2 : 1e f9             Star r1
            // store zero into the accumulator.
            0x34423e7ac1a2 @    4 : 02                LdaZero
            // store zero (the contents of the accumulator) into register r2.
            0x34423e7ac1a3 @    5 : 1e f8             Star r2
-           // 
+           //
            0x34423e7ac1a5 @    7 : 1f fe f7          Mov <closure>, r3
            0x34423e7ac1a8 @   10 : 53 96 01 f9 03    CallRuntime [DeclareGlobalsForInterpreter], r1-r3
       0 E> 0x34423e7ac1ad @   15 : 90                StackCheck
@@ -968,16 +968,16 @@ First have have the main function which does not have a name:
 
     Handler Table (size = 16)
 
-* LdaConstant <idx> 
-Load the constant at index from the constant pool into the accumulator.  
+* LdaConstant <idx>
+Load the constant at index from the constant pool into the accumulator.
 * Star <dst>
-Store the contents of the accumulator register in dst.  
+Store the contents of the accumulator register in dst.
 * Ldar <src>
-Load accumulator with value from register src.  
+Load accumulator with value from register src.
 * LdaGlobal <idx> <slot>
-Load the constant at index from the constant pool into the accumulator.  
+Load the constant at index from the constant pool into the accumulator.
 * Mov <closure>, <r3>
-Store the value of register  
+Store the value of register
 
 You can find the declarations for the these instructions in `src/interpreter/interpreter-generator.cc`.
 
@@ -985,7 +985,7 @@ You can find the declarations for the these instructions in `src/interpreter/int
 ## Unified code generation architecture
 
 ## FeedbackVector
-Is attached to every function and is responsible for recording and managing all execution feedback, which is information about types enabling. 
+Is attached to every function and is responsible for recording and managing all execution feedback, which is information about types enabling.
 You can find the declaration for this class in `src/feedback-vector.h`
 
 
@@ -997,14 +997,14 @@ Produces high-level IR graph based on interpreter bytecodes.
 
 
 ## TurboFan
-Is a compiler backend that gets fed a control flow graph and then does instruction selection, register allocation and code generation. The code generation generates 
+Is a compiler backend that gets fed a control flow graph and then does instruction selection, register allocation and code generation. The code generation generates
 
- 
+
 ### Execution/Runtime
-I'm not sure if V8 follows this exactly but I've heard and read that when the engine comes 
+I'm not sure if V8 follows this exactly but I've heard and read that when the engine comes
 across a function declaration it only parses and verifies the syntax and saves a ref
 to the function name. The statements inside the function are not checked at this stage
-only the syntax of the function declaration (parenthesis, arguments, brackets etc). 
+only the syntax of the function declaration (parenthesis, arguments, brackets etc).
 
 
 ### Function methods
@@ -1057,14 +1057,14 @@ Looking at the declaration in include/v8.h we find the following:
       UNKNOWN_ENCODING = 0x1,
       TWO_BYTE_ENCODING = 0x0,
       ONE_BYTE_ENCODING = 0x8
-    }; 
+    };
 
     int Length() const;
     int Uft8Length const;
     bool IsOneByte() const;
 
-Example usages can be found in [tests/string_test.cc](./tests/string_test.cc).
-Looking at the functions I've seen one that returns the actual bytes 
+Example usages can be found in [test/string_test.cc](./test/string_test.cc).
+Looking at the functions I've seen one that returns the actual bytes
 from the String. You can get at the in utf8 format using:
 
     String::Utf8Value print_value(joined);
@@ -1083,12 +1083,12 @@ These are string that are built using:
 This would be represented as:
 ```
          +--------------+
-         |              | 
+         |              |
    [str|one|two]     [one|...]   [two|...]
              |                       |
              +-----------------------+
 ```
-So we can see that one and two in str are pointer to existing strings. 
+So we can see that one and two in str are pointer to existing strings.
 
 
 #### ExternalString
@@ -1097,26 +1097,26 @@ These Strings located on the native heap. The ExternalString structure has a poi
 Looking at `String` I was not able to find any construtor for it, nor the other subtypes.
 
 ## Builtins
-Are JavaScript functions/objects that are provided by V8. These are built using a C++ DSL and are 
+Are JavaScript functions/objects that are provided by V8. These are built using a C++ DSL and are
 passed through:
 
     CodeStubAssembler -> CodeAssembler -> RawMachineAssembler.
-    
+
 Builtins need to have bytecode generated for them so that they can be run in TurboFan.
 
 `src/code-stub-assembler.h`
 
 All the builtins are declared in `src/builtins/builtins-definitions.h` by the `BUILTIN_LIST_BASE` macro.
 There are different type of builtins (TF = Turbo Fan):
-* TFJ 
-JavaScript linkage which means it is callable as a JavaScript function  
+* TFJ
+JavaScript linkage which means it is callable as a JavaScript function
 * TFS
 CodeStub linkage. A builtin with stub linkage can be used to extract common code into a separate code object which can
 then be used by multiple callers. These is useful because builtins are generated at compile time and
-included in the V8 snapshot. This means that they are part of every isolate that is created. Being 
+included in the V8 snapshot. This means that they are part of every isolate that is created. Being
 able to share common code for multiple builtins will save space.
 
-* TFC 
+* TFC
 CodeStub linkage with custom descriptor
 
 To see how this works in action we first need to disable snapshots. If we don't, we won't be able to
@@ -1131,7 +1131,7 @@ To find the option to disable snapshots use:
     v8_use_snapshot=false
     $ gn -C out.gn/learning
 
-After building we should be able to set a break point in bootstrapper.cc and its function 
+After building we should be able to set a break point in bootstrapper.cc and its function
 `Genesis::InitializeGlobal`:
 
     (lldb) br s -f bootstrapper.cc -l 2684
@@ -1162,21 +1162,21 @@ Lets take `console` as an example which was created using:
                           NONE);
 
     V8_NOINLINE Handle<JSFunction> SimpleInstallFunction(
-      Handle<JSObject> base, 
-      const char* name, 
-      Builtins::Name call, 
+      Handle<JSObject> base,
+      const char* name,
+      Builtins::Name call,
       int len,
-      bool adapt, 
+      bool adapt,
       PropertyAttributes attrs = DONT_ENUM,
       BuiltinFunctionId id = kInvalidBuiltinFunctionId) {
 
 So we can see that base is our Handle to a JSObject, and name is "console".
-Buildtins::Name is is Builtins:kConsoleDebug. Where is this defined?  
+Buildtins::Name is is Builtins:kConsoleDebug. Where is this defined?
 You can find a macro named `CPP` in `src/builtins/builtins-definitions.h`:
 
    CPP(ConsoleDebug)
 
-What does this macro expand to?  
+What does this macro expand to?
 It is part of the `BUILTIN_LIST_BASE` macro in builtin-definitions.h
 We have to look at where BUILTIN_LIST is used which we can find in builtins.cc.
 In `builtins.cc` we have an array of `BuiltinMetadata` which is declared as:
@@ -1203,8 +1203,8 @@ BuildintMetadata struct looks like this which might help understand what is goin
 So the `CPP(ConsoleDebug)` will expand to an entry in the array which would look something like
 this:
 
-    { ConsoleDebug, 
-      Builtings::CPP, 
+    { ConsoleDebug,
+      Builtings::CPP,
       {
         reinterpret_cast<v8::internal::Address>(reinterpret_cast<intptr_t>(Builtin_ConsoleDebug))
       }
@@ -1212,8 +1212,8 @@ this:
 
 The third paramter is the creation on the union which might not be obvious.
 
-Back to the question I'm trying to answer which is:  
-"Buildtins::Name is is Builtins:kConsoleDebug. Where is this defined?"  
+Back to the question I'm trying to answer which is:
+"Buildtins::Name is is Builtins:kConsoleDebug. Where is this defined?"
 For this we have to look at `builtins.h` and the enum Name:
 
     enum Name : int32_t {
@@ -1238,21 +1238,21 @@ So backing up to looking at the arguments to SimpleInstallFunction which are:
                           NONE);
 
     V8_NOINLINE Handle<JSFunction> SimpleInstallFunction(
-      Handle<JSObject> base, 
-      const char* name, 
-      Builtins::Name call, 
+      Handle<JSObject> base,
+      const char* name,
+      Builtins::Name call,
       int len,
-      bool adapt, 
+      bool adapt,
       PropertyAttributes attrs = DONT_ENUM,
       BuiltinFunctionId id = kInvalidBuiltinFunctionId) {
 
-We know about `Builtins::Name`, so lets look at len which is one, what is this?  
+We know about `Builtins::Name`, so lets look at len which is one, what is this?
 SimpleInstallFunction will call:
 
     Handle<JSFunction> fun =
       SimpleCreateFunction(base->GetIsolate(), function_name, call, len, adapt);
 
-`len` would be used if adapt was true but it is false in our case. This is what it would 
+`len` would be used if adapt was true but it is false in our case. This is what it would
 be used for if adapt was true:
 
     fun->shared()->set_internal_formal_parameter_count(len);
@@ -1261,16 +1261,16 @@ I'm not exactly sure what adapt is referring to here.
 
 PropertyAttributes is not specified so it will get the default value of `DONT_ENUM`.
 The last parameter which is of type BuiltinFunctionId is not specified either so the
-default value of `kInvalidBuiltinFunctionId` will be used. This is an enum defined in 
+default value of `kInvalidBuiltinFunctionId` will be used. This is an enum defined in
 `src/objects.h`.
 
 
 This [blog](https://v8project.blogspot.se/2017/11/csa.html) provides an example of adding
-a function to the String object. 
+a function to the String object.
 
     $ out.gn/learning/mksnapshot --print-code > output
 
-You can then see the generated code from this. This will produce a code stub that can 
+You can then see the generated code from this. This will produce a code stub that can
 be called through C++. Lets update this to have it be called from JavaScript:
 
 Update builtins/builtins-string-get.cc :
@@ -1302,7 +1302,7 @@ Now lets take a closer look at the code that is generated for this:
 Looking at the output generated I was surprised to see two entries for GetStringLength (I changed the name
 just to make sure there was not something else generating the second one). Why two?
 
-The following uses Intel Assembly syntax which means that no register/immediate prefixes and the first operand is the 
+The following uses Intel Assembly syntax which means that no register/immediate prefixes and the first operand is the
 destination and the second operand the source.
 ```
 --- Code ---
@@ -1313,7 +1313,7 @@ Instructions (size = 136)
 0x1fafde09b3a0     0  55             push rbp
 0x1fafde09b3a1     1  4889e5         REX.W movq rbp,rsp                  // movq rsp into rbp
 
-0x1fafde09b3a4     4  56             push rsi                            // push the value of rsi (first parameter) onto the stack 
+0x1fafde09b3a4     4  56             push rsi                            // push the value of rsi (first parameter) onto the stack
 0x1fafde09b3a5     5  57             push rdi                            // push the value of rdi (second parameter) onto the stack
 0x1fafde09b3a6     6  50             push rax                            // push the value of rax (accumulator) onto the stack
 
@@ -1360,7 +1360,7 @@ RelocInfo (size = 7)
 0x1fafde09b40f  embedded object  (0x9a8df28c271 <String[76]\: CSA_ASSERT failed: IsString(object) [../../src/code-stub-assembler.cc:1498]\n>)
 0x1fafde09b418  code target (BUILTIN)  (0x1fafde088600)
 
---- End code --- 
+--- End code ---
 ```
 
 
@@ -1406,7 +1406,7 @@ processing this macro:
 From the resulting class you can see how `Parameter` can be used from within `TF_BUILTIN` macro.
 
 ## Building V8
-You'll need to have checked out the Google V8 sources to you local file system and build it by following 
+You'll need to have checked out the Google V8 sources to you local file system and build it by following
 the instructions found [here](https://developers.google.com/v8/build).
 
 ### [gclient](https://www.chromium.org/developers/how-tos/depottools) sync
@@ -1463,7 +1463,7 @@ Running pre-submit checks:
     $ ./tools/presubmit.py
 
 ## Building chromium
-When making changes to V8 you might need to verify that your changes have not broken anything in Chromium. 
+When making changes to V8 you might need to verify that your changes have not broken anything in Chromium.
 
 Generate Your Project (gpy) :
 You'll have to run this once before building:
@@ -1483,7 +1483,7 @@ You'll have to run this once before building:
 
 ### Building using Ninja
 
-    $ ninja -C out.gn/learning 
+    $ ninja -C out.gn/learning
 
 Building the tests:
 
@@ -1513,7 +1513,7 @@ I was able to get around this by:
 
 #### Using a specific version of V8
 The instructions below work but it is also possible to create a soft link from chromium/src/v8
-to local v8 repository and the build/test. 
+to local v8 repository and the build/test.
 
 So, we want to include our updated version of V8 so that we can verify that it builds correctly with our change to V8.
 While I'm not sure this is the proper way to do it, I was able to update DEPS in src (chromium) and set
@@ -1521,16 +1521,16 @@ the v8 entry to git@github.com:danbev/v8.git@064718a8921608eaf9b5eadbb7d734ec040
 
     "git@github.com:danbev/v8.git@064718a8921608eaf9b5eadbb7d734ec04068a87"
 
-You'll have to run `gclient sync` after this. 
+You'll have to run `gclient sync` after this.
 
 Another way is to not updated the `DEPS` file, which is a version controlled file, but instead update
 `.gclientrc` and add a `custom_deps` entry:
 
-    solutions = [{u'managed': False, u'name': u'src', u'url': u'https://chromium.googlesource.com/chromium/src.git', 
+    solutions = [{u'managed': False, u'name': u'src', u'url': u'https://chromium.googlesource.com/chromium/src.git',
     u'custom_deps': {
       "src/v8": "git@github.com:danbev/v8.git@27a666f9be7ca3959c7372bdeeee14aef2a4b7ba"
     }, u'deps_file': u'.DEPS.git', u'safesync_url': u''}]
-    
+
 ## Buiding pdfium
 You may have to compile this project (in addition to chromium to verify that changes in v8 are not breaking
 code in pdfium.
@@ -1596,7 +1596,7 @@ The tests directory contains unit tests for individual classes/concepts in V8 to
 
 ## Contributing a change to V8
 1) Create a working branch using `git new-branch name`
-2) git cl upload  
+2) git cl upload
 
 See Googles [contributing-code](https://www.chromium.org/developers/contributing-code) for more details.
 
@@ -1637,11 +1637,11 @@ This is the source used for the following examples:
     const p = new Person("Daniel", 41);
     print(p.name);
     print(p.age);
-    print("after"); 
+    print("after");
 
 
 ### V8_shell startup
-What happens when the v8_shell is run?   
+What happens when the v8_shell is run?
 
     $ lldb -- out/x64.debug/d8 --enable-inspector class.js
     (lldb) breakpoint set --file d8.cc --line 2662
@@ -1657,7 +1657,7 @@ SetOptions will call `v8::V8::SetFlagsFromCommandLine` which is found in src/api
 This function can be found in src/flags.cc. The flags themselves are defined in src/flag-definitions.h
 
 Next a new SourceGroup array is create:
-    
+
     options.isolate_sources = new SourceGroup[options.num_isolates];
     SourceGroup* current = options.isolate_sources;
     current->Begin(argv, 1);
@@ -1697,7 +1697,7 @@ We are then back in Main and have the following lines:
 
 This is very similar to what I've seen in the [Node.js startup process](https://github.com/danbev/learning-nodejs#startint-argc-char-argv).
 
-We did not specify any natives_blob or snapshot_blob as an option on the command line so the defaults 
+We did not specify any natives_blob or snapshot_blob as an option on the command line so the defaults
 will be used:
 
     v8::V8::InitializeExternalStartupData(argv[0]);
@@ -1707,7 +1707,7 @@ back in src/d8.cc line 2918:
     Isolate* isolate = Isolate::New(create_params);
 
 this call will bring us into api.cc line 8185:
-   
+
      i::Isolate* isolate = new i::Isolate(false);
 So, we are invoking the Isolate constructor (in src/isolate.cc).
 
@@ -1716,7 +1716,7 @@ So, we are invoking the Isolate constructor (in src/isolate.cc).
 api.cc:
 
     isolate->Init(NULL);
-    
+
     compilation_cache_ = new CompilationCache(this);
     context_slot_cache_ = new ContextSlotCache();
     descriptor_lookup_cache_ = new DescriptorLookupCache();
@@ -1745,7 +1745,7 @@ api.cc:
 src/builtins/builtins.cc, this is where the builtins are defined.
 TODO: sort out what these macros do.
 
-In src/v8.cc we have a couple of checks for if the options passed are for a stress_run but since we 
+In src/v8.cc we have a couple of checks for if the options passed are for a stress_run but since we
 did not pass in any such flags this code path will be followed which will call RunMain:
 
     result = RunMain(isolate, argc, argv, last_run);
@@ -1842,7 +1842,7 @@ Back in d8.cc:
 
 
 src/api.cc
-   
+
     auto fun = i::Handle<i::JSFunction>::cast(Utils::OpenHandle(this));
 
     (lldb) job *fun
@@ -1913,7 +1913,7 @@ For example, a one byte char would be reinterpreted as uint8_t:
 * gdbinit has been updated. Check if there is something that should be ported to lldbinit
 
 
-### Invocation walkthrough 
+### Invocation walkthrough
 This section will go through calling a Script to understand what happens in V8.
 
 I'll be using [run-scripts.cc](./run-scripts.cc) as the example for this.
@@ -1929,13 +1929,13 @@ So, Script::Run is defined in api.cc
 First things that happens in this function is a macro:
 
     PREPARE_FOR_EXECUTION_WITH_CONTEXT_IN_RUNTIME_CALL_STATS_SCOPE(
-         "v8", 
-         "V8.Execute", 
-         context, 
-         Script, 
-         Run, 
+         "v8",
+         "V8.Execute",
+         context,
+         Script,
+         Run,
          MaybeLocal<Value>(),
-         InternalEscapableScope, 
+         InternalEscapableScope,
     true);
     TRACE_EVENT_CALL_STATS_SCOPED(isolate, category, name);
     PREPARE_FOR_EXECUTION_GENERIC(isolate, context, class_name, function_name, \
@@ -1957,7 +1957,7 @@ I'm skipping TRACE_EVENT_CALL_STATS_SCOPED for now.
     ENTER_V8_DO_NOT_USE(isolate);                                      \
     bool has_pending_exception = false
 
- 
+
     auto fun = i::Handle<i::JSFunction>::cast(Utils::OpenHandle(this));
 
     (lldb) job *fun
@@ -1992,7 +1992,7 @@ OPEN_HANDLE_LIST looks like this:
 
     #define OPEN_HANDLE_LIST(V)                    \
     ....
-    V(Script, JSFunction)                        \ 
+    V(Script, JSFunction)                        \
 
 So lets expand this for JSFunction and it should become:
 
@@ -2008,26 +2008,26 @@ A little further down in src/api.h there is another macro which looks like this:
 MAKE_OPEN_HANDLE:
 
     #define MAKE_OPEN_HANDLE(From, To)
-      v8::internal::Handle<v8::internal::To> Utils::OpenHandle( 
-      const v8::From* that, bool allow_empty_handle) {         
-      DCHECK(allow_empty_handle || that != NULL);             
-      DCHECK(that == NULL ||                                 
+      v8::internal::Handle<v8::internal::To> Utils::OpenHandle(
+      const v8::From* that, bool allow_empty_handle) {
+      DCHECK(allow_empty_handle || that != NULL);
+      DCHECK(that == NULL ||
            (*reinterpret_cast<v8::internal::Object* const*>(that))->Is##To());
-      return v8::internal::Handle<v8::internal::To>(                         
-        reinterpret_cast<v8::internal::To**>(const_cast<v8::From*>(that))); 
+      return v8::internal::Handle<v8::internal::To>(
+        reinterpret_cast<v8::internal::To**>(const_cast<v8::From*>(that)));
   }
 
 And remember that JSFunction is included in the OPEN_HANDLE_LIST so there will
 be the following in the source after the preprocessor has processed this header:
 
-      v8::internal::Handle<v8::internal::JSFunction> Utils::OpenHandle( 
-        const v8::Script* that, bool allow_empty_handle) {         
-          DCHECK(allow_empty_handle || that != NULL);             
-          DCHECK(that == NULL ||                                 
+      v8::internal::Handle<v8::internal::JSFunction> Utils::OpenHandle(
+        const v8::Script* that, bool allow_empty_handle) {
+          DCHECK(allow_empty_handle || that != NULL);
+          DCHECK(that == NULL ||
            (*reinterpret_cast<v8::internal::Object* const*>(that))->IsJSFunction());
-          return v8::internal::Handle<v8::internal::JSFunction>(                               reinterpret_cast<v8::internal::JSFunction**>(const_cast<v8::Script*>(that))); 
+          return v8::internal::Handle<v8::internal::JSFunction>(                               reinterpret_cast<v8::internal::JSFunction**>(const_cast<v8::Script*>(that)));
 
-So where is JSFunction declared? 
+So where is JSFunction declared?
 It is defined in objects.h
 
 
@@ -2056,7 +2056,7 @@ To find suitable task you can use `label:HelpWanted` at [bugs.chromium.org](http
 
 
 ### OpenHandle
-What does this call do: 
+What does this call do:
 
     Utils::OpenHandle(*(source->source_string));
 
@@ -2087,7 +2087,7 @@ If we take a closer look at the macro is should expand to something like this in
      }
 
 So this is returning a new v8::internal::Handle, the constructor is defined in src/handles.h:95.
-     
+
 src/objects.cc
 Handle<WeakFixedArray> WeakFixedArray::Add(Handle<Object> maybe_array,
 10167                                            Handle<HeapObject> value,
@@ -2131,13 +2131,13 @@ static Local<Context> New(
           DeserializeInternalFieldsCallback());
 ```
 So we can see the reason why we did not have to specify `internal_fields_deserialize`.
-What is `ExtensionConfiguration`?  
-This class can be found in `include/v8.h` and only has two members, a count of the extension names 
+What is `ExtensionConfiguration`?
+This class can be found in `include/v8.h` and only has two members, a count of the extension names
 and an array with the names.
 
-If specified these will be installed by `Boostrapper::InstallExtensions` which will delegate to 
+If specified these will be installed by `Boostrapper::InstallExtensions` which will delegate to
 `Genesis::InstallExtensions`, both can be found in `src/boostrapper.cc`.
-Where are extensions registered?   
+Where are extensions registered?
 This is done once per process and called from `V8::Initialize()`:
 ```c++
 void Bootstrapper::InitializeOncePerProcess() {
