@@ -392,21 +392,21 @@ Properties                  JSObject                    HiddenClass (Map)
 ```
 
 #### JSObject
-Each JSObject has as its first field a pointer to the generated HiddenClass. A hiddenclass contain mappings from property names to indices into the properties data type. When an instance of JSObject is created a `Map` is passed in. 
+Each JSObject has as its first field a pointer to the generated HiddenClass. A hiddenclass contain mappings from property names to indices into the properties data type. When an instance of JSObject is created a `Map` is passed in.
 As mentioned earlier JSObject inherits from JSReceiver which inherits from HeapObject
 
-For example,in [jsobject_test.cc](./tests/jsobject_test.cc) we first create a new Map using the internal Isolate Factory:
+For example,in [jsobject_test.cc](./test/jsobject_test.cc) we first create a new Map using the internal Isolate Factory:
 
     v8::internal::Handle<v8::internal::Map> map = factory->NewMap(v8::internal::JS_OBJECT_TYPE, 24);
     v8::internal::Handle<v8::internal::JSObject> js_object = factory->NewJSObjectFromMap(map);
     EXPECT_TRUE(js_object->HasFastProperties());
 
-When we call `js_object->HasFastProperties()` this will delegate to the map instance: 
+When we call `js_object->HasFastProperties()` this will delegate to the map instance:
 
     return !map()->is_dictionary_map();
 
-How do you add a property to a JSObject instance?  
-Take a look at [jsobject_test.cc](./tests/jsobject_test.cc) for an example.
+How do you add a property to a JSObject instance?
+Take a look at [jsobject_test.cc](./test/jsobject_test.cc) for an example.
 
 
 ### Caching
@@ -721,7 +721,7 @@ have to be at the top level of the file.
 
     ParseInfo parse_info(script);
 
-There is a [unit test](./tests/ast_test.cc) that shows how a ParseInfo instance can be created
+There is a [unit test](./test/ast_test.cc) that shows how a ParseInfo instance can be created
 and inspected.
 
 This will call ParseInfo's constructor (in src/parsing/parse-info.cc), and which will call `ParseInfo::InitFromIsolate`:
@@ -1075,14 +1075,14 @@ Looking at the declaration in include/v8.h we find the following:
       UNKNOWN_ENCODING = 0x1,
       TWO_BYTE_ENCODING = 0x0,
       ONE_BYTE_ENCODING = 0x8
-    }; 
+    };
 
     int Length() const;
     int Uft8Length const;
     bool IsOneByte() const;
 
-Example usages can be found in [tests/string_test.cc](./tests/string_test.cc).
-Looking at the functions I've seen one that returns the actual bytes 
+Example usages can be found in [test/string_test.cc](./test/string_test.cc).
+Looking at the functions I've seen one that returns the actual bytes
 from the String. You can get at the in utf8 format using:
 
     String::Utf8Value print_value(joined);
@@ -1598,7 +1598,7 @@ accessed from JavaScript.
 and run the script.
 
 #### tests
-The tests directory contains unit tests for individual classes/concepts in V8 to help understand them.
+The test directory contains unit tests for individual classes/concepts in V8 to help understand them.
 
 ## Building this projects code
 
