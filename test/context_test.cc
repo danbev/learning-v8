@@ -3,7 +3,6 @@
 #include "v8.h"
 #include "libplatform/libplatform.h"
 #include "v8_test_fixture.h"
-#include "src/factory.h"
 #include "src/objects.h"
 #include "src/objects-inl.h"
 #include "src/api.h"
