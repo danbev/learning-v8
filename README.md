@@ -1476,6 +1476,15 @@ Running quickchecks:
 You can use `./tools-run-tests.py -h` to list all the opitions that can be passed
 to run-tests.
 
+Running cctest:
+```console
+$ out.gn/learning/cctest test-heap-profiler/HeapSnapshotRetainedObjectInfo
+```
+To get a list of the available tests:
+```console
+$ out.gn/learning/cctest --list
+```
+
 Running pre-submit checks:
 
     $ ./tools/presubmit.py
