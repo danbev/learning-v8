@@ -117,14 +117,16 @@ not use ICU you still need to call InitializeICU :
 JavaScript specifies a lot of built-in functionality which every V8 context must provide.
 For example, you can run Math.PI and that will work in a JavaScript console/repl. The global object
 and all the built-in functionality must be setup and initialized into the V8 heap. This can be time
-consuming and affect runtime performance if this has to be done every time. The blobs above are prepared
-snapshots that get directly deserialized into the heap to provide an initilized context.
+consuming and affect runtime performance if this has to be done every time. 
+
 
 Now this is where the files `natives_blob.bin` and `snapshot_blob.bin` come into play. But what are these bin files?  
-If you take a look in src/js you'll find a number of javascript files. These files referenced in src/v8.gyp and are used
-by the target `js2c`. This target calls tools/js2c.py which is a tool for converting
+The blobs above are prepared snapshots that get directly deserialized into the heap to provide an initilized context.
+If you take a look in `src/js` you'll find a number of javascript files. These files referenced in `src/v8.gyp` and are used
+by the target `js2c`. This target calls `tools/js2c.py` which is a tool for converting
 JavaScript source code into C-Style char arrays. This target will process all the library_files specified in the variables section.
 For a GN build you'll find the configuration in BUILD.GN.
+Just note that there is ongoing work to move the .js files to V8 builtins and builtins will be discuessed later in this document.
 
 The output of this out/Debug/obj/gen/libraries.cc. So how is this file actually used?
 The `js2c` target produces the libraries.cc file which is used by other targets, for example by `v8_snapshot` which produces a 
@@ -138,13 +140,13 @@ Step through to the following line:
 
     V8::InitializeExternalStartupData(argv[0]);
 
-This call will land us in src/api.cc:
+This call will land us in `src/api.cc`:
 
     void v8::V8::InitializeExternalStartupData(const char* directory_path) {
       i::InitializeExternalStartupData(directory_path);
     }
 
-The implementation of `InitializeExternalStartupData` can be found in src/startup-data-util.cc:
+The implementation of `InitializeExternalStartupData` can be found in `src/startup-data-util.cc`:
 
     void InitializeExternalStartupData(const char* directory_path) {
     #ifdef V8_USE_EXTERNAL_STARTUP_DATA
