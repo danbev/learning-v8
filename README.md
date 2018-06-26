@@ -220,10 +220,6 @@ A UniquePersistent<SomeType> handle relies on C++ constructors and destructors t
 A Persistent<SomeType> can be constructed with its constructor, but must be explicitly cleared with Persistent::Reset.
 
 
-A UniquePersistent<SomeType> handle relies on C++ constructors and destructors to manage the lifetime of the underlying object.
-A Persistent<SomeType> can be constructed with its constructor, but must be explicitly cleared with Persistent::Reset.
-
-
 ### V8_EXPORT
 This can be found in quite a few places in v8 source code. For example:
 
