@@ -238,9 +238,9 @@ It is a preprocessor macro which looks like this:
     # define V8_EXPORT
     #endif 
 
-So we can see that if V8_HAS_ATTRIBUTE_VISIBILITY and defined(V8_SHARED) and also 
-if BUILDING_V8_SHARED V8_EXPORT is set to `__attribute__ ((visibility("default"))`.
-But in all other cases V8_EXPORT is empty and the preprocessor does not insert 
+So we can see that if `V8_HAS_ATTRIBUTE_VISIBILITY`, and `defined(V8_SHARED)`, and also 
+if `BUILDING_V8_SHARED`, `V8_EXPORT` is set to `__attribute__ ((visibility("default"))`.
+But in all other cases `V8_EXPORT` is empty and the preprocessor does not insert 
 anything (nothing will be there come compile time). 
 But what about the `__attribute__ ((visibility("default"))` what is this?  
 
