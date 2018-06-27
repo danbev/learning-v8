@@ -66,6 +66,9 @@ test/context_test: test/context_test.cc
 test/heap_test: test/heap_test.cc
 	$(COMPILE_TEST) test/main.cc $< -o $@
 
+test/map_test: test/map_test.cc
+	$(COMPILE_TEST) test/main.cc $< -o $@
+
 list-gtest:
 	./test/smi_test --gtest_list_test
 
