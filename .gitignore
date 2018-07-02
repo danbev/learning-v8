@@ -21,3 +21,4 @@ test/ast_test
 test/context_test
 contexts
 test/heap_test
+test/map_test
