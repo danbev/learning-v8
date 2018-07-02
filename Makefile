@@ -90,3 +90,4 @@ clean:
 	rm -rf test/jsobject_test
 	rm -rf test/ast_test
 	rm -rf test/context_test
+	rm -rf test/map_test
