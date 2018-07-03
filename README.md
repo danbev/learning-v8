@@ -53,6 +53,8 @@ So that describes synchronous functions, what about asynchronous functions?
 Lets take for example that you call setTimeout, the setTimeout function will be
 pushed onto the call stack and executed. This is where the callback queue comes into play and the event loop. The setTimeout function can add functions to the callback queue. This queue will be processed by the event loop when the call stack is empty.
 
+TODO: Add mirco task queue
+
 ### Isolate
 An Isolate is an independant copy of the V8 runtime which includes its own heap.
 Two different Isolates can run in parallel and can be seen as entierly different
