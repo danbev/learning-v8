@@ -421,7 +421,7 @@ and the allocation retried.
 Lets take a look at `AllocateRawWithLigthRetry`:
 ```c++
   AllocationResult alloc = AllocateRaw(size, space, alignment);
-``
+```
 `AllocateRaw` can be found in `src/heap/heap-inl.h`. There are different paths that will be taken depending on the
 `space` parameteter. Since it is `MAP_SPACE` in our case we will focus on that path:
 ```c++
