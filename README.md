@@ -945,7 +945,353 @@ Inspect third int field (bit_field3):
 0x17b027209ed8: 0b00001000001000000000001111111111
 (lldb) memory read -f x -s 4 -c 1 *map+15
 0x17b027209ed8: 0x082003ff
+```
 
+So we know that a Map instance is a pointer allocated by the Heap and with a specific 
+size. Fields are accessed using indexes (remember there are no member fields in the Map class).
+We also know that all HeapObject have a Map. The Map is sometimes referred to as the HiddenClass
+and somethime the shape of an object. If two objects have the same properties they would share 
+the same Map. This makes sense and I've see blog post that show this but I'd like to verify
+this to fully understand it.
+I'm going to try to match https://v8project.blogspot.com/2017/08/fast-properties.html with 
+the code.
+
+So, lets take a look at adding a property to a JSObject. We start by creating a new Map and then 
+use it to create a new JSObject:
+```c++
+  i::Handle<i::Map> map = factory->NewMap(i::JS_OBJECT_TYPE, 32);
+  i::Handle<i::JSObject> js_object = factory->NewJSObjectFromMap(map);
+
+  i::Handle<i::String> prop_name = factory->InternalizeUtf8String("prop_name");
+  i::Handle<i::String> prop_value = factory->InternalizeUtf8String("prop_value");
+  i::JSObject::AddProperty(js_object, prop_name, prop_value, i::NONE);  
+```
+Lets take a closer look at `AddProperty` and how it interacts with the Map. This function can be
+found in `src/objects.cc`:
+```c++
+void JSObject::AddProperty(Handle<JSObject> object, Handle<Name> name,
+                           Handle<Object> value,
+                           PropertyAttributes attributes) {
+  LookupIterator it(object, name, object, LookupIterator::OWN_SKIP_INTERCEPTOR);
+  CHECK_NE(LookupIterator::ACCESS_CHECK, it.state());
+```
+First we have the LookupIterator constructor (`src/lookup.h`) but since this is a new property which 
+we know does not exist it will not find any property.
+```c++
+CHECK(AddDataProperty(&it, value, attributes, kThrowOnError,
+                        CERTAINLY_NOT_STORE_FROM_KEYED)
+            .IsJust());
+```
+```c++
+  Handle<JSReceiver> receiver = it->GetStoreTarget<JSReceiver>();
+  ...
+  it->UpdateProtector();
+  // Migrate to the most up-to-date map that will be able to store |value|
+  // under it->name() with |attributes|.
+  it->PrepareTransitionToDataProperty(receiver, value, attributes, store_mode);
+  DCHECK_EQ(LookupIterator::TRANSITION, it->state());
+  it->ApplyTransitionToDataProperty(receiver);
+
+  // Write the property value.
+  it->WriteDataValue(value, true);
+```
+`PrepareTransitionToDataProperty`:
+```c++
+  Representation representation = value->OptimalRepresentation();
+  Handle<FieldType> type = value->OptimalType(isolate, representation);
+  maybe_map = Map::CopyWithField(map, name, type, attributes, constness,
+  representation, flag);
+```
+`Map::CopyWithField`:
+```c++
+  Descriptor d = Descriptor::DataField(name, index, attributes, constness, representation, wrapped_type);
+```
+Lets take a closer look the Decriptor which can be found in `src/property.cc`:
+```c++
+Descriptor Descriptor::DataField(Handle<Name> key, int field_index,
+                                 PropertyAttributes attributes,
+                                 PropertyConstness constness,
+                                 Representation representation,
+                                 MaybeObjectHandle wrapped_field_type) {
+  DCHECK(wrapped_field_type->IsSmi() || wrapped_field_type->IsWeakHeapObject());
+  PropertyDetails details(kData, attributes, kField, constness, representation,
+                          field_index);
+  return Descriptor(key, wrapped_field_type, details);
+}
+```
+`Descriptor` is declared in `src/property.h` and describes the elements in a instance-descriptor array. These
+are returned when calling `map->instance_descriptors()`. Let check some of the arguments:
+```console
+(lldb) job *key
+#prop_name
+(lldb) expr attributes
+(v8::internal::PropertyAttributes) $27 = NONE
+(lldb) expr constness
+(v8::internal::PropertyConstness) $28 = kMutable
+(lldb) expr representation
+(v8::internal::Representation) $29 = (kind_ = '\b')
+```
+The Descriptor class contains three members:
+```c++
+ private:
+  Handle<Name> key_;
+  MaybeObjectHandle value_;
+  PropertyDetails details_;
+```
+Lets take a closer look `PropertyDetails` which only has a single member named `value_`
+```c++
+  uint32_t value_;
+```
+It also declares a number of classes the extend BitField, for example:
+```c++
+class KindField : public BitField<PropertyKind, 0, 1> {};
+class LocationField : public BitField<PropertyLocation, KindField::kNext, 1> {};
+class ConstnessField : public BitField<PropertyConstness, LocationField::kNext, 1> {};
+class AttributesField : public BitField<PropertyAttributes, ConstnessField::kNext, 3> {};
+class PropertyCellTypeField : public BitField<PropertyCellType, AttributesField::kNext, 2> {};
+class DictionaryStorageField : public BitField<uint32_t, PropertyCellTypeField::kNext, 23> {};
+
+// Bit fields for fast objects.
+class RepresentationField : public BitField<uint32_t, AttributesField::kNext, 4> {};
+class DescriptorPointer : public BitField<uint32_t, RepresentationField::kNext, kDescriptorIndexBitCount> {};
+class FieldIndexField : public BitField<uint32_t, DescriptorPointer::kNext, kDescriptorIndexBitCount> {
+
+enum PropertyKind { kData = 0, kAccessor = 1 };
+enum PropertyLocation { kField = 0, kDescriptor = 1 };
+enum class PropertyConstness { kMutable = 0, kConst = 1 };
+enum PropertyAttributes {
+  NONE = ::v8::None,
+  READ_ONLY = ::v8::ReadOnly,
+  DONT_ENUM = ::v8::DontEnum,
+  DONT_DELETE = ::v8::DontDelete,
+  ALL_ATTRIBUTES_MASK = READ_ONLY | DONT_ENUM | DONT_DELETE,
+  SEALED = DONT_DELETE,
+  FROZEN = SEALED | READ_ONLY,
+  ABSENT = 64,  // Used in runtime to indicate a property is absent.
+  // ABSENT can never be stored in or returned from a descriptor's attributes
+  // bitfield.  It is only used as a return value meaning the attributes of
+  // a non-existent property.
+};
+enum class PropertyCellType {
+  // Meaningful when a property cell does not contain the hole.
+  kUndefined,     // The PREMONOMORPHIC of property cells.
+  kConstant,      // Cell has been assigned only once.
+  kConstantType,  // Cell has been assigned only one type.
+  kMutable,       // Cell will no longer be tracked as constant.
+  // Meaningful when a property cell contains the hole.
+  kUninitialized = kUndefined,  // Cell has never been initialized.
+  kInvalidated = kConstant,     // Cell has been deleted, invalidated or never
+                                // existed.
+  // For dictionaries not holding cells.
+  kNoCell = kMutable,
+};
+
+
+template<class T, int shift, int size>
+class BitField : public BitFieldBase<T, shift, size, uint32_t> { };
+```
+The Type T of KindField will be `PropertyKind`, the `shift` will be 0 , and the `size` 1.
+Notice that `LocationField` is using `KindField::kNext` as its shift. This is a static class constant
+of type `uint32_t` and is defined as:
+```c++
+static const U kNext = kShift + kSize;
+```
+So `LocationField` would get the value from KindField which should be:
+```c++
+class LocationField : public BitField<PropertyLocation, 1, 1> {};
+```
+
+The constructor for PropertyDetails looks like this:
+```c++
+PropertyDetails(PropertyKind kind, PropertyAttributes attributes, PropertyCellType cell_type, int dictionary_index = 0) {
+    value_ = KindField::encode(kind) | LocationField::encode(kField) |
+             AttributesField::encode(attributes) |
+             DictionaryStorageField::encode(dictionary_index) |
+             PropertyCellTypeField::encode(cell_type);
+  }
+```
+So what does KindField::encode(kind) actualy do then?
+```console
+(lldb) expr static_cast<uint32_t>(kind())
+(uint32_t) $36 = 0
+(lldb) expr static_cast<uint32_t>(kind()) << 0
+(uint32_t) $37 = 0
+```
+This value is later returned by calling `kind()`:
+```c++
+PropertyKind kind() const { return KindField::decode(value_); }
+```
+So we have all this information about this property, its type (Representation), constness, if it is 
+read-only, enumerable, deletable, sealed, frozen. After that little detour we are back in `Descriptor::DataField`:
+```c++
+  return Descriptor(key, wrapped_field_type, details);
+```
+Here we are using the key (name of the property), the wrapped_field_type, and PropertyDetails we created.
+What is `wrapped_field_type` again?  
+If we back up a few frames back into `Map::TransitionToDataProperty` we can see that the type passed in
+is taken from the following code:
+```c++
+  Representation representation = value->OptimalRepresentation();
+  Handle<FieldType> type = value->OptimalType(isolate, representation);
+```
+So this is only taking the type of the field:
+```console
+(lldb) expr representation.kind()
+(v8::internal::Representation::Kind) $51 = kHeapObject
+```
+This makes sense as the map only deals with the shape of the propery and not the value.
+Next in `Map::CopyWithField` we have:
+```c++
+  Handle<Map> new_map = Map::CopyAddDescriptor(map, &d, flag);
+```
+`CopyAddDescriptor` does:
+```c++
+  Handle<DescriptorArray> descriptors(map->instance_descriptors());
+ 
+  int nof = map->NumberOfOwnDescriptors();
+  Handle<DescriptorArray> new_descriptors = DescriptorArray::CopyUpTo(descriptors, nof, 1);
+  new_descriptors->Append(descriptor);
+  
+  Handle<LayoutDescriptor> new_layout_descriptor =
+      FLAG_unbox_double_fields
+          ? LayoutDescriptor::New(map, new_descriptors, nof + 1)
+          : handle(LayoutDescriptor::FastPointerLayout(), map->GetIsolate());
+
+  return CopyReplaceDescriptors(map, new_descriptors, new_layout_descriptor,
+                                flag, descriptor->GetKey(), "CopyAddDescriptor",
+                                SIMPLE_PROPERTY_TRANSITION);
+```
+Lets take a closer look at `LayoutDescriptor`
+
+```console
+(lldb) expr new_layout_descriptor->Print()
+Layout descriptor: <all tagged>
+```
+TODO: Take a closer look at LayoutDescritpor
+
+Later when actually adding the value in `Object::AddDataProperty`:
+```c++
+  it->WriteDataValue(value, true);
+```
+This call will end up in `src/lookup.cc` and in our case the path will be the following call:
+```c++
+  JSObject::cast(*holder)->WriteToField(descriptor_number(), property_details_, *value);
+```
+TODO: Take a closer look at LookupIterator.
+`WriteToField` can be found in `src/objects-inl.h`:
+```c++
+  FieldIndex index = FieldIndex::ForDescriptor(map(), descriptor);
+```
+`FieldIndex::ForDescriptor` can be found in `src/field-index-inl.h`:
+```c++
+inline FieldIndex FieldIndex::ForDescriptor(const Map* map, int descriptor_index) {
+  PropertyDetails details = map->instance_descriptors()->GetDetails(descriptor_index);
+  int field_index = details.field_index();
+  return ForPropertyIndex(map, field_index, details.representation());
+}
+```
+Notice that this is calling `instance_descriptors()` on the passed-in map. This as we recall from earlier returns
+and DescriptorArray (which is a type of WeakFixedArray). A Descriptor array 
+
+Our DecsriptorArray only has one entry:
+```console
+(lldb) expr map->instance_descriptors()->number_of_descriptors()
+(int) $6 = 1
+(lldb) expr map->instance_descriptors()->GetKey(0)->Print()
+#prop_name
+(lldb) expr map->instance_descriptors()->GetFieldIndex(0)
+(int) $11 = 0
+```
+We can also use `Print` on the DescriptorArray:
+```console
+lldb) expr map->instance_descriptors()->Print()
+
+  [0]: #prop_name (data field 0:h, p: 0, attrs: [WEC]) @ Any
+```
+In our case we are accessing the PropertyDetails and then getting the `field_index` which I think tells us
+where in the object the value for this property is stored.
+The last call in `ForDescriptor` is `ForProperty:
+```c++
+inline FieldIndex FieldIndex::ForPropertyIndex(const Map* map,
+                                               int property_index,
+                                               Representation representation) {
+  int inobject_properties = map->GetInObjectProperties();
+  bool is_inobject = property_index < inobject_properties;
+  int first_inobject_offset;
+  int offset;
+  if (is_inobject) {
+    first_inobject_offset = map->GetInObjectPropertyOffset(0);
+    offset = map->GetInObjectPropertyOffset(property_index);
+  } else {
+    first_inobject_offset = FixedArray::kHeaderSize;
+    property_index -= inobject_properties;
+    offset = FixedArray::kHeaderSize + property_index * kPointerSize;
+  }
+  Encoding encoding = FieldEncoding(representation);
+  return FieldIndex(is_inobject, offset, encoding, inobject_properties,
+                    first_inobject_offset);
+}
+```
+I was expecting `inobject_propertis` to be 1 here but it is 0:
+```console
+(lldb) expr inobject_properties
+(int) $14 = 0
+```
+Why is that, what am I missing?  
+These in-object properties are stored directly on the object instance and not do not use
+the properties array. All get back to an example of this later to clarify this.
+TODO: Add in-object properties example.
+
+Back in `JSObject::WriteToField`:
+```c++
+  RawFastPropertyAtPut(index, value);
+```
+
+```c++
+void JSObject::RawFastPropertyAtPut(FieldIndex index, Object* value) {
+  if (index.is_inobject()) {
+    int offset = index.offset();
+    WRITE_FIELD(this, offset, value);
+    WRITE_BARRIER(GetHeap(), this, offset, value);
+  } else {
+    property_array()->set(index.outobject_array_index(), value);
+  }
+}
+```
+In our case we know that the index is not inobject()
+```console
+(lldb) expr index.is_inobject()
+(bool) $18 = false
+```
+So, `property_array()->set()` will be called.
+```console
+(lldb) expr this
+(v8::internal::JSObject *) $21 = 0x00002c31c6a88b59
+```
+JSObject inherits from JSReceiver which is where the property_array() function is declared.
+```c++
+  inline PropertyArray* property_array() const;
+```
+```console
+(lldb) expr property_array()->Print()
+0x2c31c6a88bb1: [PropertyArray]
+ - map: 0x2c31f5603e21 <Map>
+ - length: 3
+ - hash: 0
+           0: 0x2c31f56025a1 <Odd Oddball: uninitialized>
+         1-2: 0x2c31f56026f1 <undefined>
+(lldb) expr index.outobject_array_index()
+(int) $26 = 0
+(lldb) expr value->Print()
+#prop_value
+```
+Looking at the above values printed we should see the property be written to entry 0.
+```console
+(lldb) expr property_array()->get(0)->Print()
+#uninitialized
+// after call to set
+(lldb) expr property_array()->get(0)->Print()
+#prop_value
 ```
 
 ```console
