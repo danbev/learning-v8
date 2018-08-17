@@ -4080,8 +4080,9 @@ Isolate* Isolate::New(const Isolate::CreateParams& params) {
   return isolate;
 }
 ```
-Lets take a closer look at Initialize. First the array buffer allocator is set on the 
+Lets take a closer look at `Initialize`. First the array buffer allocator is set on the 
 internal isolate which is just a setter and not that interesting.
+
 Next the snapshot blob is set (just showing the path we are taking):
 ```c++
 i_isolate->set_snapshot_blob(i::Snapshot::DefaultSnapshotBlob());
@@ -4367,11 +4368,13 @@ TODO: split `InitializeMap` so it is a little more readable here.
 
 ### Spaces
 From `src/heap/spaces.h`
+
+```console
 Young Generation                  Old Generation
 +-------------+------------+  +-----------+-------------+
 | scavenger   |            |  | map space | old object  |
 +-------------+------------+  +-----------+-------------+
-
+```
 The `map space` contains only map objects.
 The old and map spaces consist of list of pages. 
 The Page class can be found in `src/heap/spaces.h`
@@ -4381,14 +4384,61 @@ class Page : public MemoryChunk {
 ```
 
 
+In our case the calling v8::Isolate::New which is done by the test fixture: 
+```c++
+virtual void SetUp() {
+  isolate_ = v8::Isolate::New(create_params_);
+}
+```
+This will call: 
+```c++
+Isolate* Isolate::New(const Isolate::CreateParams& params) {
+  Isolate* isolate = Allocate();
+  Initialize(isolate, params);
+  return isolate;
+}
+```
+In `Isolate::Initialize` we'll call `i::Snapshot::Initialize(i_isolate)`:
+```c++
+if (params.entry_hook || !i::Snapshot::Initialize(i_isolate)) {
+  ...
+```
+Which will call:
+```c++
+bool success = isolate->Init(&deserializer);
+```
+Before this call all the roots are uninitialized. Reading this [blog](https://v8project.blogspot.com/) it says that
+the Isolate class contains a roots table. It looks to me that the Heap contains this data structure but perhaps that
+is what they meant. 
+```console
+(lldb) bt 3
+* thread #1, queue = 'com.apple.main-thread', stop reason = step over
+  * frame #0: 0x0000000101584f43 libv8.dylib`v8::internal::StartupDeserializer::DeserializeInto(this=0x00007ffeefbfe200, isolate=0x000000010481cc00) at startup-deserializer.cc:39
+    frame #1: 0x0000000101028bb6 libv8.dylib`v8::internal::Isolate::Init(this=0x000000010481cc00, des=0x00007ffeefbfe200) at isolate.cc:3036
+    frame #2: 0x000000010157c682 libv8.dylib`v8::internal::Snapshot::Initialize(isolate=0x000000010481cc00) at snapshot-common.cc:54
+```
+In `startup-deserializer.cc` we can find `StartupDeserializer::DeserializeInto`:
+```c++
+  DisallowHeapAllocation no_gc;
+  isolate->heap()->IterateSmiRoots(this);
+  isolate->heap()->IterateStrongRoots(this, VISIT_ONLY_STRONG);
+```
+After 
+If we take a look in `src/roots.h` we can find the read-only roots in Heap. If we take the 10 value, which is:
+```c++
+V(String, empty_string, empty_string)                                        \
+```
+we can then inspect this value:
+```console
+(lldb) expr roots_[9]
+(v8::internal::Object *) $32 = 0x0000152d30b82851
+(lldb) expr roots_[9]->IsString()
+(bool) $30 = true
+(lldb) expr roots_[9]->Print()
+#
+```
+So this entry is a pointer to objects on the managed heap which have been deserialized from the snapshot.
 
-
-
-
-
-
-
-In our case the calling v8::Isolate::New which is done by the test fixture. 
 The heap class has a lot of members that are initialized during construction by the body of the constructor looks like this:
 ```c++
 {
@@ -4404,13 +4454,14 @@ The heap class has a lot of members that are initialized during construction by 
   RememberUnmappedPage(nullptr, false);
 }
 ```
-We can see that roots_ is filled with 0 values. We can inspect roots_ using:
+We can see that roots_ is filled with 0 values. We can inspect `roots_` using:
 ```console
 (lldb) expr roots_
 (lldb) expr RootListIndex::kRootListLength
 (int) $16 = 509
 ```
-Now they are all 0 at this stage. These will happen in `Isolate::Init`:
+Now they are all 0 at this stage, so when will this array get populated?  
+These will happen in `Isolate::Init`:
 ```c++
   heap_.SetUp()
 ```
@@ -4445,3 +4496,134 @@ enum RootListIndex {
 Found in `src/heap/spaces.h` an instace of a MemoryChunk represents a region in memory that is 
 owned by a specific space.
 
+
+### Embedded builtins
+In the [blog post](https://v8project.blogspot.com/) explains how the builtins are embedded into the executable
+in to the .TEXT section which is readonly and therefore can be shared amoung multiple processes. We know that
+builtins are compiled and stored in the snapshot but now it seems that the are instead placed in to `out.gn/learning/gen/embedded.cc` and the combined with the object files from the compile to produce the libv8.dylib.
+V8 has a configuration option named `v8_enable_embedded_builtins` which which case `embedded.cc` will be added 
+to the list of sources. This is done in `BUILD.gn` and the `v8_snapshot` target. If `v8_enable_embedded_builtins` is false then `src/snapshot/embedded-empty.cc` will be included instead. Both of these files have the following functions:
+```c++
+const uint8_t* DefaultEmbeddedBlob()
+uint32_t DefaultEmbeddedBlobSize()
+
+#ifdef V8_MULTI_SNAPSHOTS
+const uint8_t* TrustedEmbeddedBlob()
+uint32_t TrustedEmbeddedBlobSize()
+#endif
+```
+These functions are used by `isolate.cc` and declared `extern`:
+```c++
+extern const uint8_t* DefaultEmbeddedBlob();
+extern uint32_t DefaultEmbeddedBlobSize();
+```
+And the usage of `DefaultEmbeddedBlob` can be see in Isolate::Isolate where is sets the embedded blob:
+```c++
+SetEmbeddedBlob(DefaultEmbeddedBlob(), DefaultEmbeddedBlobSize());
+```
+Lets set a break point there and see if this is empty of not.
+```console
+(lldb) expr v8_embedded_blob_size_
+(uint32_t) $0 = 4021088
+```
+So we can see that we are not using the empty one. Isolate::SetEmbeddedBlob
+
+We can see in `src/snapshot/deserializer.cc` (line 552) we have a check for the embedded_blob():
+```c++
+  CHECK_NOT_NULL(isolate->embedded_blob());
+  EmbeddedData d = EmbeddedData::FromBlob();
+  Address address = d.InstructionStartOfBuiltin(builtin_index);
+```
+`EmbeddedData can be found in `src/snapshot/snapshot.h` and the implementation can be found in snapshot-common.cc.
+```c++
+Address EmbeddedData::InstructionStartOfBuiltin(int i) const {
+  const struct Metadata* metadata = Metadata();
+  const uint8_t* result = RawData() + metadata[i].instructions_offset;
+  return reinterpret_cast<Address>(result);
+}
+```
+```console
+(lldb) expr *metadata
+(const v8::internal::EmbeddedData::Metadata) $7 = (instructions_offset = 0, instructions_length = 1464)
+```
+```c++
+  struct Metadata {
+    // Blob layout information.
+    uint32_t instructions_offset;
+    uint32_t instructions_length;
+  };
+```
+```console
+(lldb) expr *this
+(v8::internal::EmbeddedData) $10 = (data_ = "\xffffffdc\xffffffc0\xffffff88'"y[\xffffffd6", size_ = 4021088)
+(lldb) expr metadata[i]
+(const v8::internal::EmbeddedData::Metadata) $8 = (instructions_offset = 0, instructions_length = 1464)
+```
+So, is it possible for us to verify that this information is in the .text section?
+```console
+(lldb) expr result
+(const uint8_t *) $13 = 0x0000000101b14ee0 "UH\x89�jH\x83�(H\x89U�H�\x16H\x89}�H�u�H�E�H\x89U�H\x83�
+(lldb) image lookup --address 0x0000000101b14ee0 --verbose
+      Address: libv8.dylib[0x00000000019cdee0] (libv8.dylib.__TEXT.__text + 27054464)
+      Summary: libv8.dylib`v8_Default_embedded_blob_ + 7072
+       Module: file = "/Users/danielbevenius/work/google/javascript/v8/out.gn/learning/libv8.dylib", arch = "x86_64"
+       Symbol: id = {0x0004b596}, range = [0x0000000101b13340-0x0000000101ee8ea0), name="v8_Default_embedded_blob_"
+```
+So what we have is a pointer to the .text segment which is returned:
+```console
+(lldb) memory read -f x -s 1 -c 13 0x0000000101b14ee0
+0x101b14ee0: 0x55 0x48 0x89 0xe5 0x6a 0x18 0x48 0x83
+0x101b14ee8: 0xec 0x28 0x48 0x89 0x55
+```
+And we can compare this with `out.gn/learning/gen/embedded.cc`:
+```c++
+V8_EMBEDDED_TEXT_HEADER(v8_Default_embedded_blob_)
+__asm__(
+  ...
+  ".byte 0x55,0x48,0x89,0xe5,0x6a,0x18,0x48,0x83,0xec,0x28,0x48,0x89,0x55\n"
+  ...
+);
+```
+The macro `V8_EMBEDDED_TEXT_HEADER` can be found `src/snapshot/macros.h`:
+```c++
+#define V8_EMBEDDED_TEXT_HEADER(LABEL)         \
+  __asm__(V8_ASM_DECLARE(#LABEL)               \
+          ".csect " #LABEL "[DS]\n"            \
+          #LABEL ":\n"                         \
+          ".llong ." #LABEL ", TOC[tc0], 0\n"  \
+          V8_ASM_TEXT_SECTION                  \
+          "." #LABEL ":\n");
+
+define V8_ASM_DECLARE(NAME) ".private_extern " V8_ASM_MANGLE_LABEL NAME "\n"
+#define V8_ASM_MANGLE_LABEL "_"
+#define V8_ASM_TEXT_SECTION ".csect .text[PR]\n"
+```
+And would be expanded by the preprocessor into:
+```c++
+  __asm__(".private_extern " _ v8_Default_embedded_blob_ "\n"
+          ".csect " v8_Default_embedded_blob_ "[DS]\n"
+          v8_Default_embedded_blob_ ":\n"
+          ".llong ." v8_Default_embedded_blob_ ", TOC[tc0], 0\n"
+          ".csect .text[PR]\n"
+          "." v8_Default_embedded_blob_ ":\n");
+  __asm__(
+    ...
+    ".byte 0x55,0x48,0x89,0xe5,0x6a,0x18,0x48,0x83,0xec,0x28,0x48,0x89,0x55\n"
+    ...
+  );
+
+```
+
+Back in `src/snapshot/deserialzer.cc` we are on this line:
+```c++
+  Address address = d.InstructionStartOfBuiltin(builtin_index);
+  CHECK_NE(kNullAddress, address);
+  if (RelocInfo::OffHeapTargetIsCodedSpecially()) {
+    // is false in our case so skipping the code here
+  } else {
+    MaybeObject* o = reinterpret_cast<MaybeObject*>(address);
+    UnalignedCopy(current, &o);
+    current++;
+  }
+  break;
+```
