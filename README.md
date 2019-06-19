@@ -1360,7 +1360,7 @@ and the allocation retried.
 Lets take a look at `AllocateRawWithLigthRetry`:
 ```c++
   AllocationResult alloc = AllocateRaw(size, space, alignment);
-``
+```
 `AllocateRaw` can be found in `src/heap/heap-inl.h`. There are different paths that will be taken depending on the
 `space` parameteter. Since it is `MAP_SPACE` in our case we will focus on that path:
 ```c++
@@ -1775,7 +1775,7 @@ The inline caching source are located in `src/ic`.
     after
 
 LoadIC (0->.) means that it has transitioned from unititialized state (0) to pre-monomophic state (.)
-monomorphic state is specified with a `1. These states can be found in [src/ic/ic.cc](https://github.com/v8/v8/blob/df1494d69deab472a1a709bd7e688297aa5cc655/src/ic/ic.cc#L33-L52).
+monomorphic state is specified with a `1`. These states can be found in [src/ic/ic.cc](https://github.com/v8/v8/blob/df1494d69deab472a1a709bd7e688297aa5cc655/src/ic/ic.cc#L33-L52).
 What we are doing caching knowledge about the layout of the previously seen object inside the StoreIC/LoadIC calls.
 
     $ lldb -- out/x64.debug/d8 class.js
@@ -1847,7 +1847,7 @@ So the whole script is parsed even though we only generated code for the top-lev
 was not stored in any way. The functions are lazy stubs that when/if the function gets called the function get compiled. This
 means that the function has to be parsed (again, the first time was the pre-parse remember).
 
-If a function is determined to be hot it will be optimized by one of the two optimizing compilers crankshaft for older parts oof JavaScript or Turbofan for Web Assembly (WASM) and some of the newer es6 features. 
+If a function is determined to be hot it will be optimized by one of the two optimizing compilers crankshaft for older parts of JavaScript or Turbofan for Web Assembly (WASM) and some of the newer es6 features.
 
 The first time V8 sees a function it will parse it into an AST but not do any further processing of that tree
 until that function is used. 
@@ -1907,7 +1907,6 @@ Lets take the following javascript and look at the ast:
     const msg = 'testing';
     console.log(msg);
 
-    
 ```
 $ d8 --print-ast simple.js
 [generating interpreter code for user-defined function: ]
@@ -1963,7 +1962,7 @@ Lets take a look at the following line:
     Local<Script> script = Script::Compile(context, source).ToLocalChecked();
 
 This will land us in `api.cc`
- 
+
     ScriptCompiler::Source script_source(source);
     return ScriptCompiler::Compile(context, &script_source);
 
@@ -1980,7 +1979,7 @@ This will land us in `api.cc`
           i::NOT_NATIVES_CODE);
 
     (lldb) br s -f compiler.cc -l 1259
-   
+
     LanguageMode language_mode = construct_language_mode(FLAG_use_strict);
     (lldb) p language_mode
     (v8::internal::LanguageMode) $10 = SLOPPY
@@ -2157,7 +2156,7 @@ PrepareJobImpl:
 codegen.cc `MakeCodePrologue`:
 
 interpreter.cc ExecuteJobImpl:
- 
+
     generator()->GenerateBytecode(stack_limit());    
 
 src/interpreter/bytecode-generator.cc
@@ -2226,7 +2225,7 @@ This section will examine the bytecode for the following JavaScript:
 
     $ d8 --print-bytecode promise.js
 
-First have have the main function which does not have a name:
+First have the main function which does not have a name:
 
     [generating bytecode for function: ]
     (The code that generated this can be found in src/objects.cc BytecodeArray::Dissassemble)
@@ -2257,7 +2256,8 @@ First have have the main function which does not have a name:
            0: 0x34423e7ac069 <FixedArray[4]>
            1: 0x34423e7abf59 <String[4]: beve>
 
-    Handler Table (size = 16)
+    Handler Table (size = 16) Load the global with name in constant pool entry <name_index> into the
+    // accumulator using FeedBackVector slot <slot> outside of a typeof
 
 * LdaConstant <idx> 
 Load the constant at index from the constant pool into the accumulator.  
@@ -2266,7 +2266,7 @@ Store the contents of the accumulator register in dst.
 * Ldar <src>
 Load accumulator with value from register src.  
 * LdaGlobal <idx> <slot>
-Load the constant at index from the constant pool into the accumulator.  
+Load the global with name in constant pool entry idx into the accumulator using FeedBackVector slot  outside of a typeof.
 * Mov <closure>, <r3>
 Store the value of register  
 
@@ -2290,7 +2290,7 @@ Produces high-level IR graph based on interpreter bytecodes.
 ## TurboFan
 Is a compiler backend that gets fed a control flow graph and then does instruction selection, register allocation and code generation. The code generation generates 
 
- 
+
 ### Execution/Runtime
 I'm not sure if V8 follows this exactly but I've heard and read that when the engine comes 
 across a function declaration it only parses and verifies the syntax and saves a ref
@@ -2392,7 +2392,7 @@ Are JavaScript functions/objects that are provided by V8. These are built using 
 passed through:
 
     CodeStubAssembler -> CodeAssembler -> RawMachineAssembler.
-    
+
 Builtins need to have bytecode generated for them so that they can be run in TurboFan.
 
 `src/code-stub-assembler.h`
@@ -2461,7 +2461,7 @@ Lets take `console` as an example which was created using:
       PropertyAttributes attrs = DONT_ENUM,
       BuiltinFunctionId id = kInvalidBuiltinFunctionId) {
 
-So we can see that base is our Handle to a JSObject, and name is "console".
+So we can see that base is our Handle to a JSObject, and name is "debug".
 Buildtins::Name is Builtins:kConsoleDebug. Where is this defined?  
 You can find a macro named `CPP` in `src/builtins/builtins-definitions.h`:
 
@@ -2830,7 +2830,7 @@ Another way is to not updated the `DEPS` file, which is a version controlled fil
     u'custom_deps': {
       "src/v8": "git@github.com:danbev/v8.git@27a666f9be7ca3959c7372bdeeee14aef2a4b7ba"
     }, u'deps_file': u'.DEPS.git', u'safesync_url': u''}]
-    
+
 ## Buiding pdfium
 You may have to compile this project (in addition to chromium to verify that changes in v8 are not breaking
 code in pdfium.
@@ -3007,7 +3007,7 @@ back in src/d8.cc line 2918:
     Isolate* isolate = Isolate::New(create_params);
 
 this call will bring us into api.cc line 8185:
-   
+
      i::Isolate* isolate = new i::Isolate(false);
 So, we are invoking the Isolate constructor (in src/isolate.cc).
 
@@ -3142,7 +3142,7 @@ Back in d8.cc:
 
 
 src/api.cc
-   
+
     auto fun = i::Handle<i::JSFunction>::cast(Utils::OpenHandle(this));
 
     (lldb) job *fun
@@ -3258,6 +3258,8 @@ I'm skipping TRACE_EVENT_CALL_STATS_SCOPED for now.
     bool has_pending_exception = false
 
  
+
+
     auto fun = i::Handle<i::JSFunction>::cast(Utils::OpenHandle(this));
 
     (lldb) job *fun
@@ -3315,8 +3317,7 @@ MAKE_OPEN_HANDLE:
            (*reinterpret_cast<v8::internal::Object* const*>(that))->Is##To());
       return v8::internal::Handle<v8::internal::To>(                         
         reinterpret_cast<v8::internal::To**>(const_cast<v8::From*>(that))); 
-  }
-
+      }
 And remember that JSFunction is included in the OPEN_HANDLE_LIST so there will
 be the following in the source after the preprocessor has processed this header:
 
@@ -3568,7 +3569,7 @@ Where is function set, well it is probably deserialized but we can see it be use
   Handle<JSFunction> function = SimpleCreateFunction(isolate, factory->empty_string(), Builtins::kAsyncFunctionAwaitCaught, 2, false);
   native_context->set_async_function_await_caught(*function);
 }
-```console
+​```console
 (lldb) expr isolate()->builtins()->builtin_handle(Builtins::Name::kAsyncFunctionAwaitCaught)->Print()
 ```
 
@@ -3636,7 +3637,7 @@ i::Handle<i::Context> env = Utils::OpenHandle(context);
 ...
 i::Handle<i::FixedArray> data(env->embedder_data());
 ```
-We can find `embedder_data` in `src/contexts-inl.h
+We can find `embedder_data` in `src/contexts-inl.h`
 
 ```c++
 #define NATIVE_CONTEXT_FIELD_ACCESSORS(index, type, name) \
@@ -3974,10 +3975,13 @@ What is `isolate_addresses_`?
 Address isolate_addresses_[kIsolateAddressCount + 1];
 ```
 `Address` can be found in `src/globals.h`:
+
 ```c++
 typedef uintptr_t Address;
-...
-Also in src/globals.h we find:
+```
+
+Also in `src/globals.h` we find:
+
 ```c++
 #define FOR_EACH_ISOLATE_ADDRESS_NAME(C)                \
   C(Handler, handler)                                   \
@@ -4030,18 +4034,18 @@ In isolate.cc when an Isolate is initialized by `bool Isolate::Init(StartupDeser
 #undef ASSIGN_ELEMENT
 ```
 ```c++
-  isolate_addressess_IsolateAddressId::kHandlerAddress] = reinterpret_cast<Address>(handler_address());
-  isolate_addressess_IsolateAddressId::kCEntryAddress] = reinterpret_cast<Address>(c_entry_fp_address());
-  isolate_addressess_IsolateAddressId::kFunctionAddress] = reinterpret_cast<Address>(c_function_address());
-  isolate_addressess_IsolateAddressId::kContextAddress] = reinterpret_cast<Address>(context_address());
-  isolate_addressess_IsolateAddressId::kPendingExceptionAddress] = reinterpret_cast<Address>(pending_exception_address());
-  isolate_addressess_IsolateAddressId::kPendingHandlerContextAddress] = reinterpret_cast<Address>(pending_handler_context_address());
-  isolate_addressess_IsolateAddressId::kPendingHandlerCodeAddress] = reinterpret_cast<Address>(pending_handler_code_address());
-  isolate_addressess_IsolateAddressId::kPendingHandlerOffsetAddress] = reinterpret_cast<Address>(pending_handler_offset_address());
-  isolate_addressess_IsolateAddressId::kPendingHandlerFPAddress] = reinterpret_cast<Address>(pending_handler_fp_address());
-  isolate_addressess_IsolateAddressId::kPendingHandlerSPAddress] = reinterpret_cast<Address>(pending_handler_sp_address());
-  isolate_addressess_IsolateAddressId::kExternalCaughtExceptionAddress] = reinterpret_cast<Address>(external_caught_exception_address());
-  isolate_addressess_IsolateAddressId::kJSEntrySPAddress] = reinterpret_cast<Address>(js_entry_sp);
+  isolate_addressess_[IsolateAddressId::kHandlerAddress] = reinterpret_cast<Address>(handler_address());
+  isolate_addressess_[IsolateAddressId::kCEntryAddress] = reinterpret_cast<Address>(c_entry_fp_address());
+  isolate_addressess_[IsolateAddressId::kFunctionAddress] = reinterpret_cast<Address>(c_function_address());
+  isolate_addressess_[IsolateAddressId::kContextAddress] = reinterpret_cast<Address>(context_address());
+  isolate_addressess_[IsolateAddressId::kPendingExceptionAddress] = reinterpret_cast<Address>(pending_exception_address());
+  isolate_addressess_[IsolateAddressId::kPendingHandlerContextAddress] = reinterpret_cast<Address>(pending_handler_context_address());
+  isolate_addressess_[IsolateAddressId::kPendingHandlerCodeAddress] = reinterpret_cast<Address>(pending_handler_code_address());
+  isolate_addressess_[IsolateAddressId::kPendingHandlerOffsetAddress] = reinterpret_cast<Address>(pending_handler_offset_address());
+  isolate_addressess_[IsolateAddressId::kPendingHandlerFPAddress] = reinterpret_cast<Address>(pending_handler_fp_address());
+  isolate_addressess_[IsolateAddressId::kPendingHandlerSPAddress] = reinterpret_cast<Address>(pending_handler_sp_address());
+  isolate_addressess_[IsolateAddressId::kExternalCaughtExceptionAddress] = reinterpret_cast<Address>(external_caught_exception_address());
+  isolate_addressess_[IsolateAddressId::kJSEntrySPAddress] = reinterpret_cast<Address>(js_entry_sp);
 ```
 
 So where does `handler_address()` and the rest of those functions come from?
@@ -4088,7 +4092,8 @@ Next the snapshot blob is set (just showing the path we are taking):
 i_isolate->set_snapshot_blob(i::Snapshot::DefaultSnapshotBlob());
 ```
 Now, `i_isolate->set_snapshot_blob` is generated by a macro. The macro can be found in
-`src/isolate.h':
+`src/isolate.h`:
+
 ```c++
   // Accessors.
 #define GLOBAL_ACCESSOR(type, name, initialvalue)                       \
@@ -4464,26 +4469,23 @@ Now they are all 0 at this stage, so when will this array get populated?
 These will happen in `Isolate::Init`:
 ```c++
   heap_.SetUp()
-```
-
-if (!create_heap_objects) des->DeserializeInto(this);
+  if (!create_heap_objects) des->DeserializeInto(this);
 
 void StartupDeserializer::DeserializeInto(Isolate* isolate) {
 -> 17    Initialize(isolate);
 startup-deserializer.cc:37
 
 isolate->heap()->IterateSmiRoots(this);
+```
 
 This will delegate to `ConfigureHeapDefaults()` which will call Heap::ConfigureHeap:
 ```c++
-
-```
-
 enum RootListIndex {
   kFreeSpaceMapRootIndex,
   kOnePointerFillerMapRootIndex,
   ...
 }
+```
 
 ```console
 (lldb) expr heap->RootListIndex::kFreeSpaceMapRootIndex
