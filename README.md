@@ -216,7 +216,7 @@ The handle stack is not part of the C++ call stack, but the handle scopes are em
 be stack-allocated, not allocated with new.
 
 ### Persistent
-https://github.com/v8/v8/wiki/Embedder's-Guide:
+https://v8.dev/docs/embed:
 Persistent handles provide a reference to a heap-allocated JavaScript Object, just like a local handle. There are two flavors, which differ in the lifetime management of the reference they handle. Use a persistent handle when you need to keep a reference to an object for more than one function call, or when handle lifetimes do not correspond to C++ scopes. Google Chrome, for example, uses persistent handles to refer to Document Object Model (DOM) nodes.
 
 A persistent handle can be made weak, using PersistentBase::SetWeak, to trigger a callback from the garbage collector when the only references to an object are from weak persistent handles.
