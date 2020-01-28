@@ -1621,7 +1621,7 @@ to the elements.
 But for the properties this is not the case. Instead there is a mapping between the property names
 and the index into the properties.
 
-In `src/objects.h` we can find JSObject:
+In `src/objects/objects.h` we can find JSObject:
 
     class JSObject: public JSReceiver {
     ...
@@ -1807,11 +1807,11 @@ entries:
 ```
 ### Factory
 Each Internal Isolate has a Factory which is used to create instances. This is because all handles needs to be allocated
-using the factory (src/factory.h)
+using the factory (src/heap/factory.h)
 
 
 ### Objects 
-All objects extend the abstract class Object (src/objects.h).
+All objects extend the abstract class Object (src/objects/objects.h).
 
 ### Oddball
 This class extends HeapObject and  describes `null`, `undefined`, `true`, and `false` objects.
@@ -2303,7 +2303,7 @@ The declaration of Function can be found in `include/v8.h` (just noting this as 
 
 ## String types
 There are a number of different String types in V8 which are optimized for various situations.
-If we look in src/objects.h we can see the object hierarchy:
+If we look in src/objects/objects.h we can see the object hierarchy:
 ```
     Object
       SMI
@@ -2553,7 +2553,7 @@ I'm not exactly sure what adapt is referring to here.
 PropertyAttributes is not specified so it will get the default value of `DONT_ENUM`.
 The last parameter which is of type BuiltinFunctionId is not specified either so the
 default value of `kInvalidBuiltinFunctionId` will be used. This is an enum defined in 
-`src/objects.h`.
+`src/objects/objects.h`.
 
 
 This [blog](https://v8project.blogspot.se/2017/11/csa.html) provides an example of adding
