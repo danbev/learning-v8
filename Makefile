@@ -12,7 +12,7 @@ ld = "$(V8_HOME)/third_party/binutils/Linux_x64/Release/bin/ld"
 clang_cmd=$(clang)++ $@.cc -o $@ -std=c++14 \
 	  -nostdinc++ -stdlib=libc++ \
 	  -B$(V8_HOME)/third_party/binutils/Linux_x64/Release/bin \
-	  -fno-exceptions -fno-rtti -nostdinc++ \
+	  -fno-exceptions -fno-rtti \
 	  -isystem$(V8_HOME)/buildtools/third_party/libc++/trunk/include \
 	  -isystem$(V8_HOME)/buildtools/third_party/libc++abi/trunk/include \
 	  --sysroot=$(V8_HOME)/build/linux/debian_sid_amd64-sysroot \
