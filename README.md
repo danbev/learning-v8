@@ -2718,36 +2718,76 @@ the instructions found [here](https://developers.google.com/v8/build).
 
 Generate Ninja files:
 
-    $ gn args out.gn/learning
+    $ gn args out/x64.release
 
 This will open an editor where you can set configuration options. I've been using the following:
-
-    is_debug = true
-    target_cpu = "x64"
-    v8_enable_backtrace = true
-    v8_enable_slow_dchecks = true
-    v8_optimized_debug = false
+```console
+v8_monolithic
+v8_use_external_startup_data = false
+is_debug = true
+target_cpu = "x64"
+v8_enable_backtrace = true
+v8_enable_slow_dchecks = true
+v8_optimized_debug = false
+```
 
 Note that for lldb command aliases to work `is_debug` must be set to true.
 
 List avaiable build arguments:
 
-    $ gn args --list out.gn/learning
+    $ gn args --list out/x64.release
 
 List all available targets:
 
-    $ ninja -C out.gn/learning/ -t targets all
+    $ ninja -C out/x64.release/ -t targets all
 
 Building:
 
-    $ ninja -C out.gn/learning
+    $ ninja -C out/x64.release
 
 Running quickchecks:
 
-    $ ./tools/run-tests.py --outdir=out.gn/learning --quickcheck
+    $ ./tools/run-tests.py --outdir=out/x64.release --quickcheck
 
 You can use `./tools-run-tests.py -h` to list all the opitions that can be passed
 to run-tests.
+
+#### Troubleshooting build:
+```console
+/v8_src/v8/out/x64.release/obj/libv8_monolith.a(eh-frame.o):eh-frame.cc:function v8::internal::EhFrameWriter::WriteEmptyEhFrame(std::__1::basic_ostream<char, std::__1::char_traits<char> >&): error: undefined reference to 'std::__1::basic_ostream<char, std::__1::char_traits<char> >::write(char const*, long)'
+clang: error: linker command failed with exit code 1 (use -v to see invocation)
+```
+`-stdlib=libc++` is llvm's C++ runtime. This runtime has a `__1` namespace.
+I looks like the static library above was compiled with clangs/llvm's `libc++`
+as we are seeing the `__1` namespace.
+
+-stdlib=libstdc++ is GNU's C++ runtime
+
+So we can see that the namespace `std::__1` is used which we now
+know is the namespace that libc++ which is clangs libc++ library.
+I guess we could go about this in two ways, either we can change v8 build of
+to use glibc++ when compiling so that the symbols are correct when we want to
+link against it, or we can update our linker (ld) to use libc++.
+
+We need to include the correct libraries to link with during linking, 
+which means specifying:
+```
+-stdlib=libc++ -Wl,-L$(v8_build_dir)
+```
+If we look in $(v8_build_dir) we find `libc++.so`. We also need to this library
+to be found at runtime by the dynamic linker using `LD_LIBRARY_PATH`:
+```console
+$ LD_LIBRARY_PATH=../v8_src/v8/out/x64.release/ ./hello-world
+```
+Notice that this is using `ld` from our path. We can tell clang to use a different
+search path with the `-B` option:
+```console
+$ clang++ --help | grep -- '-B'
+  -B <dir>                Add <dir> to search path for binaries and object files used implicitly
+```
+
+`libgcc_s` is GCC low level runtime library. I've been confusing this with
+glibc++ libraries for some reason but they are not the same.
 
 Running cctest:
 ```console
