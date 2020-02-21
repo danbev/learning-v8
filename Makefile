@@ -9,7 +9,7 @@ GTEST_FILTER ?= "*"
 clang = "$(V8_HOME)/third_party/llvm-build/Release+Asserts/bin/clang"
 ld = "$(V8_HOME)/third_party/binutils/Linux_x64/Release/bin/ld"
 
-clang_cmd=$(clang)++ $@.cc -o $@ -std=c++14 \
+clang_cmd=$(clang)++ -g $@.cc -o $@ -std=c++14 \
 	  -nostdinc++ -stdlib=libc++ \
 	  -B$(V8_HOME)/third_party/binutils/Linux_x64/Release/bin \
 	  -fno-exceptions -fno-rtti \
@@ -23,6 +23,8 @@ clang_cmd=$(clang)++ $@.cc -o $@ -std=c++14 \
 
 v8_dylibs=-lv8_monolith
 
+current_dir=$(shell pwd)
+
 COMPILE_TEST = g++ -v -std=c++11 -O0 -g -I`pwd`/deps/googletest/googletest/include -I$(v8_include_dir) -I$(v8_gen_dir) -I$(V8_HOME) $(v8_dylibs) -L$(v8_build_dir) -pthread  lib/gtest/libgtest.a -rpath $(v8_build_dir)
 
 hello-world: hello-world.cc
@@ -32,6 +34,10 @@ hello-world: hello-world.cc
 .PHONY: run-hello
 run-hello:
 	@LD_LIBRARY_PATH=$(V8_HOME)/out/x64.release/ ./hello-world
+
+.PHONY: gdb-hello
+gdb-hello:
+	@env LD_LIBRARY_PATH=$(v8_build_dir) gdb --cd=$(v8_build_dir) --args $(current_dir)/hello-world
 
 contexts: snapshot_blob.bin contexts.cc
 	clang++ -O0 -g -I$(v8_include_dir) $(v8_dylibs) -L$(v8_build_dir) $@.cc -o $@ -pthread -std=c++0x -rpath $(v8_build_dir)
