@@ -90,19 +90,19 @@ list-gtest:
 .PHONY: clean list-gtest
 
 clean: 
-	rm -f hello-world
-	rm -f instances
-	rm -f run-script
-	rm -rf exceptions
-	rm -f natives_blob.bin
-	rm -f snapshot_blob.bin
-	rm -rf hello-world.dSYM
-	rm -rf test/local_test
-	rm -rf test/persistent-object_test
-	rm -rf test/maybe_test
-	rm -rf test/smi_test
-	rm -rf test/string_test
-	rm -rf test/jsobject_test
-	rm -rf test/ast_test
-	rm -rf test/context_test
-	rm -rf test/map_test
+	@rm -f hello-world
+	@rm -f instances
+	@rm -f run-script
+	@rm -rf exceptions
+	@rm -f natives_blob.bin
+	@rm -f snapshot_blob.bin
+	@rm -rf hello-world.dSYM
+	@rm -rf test/local_test
+	@rm -rf test/persistent-object_test
+	@rm -rf test/maybe_test
+	@rm -rf test/smi_test
+	@rm -rf test/string_test
+	@rm -rf test/jsobject_test
+	@rm -rf test/ast_test
+	@rm -rf test/context_test
+	@rm -rf test/map_test
