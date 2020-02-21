@@ -1,38 +1,53 @@
-V8_HOME ?= /Users/danielbevenius/work/google/javascript/v8
-v8_build_dir = $(V8_HOME)/out.gn/learning
+V8_HOME ?= /home/danielbevenius/work/google/v8_src/v8
+v8_build_dir = $(V8_HOME)/out/x64.release
+v8_buildtools_dir = $(V8_HOME)/buildtools/third_party
+
 v8_include_dir = $(V8_HOME)/include
 v8_src_dir = $(V8_HOME)/src
 v8_gen_dir = $(v8_build_dir)/gen
 GTEST_FILTER ?= "*"
+clang = "$(V8_HOME)/third_party/llvm-build/Release+Asserts/bin/clang"
+ld = "$(V8_HOME)/third_party/binutils/Linux_x64/Release/bin/ld"
 
-v8_dylibs = -lv8 -lv8_libbase -lv8_libplatform -licuuc -licui18n 
+clang_cmd=$(clang)++ $@.cc -o $@ -std=c++14 \
+	  -nostdinc++ -stdlib=libc++ \
+	  -B$(V8_HOME)/third_party/binutils/Linux_x64/Release/bin \
+	  -fno-exceptions -fno-rtti -nostdinc++ \
+	  -isystem$(V8_HOME)/buildtools/third_party/libc++/trunk/include \
+	  -isystem$(V8_HOME)/buildtools/third_party/libc++abi/trunk/include \
+	  --sysroot=$(V8_HOME)/build/linux/debian_sid_amd64-sysroot \
+          -I$(v8_include_dir) \
+          -L$(v8_build_dir)/obj \
+          $(v8_dylibs) \
+          -Wl,-L$(v8_build_dir) -Wl,-lpthread
 
-COMPILE_TEST = clang++ -std=c++11 -O0 -g -I`pwd`/deps/googletest/googletest/include -I$(v8_include_dir) -I$(v8_gen_dir) -I$(V8_HOME) $(v8_dylibs) -L$(v8_build_dir) -pthread  lib/gtest/libgtest.a -rpath $(v8_build_dir) 
+v8_dylibs=-lv8_monolith
 
-LD_LIBRARY_PATH=$(v8_build_dir)
+COMPILE_TEST = g++ -v -std=c++11 -O0 -g -I`pwd`/deps/googletest/googletest/include -I$(v8_include_dir) -I$(v8_gen_dir) -I$(V8_HOME) $(v8_dylibs) -L$(v8_build_dir) -pthread  lib/gtest/libgtest.a -rpath $(v8_build_dir)
 
-hello-world: natives_blob.bin snapshot_blob.bin hello-world.cc
+hello-world: hello-world.cc
+	@echo "Using v8_home = $(V8_HOME)"
+	$(clang_cmd)
+
+.PHONY: run-hello
+run-hello:
+	@LD_LIBRARY_PATH=$(V8_HOME)/out/x64.release/ ./hello-world
+
+contexts: snapshot_blob.bin contexts.cc
+	clang++ -O0 -g -I$(v8_include_dir) $(v8_dylibs) -L$(v8_build_dir) $@.cc -o $@ -pthread -std=c++0x -rpath $(v8_build_dir)
+
+ns: snapshot_blob.bin ns.cc
 	@echo "Using v8_home = $(v8_include_dir)"
 	clang++ -O0 -g -I$(v8_include_dir) $(v8_dylibs) -L$(v8_build_dir) $@.cc -o $@ -pthread -std=c++0x -rpath $(v8_build_dir)
 
-contexts: natives_blob.bin snapshot_blob.bin contexts.cc
-	clang++ -O0 -g -I$(v8_include_dir) $(v8_dylibs) -L$(v8_build_dir) $@.cc -o $@ -pthread -std=c++0x -rpath $(v8_build_dir)
-
-ns: natives_blob.bin snapshot_blob.bin ns.cc
-	@echo "Using v8_home = $(v8_include_dir)"
-	clang++ -O0 -g -I$(v8_include_dir) $(v8_dylibs) -L$(v8_build_dir) $@.cc -o $@ -pthread -std=c++0x -rpath $(v8_build_dir)
-
-instances: natives_blob.bin snapshot_blob.bin instances.cc
+instances: snapshot_blob.bin instances.cc
 	clang++ -O0 -g -fno-rtti -I$(v8_include_dir) $(v8_dylibs) -L$(v8_build_dir) $@.cc -o $@ -pthread -std=c++0x -rpath $(v8_build_dir)
 
-run-script: natives_blob.bin snapshot_blob.bin run-script.cc
+run-script: snapshot_blob.bin run-script.cc
 	clang++ -O0 -g -I$(v8_include_dir) $(v8_dylibs) -L$(v8_build_dir) $@.cc -o $@ -pthread -std=c++0x -rpath $(v8_build_dir)
 
-exceptions: natives_blob.bin snapshot_blob.bin exceptions.cc
+exceptions: snapshot_blob.bin exceptions.cc
 	clang++ -O0 -g -fno-rtti -I$(v8_include_dir) -I$(V8_HOME) $(v8_dylibs) -L$(v8_build_dir) $@.cc $(v8_src_dir)/objects-printer.cc -o $@ -pthread -std=c++0x -rpath $(v8_build_dir)
-
-natives_blob.bin:
-	@cp $(v8_build_dir)/$@ .
 
 snapshot_blob.bin:
 	@cp $(v8_build_dir)/$@ .

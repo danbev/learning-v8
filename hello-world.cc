@@ -11,9 +11,9 @@ using namespace v8;
 int age = 41;
 
 void doit(const FunctionCallbackInfo<Value>& args) {
-    String::Utf8Value str(args[0]);
+    String::Utf8Value str(args.GetIsolate(), args[0]);
     printf("doit argument = %s...\n", *str);
-    args.GetReturnValue().Set(String::NewFromUtf8(args.GetIsolate(), "done", NewStringType::kNormal).ToLocalChecked());
+    args.GetReturnValue().Set(String::NewFromUtf8(args.GetIsolate(), "doit...done", NewStringType::kNormal).ToLocalChecked());
 }
 
 void ageGetter(Local<String> property, const PropertyCallbackInfo<Value>& info) {
@@ -21,29 +21,30 @@ void ageGetter(Local<String> property, const PropertyCallbackInfo<Value>& info) 
 }
 
 void ageSetter(Local<String> property, Local<Value> value, const PropertyCallbackInfo<void>& info) {
-    age = value->Int32Value();
+    age = value->Int32Value(info.GetIsolate()->GetCurrentContext()).FromJust();
 }
 
 void propertyListener(Local<String> name, const PropertyCallbackInfo<Value>& info) {
-    String::Utf8Value utf8_value(name);
+    String::Utf8Value utf8_value(info.GetIsolate(), name);
     std::string key = std::string(*utf8_value);
     printf("ageListener called for nam %s.\n", key.c_str());
 }
 
 int main(int argc, char* argv[]) {
-    // Now this is where the files 'natives_blob.bin' and snapshot_blob.bin' come into play. But what
-    // are these bin files?
+    // Now this is where the files snapshot_blob.bin' comes into play. But what
+    // is this bin file?
     // JavaScript specifies a lot of built-in functionality which every V8 context must provide.
     // For example, you can run Math.PI and that will work in a JavaScript console/repl. The global object
     // and all the built-in functionality must be setup and initialized into the V8 heap. This can be time
-    // consuming and affect runtime performance if this has to be done every time. The blobs above are prepared
-    // snapshots that get directly deserialized into the heap to provide an initilized context.
+    // consuming and affect runtime performance if this has to be done every time. The blob above is prepared
+    // snapshot that get directly deserialized into the heap to provide an initilized context.
     V8::InitializeExternalStartupData(argv[0]);
 
-    // set up thread pool etc.
-    Platform* platform = platform::CreateDefaultPlatform();
-    // justs sets the platform created above.
-    V8::InitializePlatform(platform);
+    // Set up thread pool etc.
+    std::unique_ptr<Platform> platform = platform::NewDefaultPlatform();
+    platform::NewDefaultPlatform();
+    // Just sets the platform created above.
+    V8::InitializePlatform(platform.get());
     V8::Initialize();
 
     Isolate::CreateParams create_params;
@@ -56,7 +57,7 @@ int main(int argc, char* argv[]) {
         // Will set the scope using Isolate::Scope whose constructor will call
         // isolate->Enter() and its destructor isolate->Exit()
         // I think this pattern is called "Resource Acquisition Is Initialisation" (RAII),
-        // R, A double I for the cool kids. The resouce allocation is done by the constructor,
+        // The resouce allocation is done by the constructor,
         // and the release by the descructor when this instance goes out of scope.
         Isolate::Scope isolate_scope(isolate);
         // Create a stack-allocated handle scope.
@@ -75,7 +76,7 @@ int main(int argc, char* argv[]) {
                 ageGetter,
                 ageSetter);
         // set a named property interceptor
-        global->SetNamedPropertyHandler(propertyListener);
+        //global->SetNamedPropertyHandler(propertyListener);
 
         // Inside an instance of V8 (an Isolate) you can have multiple unrelated JavaScript applications
         // running. JavaScript has global level stuff, and one application should not mess things up for
@@ -88,7 +89,8 @@ int main(int argc, char* argv[]) {
         Context::Scope context_scope(context);
 
         // Create a string containing the JavaScript source code.
-        const char *js = "age = 40; doit(age);";
+        const char* js = "const age = 40; doit(age);";
+        printf("js: %s\n", js);
         Local<String> source = String::NewFromUtf8(isolate, js, NewStringType::kNormal).ToLocalChecked();
 
         // Compile the source code.
@@ -98,7 +100,7 @@ int main(int argc, char* argv[]) {
         Local<Value> result = script->Run(context).ToLocalChecked();
 
         // Convert the result to an UTF8 string and print it.
-        String::Utf8Value utf8(result);
+        String::Utf8Value utf8(isolate, result);
         printf("%s\n", *utf8);
     }
 
@@ -106,6 +108,5 @@ int main(int argc, char* argv[]) {
     isolate->Dispose();
     V8::Dispose();
     V8::ShutdownPlatform();
-    delete platform;
     return 0;
 }
