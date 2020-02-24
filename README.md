@@ -57,16 +57,18 @@ TODO: Add mirco task queue
 
 ### Isolate
 An Isolate is an independant copy of the V8 runtime which includes its own heap.
-Two different Isolates can run in parallel and can be seen as entierly different
+Two different Isolates can run in parallel and can be seen as entirely different
 sandboxed instances of a V8 runtime.
 
 ### Context
-To allow separate JavaScript applications to run in the same isolate a context must be specified for each one.
-This is to avoid them interfering with each other, for example by changing the builtin objects provided.
+To allow separate JavaScript applications to run in the same isolate a context
+must be specified for each one.  This is to avoid them interfering with each
+other, for example by changing the builtin objects provided.
 
 #### Threads
-V8 is single threaded (the execution of the functions of the stack) but there are supporting threads used
-for garbage collection, profiling (IC, and perhaps other things) (I think).
+V8 is single threaded (the execution of the functions of the stack) but there
+are supporting threads used for garbage collection, profiling (IC, and perhaps
+other things) (I think).
 Lets see what threads there are:
 
     $ lldb -- hello-world
@@ -122,13 +124,18 @@ and all the built-in functionality must be setup and initialized into the V8 hea
 consuming and affect runtime performance if this has to be done every time. 
 
 
-Now this is where the files `natives_blob.bin` and `snapshot_blob.bin` come into play. But what are these bin files?  
-The blobs above are prepared snapshots that get directly deserialized into the heap to provide an initilized context.
-If you take a look in `src/js` you'll find a number of javascript files. These files referenced in `src/v8.gyp` and are used
-by the target `js2c`. This target calls `tools/js2c.py` which is a tool for converting
-JavaScript source code into C-Style char arrays. This target will process all the library_files specified in the variables section.
+Now this is where the files `natives_blob.bin` and `snapshot_blob.bin` come into play. 
+But what are these bin files?  
+The blobs above are prepared snapshots that get directly deserialized into the
+heap to provide an initilized context.
+If you take a look in `src/js` you'll find a number of javascript files. These 
+files referenced in `src/v8.gyp` and are used by the target `js2c`. This target
+calls `tools/js2c.py` which is a tool for converting JavaScript source code into
+C-Style char arrays. This target will process all the library_files specified
+in the variables section.
 For a GN build you'll find the configuration in BUILD.GN.
-Just note that there is ongoing work to move the .js files to V8 builtins and builtins will be discuessed later in this document.
+Just note that there is ongoing work to move the .js files to V8 builtins and 
+builtins will be discussed later in this document.
 
 The output of this out/Debug/obj/gen/libraries.cc. So how is this file actually used?
 The `js2c` target produces the libraries.cc file which is used by other targets, for example by `v8_snapshot` which produces a 
@@ -188,13 +195,16 @@ This file is then read and set by calling:
 Local<String> script_name = ...;
 ```
 So what is script_name. Well it is an object reference that is managed by the v8 GC.
-The GC needs to be able to move things (pointers around) and also track if things should be GC'd. Local handles
-as opposed to persistent handles are light weight and mostly used local operations. These handles are managed by
-HandleScopes so you must have a handlescope on the stack and the local is only valid as long as the handlescope is
-valid. This uses Resource Acquisition Is Initialization (RAII) so when the HandleScope instance goes out of scope
-it will remove all the Local instances.
+The GC needs to be able to move things (pointers around) and also track if
+things should be GC'd. Local handles as opposed to persistent handles are light
+weight and mostly used local operations. These handles are managed by
+HandleScopes so you must have a handlescope on the stack and the local is only
+valid as long as the handlescope is valid. This uses Resource Acquisition Is
+Initialization (RAII) so when the HandleScope instance goes out of scope it
+will remove all the Local instances.
 
-The `Local` class (in `include/v8.h`) only has one member which is of type pointer to the type `T`. So for the above example it would be:
+The `Local` class (in `include/v8.h`) only has one member which is of type
+pointer to the type `T`. So for the above example it would be:
 ```c++
   String* val_;
 ```
@@ -212,18 +222,28 @@ A Local<T> has overloaded a number of operators, for example ->:
 ````
 Where Length is a method on the v8 String class.
 
-The handle stack is not part of the C++ call stack, but the handle scopes are embedded in the C++ stack. Handle scopes can only
-be stack-allocated, not allocated with new.
+The handle stack is not part of the C++ call stack, but the handle scopes are
+embedded in the C++ stack. Handle scopes can only be stack-allocated, not
+allocated with new.
 
 ### Persistent
 https://v8.dev/docs/embed:
-Persistent handles provide a reference to a heap-allocated JavaScript Object, just like a local handle. There are two flavors, which differ in the lifetime management of the reference they handle. Use a persistent handle when you need to keep a reference to an object for more than one function call, or when handle lifetimes do not correspond to C++ scopes. Google Chrome, for example, uses persistent handles to refer to Document Object Model (DOM) nodes.
+Persistent handles provide a reference to a heap-allocated JavaScript Object, 
+just like a local handle. There are two flavors, which differ in the lifetime
+management of the reference they handle. Use a persistent handle when you need
+to keep a reference to an object for more than one function call, or when handle
+lifetimes do not correspond to C++ scopes. Google Chrome, for example, uses
+persistent handles to refer to Document Object Model (DOM) nodes.
 
-A persistent handle can be made weak, using PersistentBase::SetWeak, to trigger a callback from the garbage collector when the only references to an object are from weak persistent handles.
+A persistent handle can be made weak, using PersistentBase::SetWeak, to trigger
+a callback from the garbage collector when the only references to an object are
+from weak persistent handles.
 
 
-A UniquePersistent<SomeType> handle relies on C++ constructors and destructors to manage the lifetime of the underlying object.
-A Persistent<SomeType> can be constructed with its constructor, but must be explicitly cleared with Persistent::Reset.
+A UniquePersistent<SomeType> handle relies on C++ constructors and destructors
+to manage the lifetime of the underlying object.
+A Persistent<SomeType> can be constructed with its constructor, but must be
+explicitly cleared with Persistent::Reset.
 
 So how is a persistent object created?  
 Let's write a test and find out (`test/persistent-object_text.cc`):
@@ -231,12 +251,12 @@ Let's write a test and find out (`test/persistent-object_text.cc`):
 $ make test/persistent-object_test
 $ ./test/persistent-object_test --gtest_filter=PersistentTest.value
 ```
-Now, to create an instance of Persistent we need a Local<T> instance or the Persistent instance will
-just be empty.
+Now, to create an instance of Persistent we need a Local<T> instance or the
+Persistent instance will just be empty.
 ```c++
 Local<Object> o = Local<Object>::New(isolate_, Object::New(isolate_));
 ```
-`Local<Object>::New` can be found in `src/api.cc`:
+`Local<Object>::New` can be found in `src/api/api.cc`:
 ```c++
 Local<v8::Object> v8::Object::New(Isolate* isolate) {
   i::Isolate* i_isolate = reinterpret_cast<i::Isolate*>(isolate);
@@ -247,9 +267,9 @@ Local<v8::Object> v8::Object::New(Isolate* isolate) {
   return Utils::ToLocal(obj);
 }
 ```
-The first thing that happens is that the public Isolate pointer is cast to an pointer to the internal
-Isolate type.
-`LOG_API` is a macro in the same sourcd file:
+The first thing that happens is that the public Isolate pointer is cast to an
+pointer to the internal `Isolate` type.
+`LOG_API` is a macro in the same source file (src/api/api.cc):
 ```c++
 #define LOG_API(isolate, class_name, function_name)                           \
   i::RuntimeCallTimerScope _runtime_timer(                                    \
@@ -316,7 +336,9 @@ Local<v8::Object> v8::Object::New(Isolate* isolate) {
 ```
 TODO: Look closer at `VMState`.  
 
-First, `i_isolate->object_function()` is called and the result passed to `NewJSObject`. `object_function` is generated by a macro named `NATIVE_CONTEXT_FIELDS`:
+First, `i_isolate->object_function()` is called and the result passed to
+`NewJSObject`. `object_function` is generated by a macro named 
+`NATIVE_CONTEXT_FIELDS`:
 ```c++
 #define NATIVE_CONTEXT_FIELD_ACCESSOR(index, type, name)     \
   Handle<type> Isolate::name() {                             \
