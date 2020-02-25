@@ -65,6 +65,87 @@ To allow separate JavaScript applications to run in the same isolate a context
 must be specified for each one.  This is to avoid them interfering with each
 other, for example by changing the builtin objects provided.
 
+### ObjectTemplate
+These allow you to create JavaScript objects without a dedicated constructor.
+This would be something like:
+```js
+const obj = {};
+```
+
+### FunctionTemplate
+Allows us to provide a constructor function that can be called from JavaScript
+code using the `new` operator:
+```js
+const obj = new Something(1, 2, "3");
+```
+
+Using _v8_internal_Print_Object from c++:
+```console
+$ nm libv8_monolith.a | grep Print_Object | c++filt
+0000000000000000 T _v8_internal_Print_Object(void*)
+```
+Notice that this function does not have a namespace.
+We can use this as:
+```c++
+extern void _v8_internal_Print_Object(void* object);
+
+_v8_internal_Print_Object(*((v8::internal::Object**)(*global)));
+```
+Lets take a closer look at the above:
+```c++
+  v8::internal::Object** gl = ((v8::internal::Object**)(*global));
+```
+We use the dereference operator to get the value of a Local, which is just of
+type `T*`, a pointer to the type the Local. We are then casting that to be
+of type pointer-to-pointer to Object.
+```
+  gl         Object*         Object
++-----+      +------+      +-------+
+|     |----->|      |----->|       |
++-----+      +------+      +-------+
+```
+An instance of v8::internal::Object only has a single data member which is a
+field named `ptr_` of type `Address`:
+
+```c++
+class Object : public TaggedImpl<HeapObjectReferenceType::STRONG, Address> {
+}
+
+template <HeapObjectReferenceType kRefType, typename StorageType>
+class TaggedImpl {
+
+  StorageType ptr_;
+}
+```
+So the following is telling the compiler to treat the value of our Local,
+`*global`, as a pointer (which it already is) to a pointer that points to
+a memory location that confirms to the layout of an v8::internal::Object type,
+which we know now has a `prt_` member. And we want to dereference it and pass
+it into the function.
+```c++
+_v8_internal_Print_Object(*((v8::internal::Object**)(*global)));
+```
+
+```console
+(lldb) expr gl
+(v8::internal::Object **) $0 = 0x00000000020ee160
+(lldb) memory read -f x -s 8 -c 1 gl
+0x020ee160: 0x00000aee081c0121
+
+(lldb) memory read -f x -s 8 -c 1 *gl
+0xaee081c0121: 0x0200000002080433
+```
+
+
+You can reload `.lldbinit` using the following command:
+```console
+(lldb) command source ~/.lldbinit
+```
+This can be useful when debugging a lldb command. You can set a breakpoint
+and break at that location and make updates to the command and reload without
+having to restart lldb.
+
+
 #### Threads
 V8 is single threaded (the execution of the functions of the stack) but there
 are supporting threads used for garbage collection, profiling (IC, and perhaps
