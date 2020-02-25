@@ -9,7 +9,7 @@ GTEST_FILTER ?= "*"
 clang = "$(V8_HOME)/third_party/llvm-build/Release+Asserts/bin/clang"
 ld = "$(V8_HOME)/third_party/binutils/Linux_x64/Release/bin/ld"
 
-clang_cmd=$(clang)++ -g $@.cc -o $@ -std=c++14 \
+clang_cmd=$(clang)++ -Wall -g $@.cc -o $@ -std=c++14 \
 	  -nostdinc++ -stdlib=libc++ \
 	  -B$(V8_HOME)/third_party/binutils/Linux_x64/Release/bin \
 	  -fno-exceptions -fno-rtti \
@@ -17,6 +17,8 @@ clang_cmd=$(clang)++ -g $@.cc -o $@ -std=c++14 \
 	  -isystem$(V8_HOME)/buildtools/third_party/libc++abi/trunk/include \
 	  --sysroot=$(V8_HOME)/build/linux/debian_sid_amd64-sysroot \
           -I$(v8_include_dir) \
+          -I$(V8_HOME) \
+          -I$(v8_build_dir)/gen \
           -L$(v8_build_dir)/obj \
           $(v8_dylibs) \
           -Wl,-L$(v8_build_dir) -Wl,-lpthread
@@ -49,8 +51,8 @@ ns: snapshot_blob.bin ns.cc
 instances: snapshot_blob.bin instances.cc
 	clang++ -O0 -g -fno-rtti -I$(v8_include_dir) $(v8_dylibs) -L$(v8_build_dir) $@.cc -o $@ -pthread -std=c++0x -rpath $(v8_build_dir)
 
-run-script: snapshot_blob.bin run-script.cc
-	clang++ -O0 -g -I$(v8_include_dir) $(v8_dylibs) -L$(v8_build_dir) $@.cc -o $@ -pthread -std=c++0x -rpath $(v8_build_dir)
+run-script: run-script.cc
+	$(clang_cmd) 
 
 exceptions: snapshot_blob.bin exceptions.cc
 	clang++ -O0 -g -fno-rtti -I$(v8_include_dir) -I$(V8_HOME) $(v8_dylibs) -L$(v8_build_dir) $@.cc $(v8_src_dir)/objects-printer.cc -o $@ -pthread -std=c++0x -rpath $(v8_build_dir)
