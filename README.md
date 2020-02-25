@@ -126,6 +126,50 @@ it into the function.
 _v8_internal_Print_Object(*((v8::internal::Object**)(*global)));
 ```
 
+But I'm still missing the connection between ObjectTemplate and object.
+When we create it we use:
+```c++
+Local<ObjectTemplate> global = ObjectTemplate::New(isolate);
+```
+In `src/api/api.cc` we have:
+```c++
+static Local<ObjectTemplate> ObjectTemplateNew(
+    i::Isolate* isolate, v8::Local<FunctionTemplate> constructor,
+    bool do_not_cache) {
+  i::Handle<i::Struct> struct_obj = isolate->factory()->NewStruct(
+      i::OBJECT_TEMPLATE_INFO_TYPE, i::AllocationType::kOld);
+  i::Handle<i::ObjectTemplateInfo> obj = i::Handle<i::ObjectTemplateInfo>::cast(struct_obj);
+  InitializeTemplate(obj, Consts::OBJECT_TEMPLATE);
+  int next_serial_number = 0;
+  if (!constructor.IsEmpty())
+    obj->set_constructor(*Utils::OpenHandle(*constructor));
+  obj->set_data(i::Smi::zero());
+  return Utils::ToLocal(obj);
+}
+```
+`NewStruct` can be found in `src/heap/factory-base.cc`
+```c++
+template <typename Impl>
+HandleFor<Impl, Struct> FactoryBase<Impl>::NewStruct(
+    InstanceType type, AllocationType allocation) {
+  Map map = Map::GetStructMap(read_only_roots(), type);
+  int size = map.instance_size();
+  HeapObject result = AllocateRawWithImmortalMap(size, allocation, map);
+  HandleFor<Impl, Struct> str = handle(Struct::cast(result), isolate());
+  str->InitializeBody(size);
+  return str;
+}
+```
+```console
+1725	  return Utils::ToLocal(obj);
+(gdb) p obj
+$6 = {<v8::internal::HandleBase> = {location_ = 0x30b5160}, <No data fields>}
+```
+So this is the connection, what we see as a Local<ObjectTemplate> is a HandleBase.
+TODO: dig into this some more when I have time.
+
+
+
 ```console
 (lldb) expr gl
 (v8::internal::Object **) $0 = 0x00000000020ee160
