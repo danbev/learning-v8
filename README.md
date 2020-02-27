@@ -2869,7 +2869,8 @@ Generate Ninja files:
 
 This will open an editor where you can set configuration options. I've been using the following:
 ```console
-v8_monolithic
+v8_monolithic = true
+use_custom_libcxx = false
 v8_use_external_startup_data = false
 is_debug = true
 target_cpu = "x64"

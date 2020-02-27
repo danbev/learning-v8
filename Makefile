@@ -5,17 +5,14 @@ v8_buildtools_dir = $(V8_HOME)/buildtools/third_party
 v8_include_dir = $(V8_HOME)/include
 v8_src_dir = $(V8_HOME)/src
 v8_gen_dir = $(v8_build_dir)/gen
+v8_dylibs=-lv8_monolith
 GTEST_FILTER ?= "*"
 clang = "$(V8_HOME)/third_party/llvm-build/Release+Asserts/bin/clang"
-ld = "$(V8_HOME)/third_party/binutils/Linux_x64/Release/bin/ld"
 
-clang_cmd=$(clang)++ -Wall -g $@.cc -o $@ -std=c++14 \
-	  -nostdinc++ -stdlib=libc++ \
-	  -B$(V8_HOME)/third_party/binutils/Linux_x64/Release/bin \
+gtest_home = $(PWD)/deps/googletest/googletest
+
+clang_cmd=g++ -Wall -g $@.cc -o $@ -std=c++14 -Wcast-function-type \
 	  -fno-exceptions -fno-rtti \
-	  -isystem$(V8_HOME)/buildtools/third_party/libc++/trunk/include \
-	  -isystem$(V8_HOME)/buildtools/third_party/libc++abi/trunk/include \
-	  --sysroot=$(V8_HOME)/build/linux/debian_sid_amd64-sysroot \
           -I$(v8_include_dir) \
           -I$(V8_HOME) \
           -I$(v8_build_dir)/gen \
@@ -23,15 +20,41 @@ clang_cmd=$(clang)++ -Wall -g $@.cc -o $@ -std=c++14 \
           $(v8_dylibs) \
           -Wl,-L$(v8_build_dir) -Wl,-lpthread
 
-v8_dylibs=-lv8_monolith
+clang_test_cmd=g++ -Wall -g test/main.cc $@.cc -o $@  ./lib/gtest/libgtest-linux.a -std=c++14 \
+	  -fno-exceptions -fno-rtti \
+          -I$(v8_include_dir) \
+          -I$(V8_HOME) \
+          -I$(v8_build_dir)/gen \
+          -L$(v8_build_dir)/obj \
+          -I./deps/googletest/googletest/include \
+          $(v8_dylibs) \
+          -Wl,-L$(v8_build_dir) -Wl,-L/usr/lib64 -Wl,-lstdc++ -Wl,-lpthread
+
+clang_gtest_cmd=g++ --verbose -Wall -O0 -g -c $(gtest_home)/src/gtest-all.cc \
+          -o $(gtest_home)/gtest-all.o	-std=c++14 \
+	  -fno-exceptions -fno-rtti \
+          -I$(gtest_home) \
+          -I$(gtest_home)/include
+          
+
 
 current_dir=$(shell pwd)
 
-COMPILE_TEST = g++ -v -std=c++11 -O0 -g -I`pwd`/deps/googletest/googletest/include -I$(v8_include_dir) -I$(v8_gen_dir) -I$(V8_HOME) $(v8_dylibs) -L$(v8_build_dir) -pthread  lib/gtest/libgtest.a -rpath $(v8_build_dir)
+COMPILE_TEST = g++ -v -std=c++11 -O0 -g -I$(V8_HOME)/third_party/googletest/src/googletest/include -I$(v8_include_dir) -I$(v8_gen_dir) -I$(V8_HOME) $(v8_dylibs) -L$(v8_build_dir) -pthread  lib/gtest/libgtest.a
 
 hello-world: hello-world.cc
 	@echo "Using v8_home = $(V8_HOME)"
 	$(clang_cmd)
+
+persistent-obj: persistent-obj.cc
+	$(clang_cmd)
+
+.PHONY: gtest-compile
+gtest-compile: 
+	@echo "Building gtest library"
+	$(clang_gtest_cmd)
+	ar -rv $(PWD)/lib/gtest/libgtest-linux.a $(gtest_home)/gtest-all.o
+
 
 .PHONY: run-hello
 run-hello:
@@ -66,7 +89,7 @@ test/local_test: test/local_test.cc
 	$(COMPILE_TEST) test/main.cc $< -o $@
 
 test/persistent-object_test: test/persistent-object_test.cc
-	$(COMPILE_TEST) test/main.cc $< -o $@
+	$(clang_test_cmd)
 
 test/maybe_test: test/maybe_test.cc
 	$(COMPILE_TEST) test/main.cc $< -o $@
