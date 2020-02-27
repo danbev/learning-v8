@@ -21,7 +21,7 @@ clang_cmd=g++ -Wall -g $@.cc -o $@ -std=c++14 -Wcast-function-type \
           -Wl,-L$(v8_build_dir) -Wl,-lpthread
 
 clang_test_cmd=g++ -Wall -g test/main.cc $@.cc -o $@  ./lib/gtest/libgtest-linux.a -std=c++14 \
-	  -fno-exceptions -fno-rtti -Wcast-function-type \
+	  -fno-exceptions -fno-rtti -Wcast-function-type -Wno-unused-variable \
           -I$(v8_include_dir) \
           -I$(V8_HOME) \
           -I$(v8_build_dir)/gen \
@@ -62,7 +62,7 @@ run-hello:
 
 .PHONY: gdb-hello
 gdb-hello:
-	@env LD_LIBRARY_PATH=$(v8_build_dir) gdb --cd=$(v8_build_dir) --args $(current_dir)/hello-world
+	gdb --cd=$(v8_build_dir) --args $(current_dir)/hello-world
 
 contexts: snapshot_blob.bin contexts.cc
 	clang++ -O0 -g -I$(v8_include_dir) $(v8_dylibs) -L$(v8_build_dir) $@.cc -o $@ -pthread -std=c++0x -rpath $(v8_build_dir)
