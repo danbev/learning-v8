@@ -1731,16 +1731,41 @@ The above can be found in src/api.h. The same goes for `Local<Object>, Local<Str
 
 ### Small Integers
 Reading through v8.h I came accross `// Tag information for Smi`
-Smi stands for small integers. It turns out that ECMA Number is defined as a 64-bit binary double-precision
-but internally V8 uses 32-bit to represent all values. How can that work, how can you represent a 64-bit value
-using only 32-bits?   
+Smi stands for small integers.
 
-Instead the small integer is represented by the 32 bits plus a pointer to the 64-bit number. V8 needs to
-know if a value stored in memory represents a 32-bit integer, or if it is really a 64-bit number, in which
-case it has to follow the pointer to get the complete value. This is where the concept of tagging comes in.
-Tagging involved borrowing one bit of the 32-bit, making it 31-bit and having the leftover bit represent a 
-tag. If the tag is zero then this is a plain value, but if tag is 1 then the pointer must be followed.
+A pointer is really just a integer that is treated like a memory address. We can
+use that memory address to get the start of the data located in that memory slot.
+But we can also just store an normal value like 18 in it. There might be cases
+where it does not make sense to store a small integer somewhere in the heap and
+have a pointer to it, but instead store the value directly in the pointer itself.
+But that only works for small integers so there needs to be away to know if the
+value we want is stored in the pointer or if we should follow the value stored to
+the heap to get the value.
+
+A word on a 64 bit machine is 8 bytes (64 bits) and all of the pointers need to
+be aligned to multiples of 8. So a pointer could be:
+```
+1000       = 8
+10000      = 16
+11000      = 24
+100000     = 32
+1000000000 = 512
+```
+Remember that we are talking about the pointers and not the values store at
+the memory location they point to. We can see that there are always three bits
+that are zero in the pointers. So we can use them for something else and just
+mask them out when using them as pointers.
+
+Tagging involves borrowing one bit of the 32-bit, making it 31-bit and having
+the leftover bit represent a tag. If the tag is zero then this is a plain value,
+but if tag is 1 then the pointer must be followed.
 This does not only have to be for numbers it could also be used for object (I think)
+
+Instead the small integer is represented by the 32 bits plus a pointer to the
+64-bit number. V8 needs to know if a value stored in memory represents a 32-bit
+integer, or if it is really a 64-bit number, in which case it has to follow the
+pointer to get the complete value. This is where the concept of tagging comes in.
+
 
 
 ### Properties/Elements
