@@ -21,7 +21,7 @@ clang_cmd=g++ -Wall -g $@.cc -o $@ -std=c++14 -Wcast-function-type \
           -Wl,-L$(v8_build_dir) -Wl,-lpthread
 
 clang_test_cmd=g++ -Wall -g test/main.cc $@.cc -o $@  ./lib/gtest/libgtest-linux.a -std=c++14 \
-	  -fno-exceptions -fno-rtti \
+	  -fno-exceptions -fno-rtti -Wcast-function-type \
           -I$(v8_include_dir) \
           -I$(V8_HOME) \
           -I$(v8_build_dir)/gen \
