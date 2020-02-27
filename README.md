@@ -160,6 +160,12 @@ HandleFor<Impl, Struct> FactoryBase<Impl>::NewStruct(
   return str;
 }
 ```
+Every object that is stored on the v8 heap has a Map (`src/objects/map.h`) that
+describes the structure of the object being stored.
+```c++
+class Map : public HeapObject {
+```
+
 ```console
 1725	  return Utils::ToLocal(obj);
 (gdb) p obj
@@ -518,8 +524,8 @@ Handle<JSObject> Factory::NewJSObject(Handle<JSFunction> constructor, PretenureF
 So we have created a new map
 
 ### Map
-So an HeapObject contains a pointer to a Map, or rather has a function that returns a pointer to Map. I can't see
-any member map in the HeapObject class.
+So an HeapObject contains a pointer to a Map, or rather has a function that 
+returns a pointer to Map. I can't see any member map in the HeapObject class.
 
 Lets take a look at when a map is created.
 ```console
@@ -538,8 +544,8 @@ Handle<Map> Factory::NewMap(InstanceType type,
                 isolate());
 }
 ```
-We can see that the above is calling `AllocateRawWithRetryOrFail` on the heap instance passing a size of `88` and
-specifying the `MAP_SPACE`:
+We can see that the above is calling `AllocateRawWithRetryOrFail` on the heap 
+instance passing a size of `88` and specifying the `MAP_SPACE`:
 ```c++
 HeapObject* Heap::AllocateRawWithRetryOrFail(int size, AllocationSpace space,
                                              AllocationAlignment alignment) {
@@ -4441,7 +4447,7 @@ isolate->heap()->IterateSmiRoots(this);
   V(Smi, interpreter_entry_return_pc_offset, InterpreterEntryReturnPCOffset)
 ```
 
-The Isolate class extends HiddenFactory:
+The Isolate class extends HiddenFactory (src/execution/isolate.h):
 ```c++
 // HiddenFactory exists so Isolate can privately inherit from it without making
 // Factory's members available to Isolate directly.
@@ -4459,6 +4465,7 @@ v8::internal::Factory* factory() {
   return (v8::internal::Factory*)this;  // NOLINT(readability/casting)
 }
 ```
+The factory class can be found in `src/heap/factory`.
 
 Next, lets take a closer look at NewMap:
 ```c++
