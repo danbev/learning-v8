@@ -35,8 +35,12 @@ void Something::make_weak() {
 
 TEST_F(PersistentTest, object) {
   const v8::HandleScope handle_scope(V8TestFixture::isolate_);
+  v8::Handle<v8::Context> context = v8::Context::New(isolate_,
+                                         nullptr,
+                                         v8::Local<v8::ObjectTemplate>());
+  v8::Context::Scope context_scope(context);
   v8::Local<v8::Object> object = v8::Object::New(isolate_);
   Something s(isolate_, object);
   s.make_weak();
-  //EXPECT_EQ(true, v.IsEmpty()) << "Default constructed Local should be empty";
+  EXPECT_EQ(false, s.persistent().IsEmpty()) << "Default constructed Local should be empty";
 }
