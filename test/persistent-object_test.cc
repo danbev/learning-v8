@@ -24,13 +24,37 @@ v8::Persistent<v8::Object>& Something::persistent() {
   return persistent_handle_;
 }
 
+void WeakCallback(const v8::WeakCallbackInfo<Something>& data) {
+  Something* obj = data.GetParameter();
+  std::cout << "in make weak callback..." << '\n';
+}
+
+void WeakCallbackVoid(const v8::WeakCallbackInfo<void>& data) {
+  Something* obj = reinterpret_cast<Something*>(data.GetParameter());
+  //std::cout << "in make weak callback..." << '\n';
+}
+
 void Something::make_weak() {
-  persistent_handle_.SetWeak(
-      this,
-      [](const v8::WeakCallbackInfo<Something>& data) {
+  /*
+  auto cb = [](const v8::WeakCallbackInfo<Something>& data) {
         Something* obj = data.GetParameter();
         std::cout << "in make weak callback..." << '\n';
-      }, v8::WeakCallbackType::kParameter);
+  };
+  */
+  typedef typename v8::WeakCallbackInfo<Something>::Callback Something_Callback;
+  Something_Callback something_callback = WeakCallback;
+
+  typedef typename v8::WeakCallbackInfo<void>::Callback v8_Callback;
+  //#if defined(__GNUC__) && !defined(__clang__)
+   // #pragma GCC diagnostic push
+    //#pragma GCC diagnostic ignored "-Wcast-function-type"
+  //#endif
+    v8_Callback cb = reinterpret_cast<v8_Callback>(WeakCallbackVoid);
+    //persistent_handle_.SetWeak(this, WeakCallback, v8::WeakCallbackType::kParameter);
+  //#if defined(__GNUC__) && !defined(__clang__)
+    //#pragma GCC diagnostic pop
+  //#endif
+
 }
 
 TEST_F(PersistentTest, object) {
