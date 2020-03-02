@@ -79,6 +79,7 @@ code using the `new` operator:
 const obj = new Something(1, 2, "3");
 ```
 
+### PrintObject
 Using _v8_internal_Print_Object from c++:
 ```console
 $ nm libv8_monolith.a | grep Print_Object | c++filt
@@ -95,9 +96,9 @@ Lets take a closer look at the above:
 ```c++
   v8::internal::Object** gl = ((v8::internal::Object**)(*global));
 ```
-We use the dereference operator to get the value of a Local, which is just of
-type `T*`, a pointer to the type the Local. We are then casting that to be
-of type pointer-to-pointer to Object.
+We use the dereference operator to get the value of a Local (*global), which is
+just of type `T*`, a pointer to the type the Local. We are then casting that to
+be of type pointer-to-pointer to Object.
 ```
   gl         Object*         Object
 +-----+      +------+      +-------+
@@ -195,6 +196,25 @@ This can be useful when debugging a lldb command. You can set a breakpoint
 and break at that location and make updates to the command and reload without
 having to restart lldb.
 
+Currently, the lldb-commands.py that ships with v8 contains an extra operation
+of the parameter pased to `ptr_arg_cmd`:
+```python
+def ptr_arg_cmd(debugger, name, param, cmd):                                    
+  if not param:                                                                 
+    print("'{}' requires an argument".format(name))                             
+    return                                                                      
+  param = '(void*)({})'.format(param)                                           
+  no_arg_cmd(debugger, cmd.format(param)) 
+```
+Notice that `param` is the object that we want to print, for example lets say
+it is a local named obj:
+```
+param = "(void*)(obj)"
+```
+This will then be "passed"/formatted into the command string:
+```
+"_v8_internal_Print_Object(*(v8::internal::Object**)(*(void*)(obj))")
+```
 
 #### Threads
 V8 is single threaded (the execution of the functions of the stack) but there
