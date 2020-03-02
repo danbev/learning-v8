@@ -15,7 +15,7 @@ class V8TestFixture : public ::testing::Test {
 
   static void SetUpTestCase() {
     v8::V8::InitializeExternalStartupData("fixture");
-    platform_.reset(v8::platform::NewDefaultPlatform().get());
+    platform_ = v8::platform::NewDefaultPlatform();
     allocator_.reset(v8::ArrayBuffer::Allocator::NewDefaultAllocator());
     create_params_.array_buffer_allocator = allocator_.get();
     v8::V8::InitializePlatform(platform_.get());
