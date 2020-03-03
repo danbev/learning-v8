@@ -3,8 +3,8 @@
 #include "v8.h"
 #include "libplatform/libplatform.h"
 #include "v8_test_fixture.h"
-#include "src/objects.h"
-#include "src/objects-inl.h"
+#include "src/objects/objects.h"
+#include "src/objects/objects-inl.h"
 
 using namespace v8;
 namespace i = v8::internal;

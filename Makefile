@@ -1,5 +1,5 @@
 V8_HOME ?= /home/danielbevenius/work/google/v8_src/v8
-v8_build_dir = $(V8_HOME)/out/x64.release
+v8_build_dir = $(V8_HOME)/out/x64.release_gcc
 v8_buildtools_dir = $(V8_HOME)/buildtools/third_party
 
 v8_include_dir = $(V8_HOME)/include
@@ -22,8 +22,10 @@ clang_cmd=g++ -Wall -g $@.cc -o $@ -std=c++14 -Wcast-function-type \
 
 clang_test_cmd=g++ -Wall -g test/main.cc $@.cc -o $@  ./lib/gtest/libgtest-linux.a -std=c++14 \
 	  -fno-exceptions -fno-rtti -Wcast-function-type -Wno-unused-variable \
+	  -DV8_INTL_SUPPORT \
           -I$(v8_include_dir) \
           -I$(V8_HOME) \
+          -I$(V8_HOME)/third_party/icu/source/common/ \
           -I$(v8_build_dir)/gen \
           -L$(v8_build_dir)/obj \
           -I./deps/googletest/googletest/include \
@@ -58,7 +60,7 @@ gtest-compile:
 
 .PHONY: run-hello
 run-hello:
-	@LD_LIBRARY_PATH=$(V8_HOME)/out/x64.release/ ./hello-world
+	@LD_LIBRARY_PATH=$(v8_build_dir)/ ./hello-world
 
 .PHONY: gdb-hello
 gdb-hello:
@@ -101,7 +103,7 @@ test/string_test: test/string_test.cc
 	$(COMPILE_TEST) test/main.cc $< -o $@
 
 test/jsobject_test: test/jsobject_test.cc
-	$(COMPILE_TEST) test/main.cc $< -o $@
+	$(clang_test_cmd)
 
 test/ast_test: test/ast_test.cc
 	$(COMPILE_TEST) -Wno-everything test/main.cc $< -o $@
@@ -110,7 +112,7 @@ test/context_test: test/context_test.cc
 	$(COMPILE_TEST) test/main.cc $< -o $@
 
 test/heap_test: test/heap_test.cc
-	$(COMPILE_TEST) test/main.cc $< -o $@
+	$(clang_test_cmd)
 
 test/map_test: test/map_test.cc
 	$(COMPILE_TEST) test/main.cc $< -o $@
