@@ -176,7 +176,6 @@ So this is the connection, what we see as a Local<ObjectTemplate> is a HandleBas
 TODO: dig into this some more when I have time.
 
 
-
 ```console
 (lldb) expr gl
 (v8::internal::Object **) $0 = 0x00000000020ee160
@@ -3010,6 +3009,12 @@ Running pre-submit checks:
 ```console
 $ git cl presubmit
 ```
+
+Then upload using:
+```console
+$ git cl upload
+```
+
 
 ## Building chromium
 When making changes to V8 you might need to verify that your changes have not broken anything in Chromium. 
