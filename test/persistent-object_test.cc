@@ -68,3 +68,17 @@ TEST_F(PersistentTest, object) {
   s.make_weak();
   EXPECT_EQ(false, s.persistent().IsEmpty()) << "Default constructed Local should be empty";
 }
+
+TEST_F(PersistentTest, PrintObject) {
+  const v8::HandleScope handle_scope(isolate_);
+  v8::Isolate::Scope isolate_scope(isolate_);
+  v8::Handle<v8::Context> context = v8::Context::New(isolate_,
+                                         nullptr,
+                                         v8::Local<v8::ObjectTemplate>());
+  v8::Context::Scope context_scope(context);
+
+  v8::Local<v8::Object> obj = v8::Object::New(isolate_);
+  //v8::internal::Object** ppo = ((v8::internal::Object**)(*obj));
+  //_v8_internal_Print_Object(*ppo);
+  _v8_internal_Print_Object(*((v8::internal::Object**)*obj));
+}
