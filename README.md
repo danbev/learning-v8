@@ -5446,3 +5446,14 @@ I needed to specify:
 use_custom_libcxx = true
 ```
 In args.gn.
+
+
+Compilation error when including `src/objects/objects-inl.h:
+```console
+/home/danielbevenius/work/google/v8_src/v8/src/objects/object-macros.h:263:14: error: no declaration matches ‘bool v8::internal::HeapObject::IsJSCollator() const’
+```
+Does this need i18n perhaps?
+```console
+$ gn args --list out/x64.release_gcc | grep i18n
+v8_enable_i18n_support
+```
