@@ -1,15 +1,15 @@
 V8_HOME ?= /home/danielbevenius/work/google/v8_src/v8
 v8_build_dir = $(V8_HOME)/out/x64.release_gcc
 v8_buildtools_dir = $(V8_HOME)/buildtools/third_party
+gtest_home = $(PWD)/deps/googletest/googletest
+current_dir=$(shell pwd)
 
 v8_include_dir = $(V8_HOME)/include
 v8_src_dir = $(V8_HOME)/src
 v8_gen_dir = $(v8_build_dir)/gen
-v8_dylibs=-lv8_monolith
+v8_dylibs=-lv8_for_testing -lv8_libplatform -lv8_libbase
 GTEST_FILTER ?= "*"
 clang = "$(V8_HOME)/third_party/llvm-build/Release+Asserts/bin/clang"
-
-gtest_home = $(PWD)/deps/googletest/googletest
 
 clang_cmd=g++ -Wall -g $@.cc -o $@ -std=c++14 -Wcast-function-type \
 	  -fno-exceptions -fno-rtti \
@@ -22,14 +22,16 @@ clang_cmd=g++ -Wall -g $@.cc -o $@ -std=c++14 -Wcast-function-type \
 
 clang_test_cmd=g++ -Wall -g test/main.cc $@.cc -o $@  ./lib/gtest/libgtest-linux.a -std=c++14 \
 	  -fno-exceptions -fno-rtti -Wcast-function-type -Wno-unused-variable \
+	  -Wno-class-memaccess -Wno-comment -Wno-unused-but-set-variable \
 	  -DV8_INTL_SUPPORT \
           -I$(v8_include_dir) \
           -I$(V8_HOME) \
           -I$(V8_HOME)/third_party/icu/source/common/ \
           -I$(v8_build_dir)/gen \
-          -L$(v8_build_dir)/obj \
+          -L$(v8_build_dir) \
           -I./deps/googletest/googletest/include \
           $(v8_dylibs) \
+          -Wl,--verbose \
           -Wl,-L$(v8_build_dir) -Wl,-L/usr/lib64 -Wl,-lstdc++ -Wl,-lpthread
 
 clang_gtest_cmd=g++ --verbose -Wall -O0 -g -c $(gtest_home)/src/gtest-all.cc \
@@ -37,10 +39,7 @@ clang_gtest_cmd=g++ --verbose -Wall -O0 -g -c $(gtest_home)/src/gtest-all.cc \
 	  -fno-exceptions -fno-rtti \
           -I$(gtest_home) \
           -I$(gtest_home)/include
-          
 
-
-current_dir=$(shell pwd)
 
 COMPILE_TEST = g++ -v -std=c++11 -O0 -g -I$(V8_HOME)/third_party/googletest/src/googletest/include -I$(v8_include_dir) -I$(v8_gen_dir) -I$(V8_HOME) $(v8_dylibs) -L$(v8_build_dir) -pthread  lib/gtest/libgtest.a
 
@@ -115,7 +114,7 @@ test/heap_test: test/heap_test.cc
 	$(clang_test_cmd)
 
 test/map_test: test/map_test.cc
-	$(COMPILE_TEST) test/main.cc $< -o $@
+	$(clang_test_cmd)
 
 list-gtest:
 	./test/smi_test --gtest_list_test

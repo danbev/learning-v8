@@ -5457,3 +5457,72 @@ Does this need i18n perhaps?
 $ gn args --list out/x64.release_gcc | grep i18n
 v8_enable_i18n_support
 ```
+
+```console
+usr/bin/ld: /tmp/ccJOrUMl.o: in function `v8::internal::MaybeHandle<v8::internal::Object>::Check() const':
+/home/danielbevenius/work/google/v8_src/v8/src/handles/maybe-handles.h:44: undefined reference to `V8_Fatal(char const*, ...)'
+collect2: error: ld returned 1 exit status
+```
+V8_Fatal is referenced but not defined in v8_monolith.a:
+```console
+$ nm libv8_monolith.a | grep V8_Fatal | c++filt 
+...
+U V8_Fatal(char const*, int, char const*, ...)
+```
+And I thought it might be defined in libv8_libbase.a but it is the same there.
+Actually, I was looking at the wrong symbol. This was not from the logging.o 
+object file. If we look at it we find:
+```console
+v8_libbase/logging.o:
+...
+0000000000000000 T V8_Fatal(char const*, int, char const*, ...)
+```
+In out/x64.release/obj/logging.o we can find it defined:
+```console
+$ nm -C  libv8_libbase.a | grep -A 50 logging.o | grep V8_Fatal
+0000000000000000 T V8_Fatal(char const*, int, char const*, ...)
+```
+`T` means that the symbol is in the text section.
+So if the linker is able to find libv8_libbase.a it should be able to resolve
+this.
+
+So we need to make sure the linker can find the directory where the libraries
+are located ('-Wl,-Ldir'), and also that it will include the library ('-Wl,-llibname')
+
+With this in place I can see that the linker can open the archive:
+```console
+attempt to open /home/danielbevenius/work/google/v8_src/v8/out/x64.release_gcc/obj/libv8_libbase.so failed
+attempt to open /home/danielbevenius/work/google/v8_src/v8/out/x64.release_gcc/obj/libv8_libbase.a succeeded
+/home/danielbevenius/work/google/v8_src/v8/out/x64.release_gcc/obj/libv8_libbase.a
+```
+But I'm still getting the same linking error. If we look closer at the error message
+we can see that it is maybe-handles.h that is complaining. Could it be that the
+order is incorrect when linking. libv8_libbase.a needs to come after libv8_monolith
+Something I noticed is that even though the library libv8_libbase.a is found it
+does not look like the linker actually reads the object files. I can see that it
+does this for libv8_monolith.a:
+```console
+(/home/danielbevenius/work/google/v8_src/v8/out/x64.release_gcc/obj/libv8_monolith.a)common-node-cache.o
+```
+Hmm, actually looking at the signature of the function it is V8_Fatal(char const*, ...)
+and not char const*, int, char const*, ...)
+
+For a debug build it will be:
+```
+    void V8_Fatal(const char* file, int line, const char* format, ...);
+```
+And else
+```
+    void V8_Fatal(const char* format, ...);
+```
+So it looks like I need to set debug to false. With this the V8_Fatal symbol
+in logging.o is:
+```console
+$ nm -C out/x64.release_gcc/obj/v8_libbase/logging.o | grep V8_Fatal
+0000000000000000 T V8_Fatal(char const*, ...)
+```
+
+
+
+
+
