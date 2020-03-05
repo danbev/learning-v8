@@ -221,7 +221,7 @@ are supporting threads used for garbage collection, profiling (IC, and perhaps
 other things) (I think).
 Lets see what threads there are:
 
-    $ lldb -- hello-world
+    $ LD_LIBRARY_PATH=../v8_src/v8/out/x64.release_gcc/ lldb ./hello-world 
     (lldb) br s -n main
     (lldb) r
     (lldb) thread list
@@ -267,76 +267,25 @@ not use ICU you still need to call InitializeICU :
 
     V8::InitializeICU();
 
-### Snapshots
+### Snapshot
 JavaScript specifies a lot of built-in functionality which every V8 context must provide.
-For example, you can run Math.PI and that will work in a JavaScript console/repl. The global object
-and all the built-in functionality must be setup and initialized into the V8 heap. This can be time
-consuming and affect runtime performance if this has to be done every time. 
+For example, you can run Math.PI and that will work in a JavaScript console/repl.
+The global object and all the built-in functionality must be setup and initialized
+into the V8 heap. This can be time consuming and affect runtime performance if
+this has to be done every time. 
 
-
-Now this is where the files `natives_blob.bin` and `snapshot_blob.bin` come into play. 
-But what are these bin files?  
+Now this is where the file `snapshot_blob.bin` comes into play. 
+But what are this bin file?  
 The blobs above are prepared snapshots that get directly deserialized into the
 heap to provide an initilized context.
-If you take a look in `src/js` you'll find a number of javascript files. These 
-files referenced in `src/v8.gyp` and are used by the target `js2c`. This target
-calls `tools/js2c.py` which is a tool for converting JavaScript source code into
-C-Style char arrays. This target will process all the library_files specified
-in the variables section.
-For a GN build you'll find the configuration in BUILD.GN.
-Just note that there is ongoing work to move the .js files to V8 builtins and 
-builtins will be discussed later in this document.
 
-The output of this out/Debug/obj/gen/libraries.cc. So how is this file actually used?
-The `js2c` target produces the libraries.cc file which is used by other targets, for example by `v8_snapshot` which produces a 
-snapshot_blob.bin file.
+There is an executable named `mksnapshot` which is defined in 
+`src/snapshot/mksnapshot.c`. 
 
-    $ lldb hello_world
-    (lldb) br s -n main
-    (lldb) r
+When V8 is built with `v8_use_external_startup_data` the build process will
+create a snapshot_blob.bin file using a template in BUILD.gn named `run_mksnapshot`
+, but if false it will generate a file named snapshot.cc. 
 
-Step through to the following line:
-
-    V8::InitializeExternalStartupData(argv[0]);
-
-This call will land us in `src/api.cc`:
-
-    void v8::V8::InitializeExternalStartupData(const char* directory_path) {
-      i::InitializeExternalStartupData(directory_path);
-    }
-
-The implementation of `InitializeExternalStartupData` can be found in `src/startup-data-util.cc`:
-
-    void InitializeExternalStartupData(const char* directory_path) {
-    #ifdef V8_USE_EXTERNAL_STARTUP_DATA
-      char* natives;
-      char* snapshot;
-      LoadFromFiles(
-        base::RelativePath(&natives, directory_path, "natives_blob.bin"),
-        base::RelativePath(&snapshot, directory_path, "snapshot_blob.bin"));
-      free(natives);
-      free(snapshot);
-    #endif  // V8_USE_EXTERNAL_STARTUP_DATA
-}
-
-Lets take a closer look at `LoadFromFiles`, the implementation if also in `src/startup-data-util.cc`:
-
-    void LoadFromFiles(const char* natives_blob, const char* snapshot_blob) {
-      Load(natives_blob, &g_natives, v8::V8::SetNativesDataBlob);
-      Load(snapshot_blob, &g_snapshot, v8::V8::SetSnapshotDataBlob);
-
-      atexit(&FreeStartupData);
-    }
-
-
-    (lldb) p blob_file
-    (const char *) $1 = 0x0000000104200000 "/Users/danielbevenius/work/nodejs/learning-v8/natives_blob.bin"
-
-This file is then read and set by calling:
-
-    void V8::SetNativesDataBlob(StartupData* natives_blob) {
-      i::V8::SetNativesBlob(natives_blob);
-    }
 
 
 ### Local
@@ -2899,25 +2848,53 @@ You'll need to have checked out the Google V8 sources to you local file system a
 the instructions found [here](https://developers.google.com/v8/build).
 
 ### [gclient](https://www.chromium.org/developers/how-tos/depottools) sync
-
-    gclient sync
+```console
+$ gclient sync
+```
 
 ### [GN](https://chromium.googlesource.com/chromium/src/+/master/tools/gn/docs/quick_start.md)
 GN stands for Generate Ninja.
+```console
+$ tools/dev/v8gen.py --help
+```
 
-    $ tools/dev/v8gen.py --help
+Show all executables
+```console
+$ gn ls out/x64.release_gcc --type=executable
+```
+If you want details of a specific target you can use `desc`:
+```console
+$ gn desc out/x64.release_gcc/ //:mksnapshot
+``` 
+`//:mksnapshot` is a label where `//` indicates the root directory and then the
+name of the label. If the label was in a subdirectory that subdirectory would
+come before the `:`. 
+This command is useful to see which files are included in an executable.
 
-    $ ./tools/dev/v8gen.py list
-    ....
-    x64.debug
-    x64.optdebug
-    x64.release
+When gn starts it will search for a .gn file in the current directory. The one
+in specifies the following:
+```
+import("//build/dotfile_settings.gni")                                          
+```
+This includes a bunch of gni files from the build directory
+(the dotfile_settings.gni) that is.
 
-    $ vi out.gn/learning/args.gn
+```console
+buildconfig = "//build/config/BUILDCONFIG.gn"                                   
+```
+This is the master GN build configuration file.
 
-Generate Ninja files:
 
-    $ gn args out/x64.release
+Show all shared_libraries:
+```console
+$ gn ls out/x64.release_gcc --type=shared_libraries
+```
+
+Edit build arguments:
+```console
+$ vi out/x64.release_gcc/args.gn
+$ gn args out/x64.release_gcc
+```
 
 This will open an editor where you can set configuration options. I've been using the following:
 ```console
@@ -2931,15 +2908,15 @@ v8_enable_slow_dchecks = true
 v8_optimized_debug = false
 ```
 
-Note that for lldb command aliases to work `is_debug` must be set to true.
-
 List avaiable build arguments:
-
-    $ gn args --list out/x64.release
+```console
+$ gn args --list out/x64.release
+```
 
 List all available targets:
-
-    $ ninja -C out/x64.release/ -t targets all
+```console
+$ ninja -C out/x64.release/ -t targets all
+```
 
 Building:
 ```console
@@ -2947,8 +2924,9 @@ $ env CPATH=/usr/include ninja -C out/x64.release_gcc/
 ```
 
 Running quickchecks:
-
-    $ ./tools/run-tests.py --outdir=out/x64.release --quickcheck
+```
+$ ./tools/run-tests.py --outdir=out/x64.release --quickcheck
+```
 
 You can use `./tools-run-tests.py -h` to list all the opitions that can be passed
 to run-tests.
@@ -3014,6 +2992,144 @@ Then upload using:
 ```console
 $ git cl upload
 ```
+
+#### Build details
+So when we run gn it will generate Ninja build file. GN itself is written in 
+C++ but has a python wrapper around it. 
+
+A group in gn is just a collection of other targets which enables them to have
+a name.
+
+So when we run gn there will be a number of .ninja files generated. If we look
+in the root of the output directory we find two .ninja files:
+```console
+build.ninja  toolchain.ninja
+```
+By default ninja will look for `build.ninja' and when we run ninja we usually
+specify the `-C out/dir`. If no targets are specified on the command line ninja
+will execute all outputs unless there is one specified as default. V8 has the 
+following default target:
+```
+default all
+
+build all: phony $
+    ./bytecode_builtins_list_generator $                                        
+    ./d8 $                                                                      
+    obj/fuzzer_support.stamp $                                                  
+    ./gen-regexp-special-case $                                                 
+    obj/generate_bytecode_builtins_list.stamp $                                 
+    obj/gn_all.stamp $                                                          
+    obj/json_fuzzer.stamp $                                                     
+    obj/lib_wasm_fuzzer_common.stamp $                                          
+    ./mksnapshot $                                                              
+    obj/multi_return_fuzzer.stamp $                                             
+    obj/parser_fuzzer.stamp $                                                   
+    obj/postmortem-metadata.stamp $                                             
+    obj/regexp_builtins_fuzzer.stamp $                                          
+    obj/regexp_fuzzer.stamp $                                                   
+    obj/run_gen-regexp-special-case.stamp $                                     
+    obj/run_mksnapshot_default.stamp $                                          
+    obj/run_torque.stamp $                                                      
+    ./torque $                                                                  
+    ./torque-language-server $                                                  
+    obj/torque_base.stamp $                                                     
+    obj/torque_generated_definitions.stamp $                                    
+    obj/torque_generated_initializers.stamp $                                   
+    obj/torque_ls_base.stamp $                                                  
+    ./libv8.so.TOC $                                                            
+    obj/v8_archive.stamp $
+    ...
+```
+A `phony` rule can be used to create an alias for other targets. 
+The `$` in ninja is an escape character so in the case of the all target it
+escapes the new line, like using \ in a shell script.
+
+Lets take a look at `bytecode_builtins_list_generator`: 
+```
+build $:bytecode_builtins_list_generator: phony ./bytecode_builtins_list_generator
+```
+The format of the ninja build statement is:
+```
+build outputs: rulename inputs
+```
+We are again seeing the `$` ninja escape character but this time it is escaping
+the colon which would otherwise be interpreted as separating file names. The output
+in this case is bytecode_builtins_list_generator. And I'm guessing, as I can't
+find a connection between `./bytecode_builtins_list_generator` and 
+
+The default `target_out_dir` in this case is //out/x64.release_gcc/obj.
+The executable in BUILD.gn which generates this does not specify any output
+directory so I'm assuming that it the generated .ninja file is place in the 
+target_out_dir in this case where we can find `bytecode_builtins_list_generator.ninja` 
+This file has a label named:
+```
+label_name = bytecode_builtins_list_generator                                   
+```
+Hmm, notice that in build.ninja there is the following command:
+```
+subninja toolchain.ninja
+```
+And in `toolchain.ninja` we have:
+```
+subninja obj/bytecode_builtins_list_generator.ninja
+```
+This is what is making `./bytecode_builtins_list_generator` available.
+
+```console
+$ ninja -C out/x64.release_gcc/ -t targets all  | grep bytecode_builtins_list_generator
+$ rm out/x64.release_gcc/bytecode_builtins_list_generator 
+$ ninja -C out/x64.release_gcc/ bytecode_builtins_list_generator
+ninja: Entering directory `out/x64.release_gcc/'
+[1/1] LINK ./bytecode_builtins_list_generator
+```
+
+Alright, so I'd like to understand when in the process torgue is run to
+generate classes like TorqueGeneratedStruct:
+```c++
+class Struct : public TorqueGeneratedStruct<Struct, HeapObject> {
+```
+```
+./torque $                                                                  
+./torque-language-server $                                                  
+obj/torque_base.stamp $                                                     
+obj/torque_generated_definitions.stamp $                                    
+obj/torque_generated_initializers.stamp $                                   
+obj/torque_ls_base.stamp $  
+```
+Like before we can find that obj/torque.ninja in included by the subninja command
+in toolchain.ninja:
+```
+subninja obj/torque.ninja
+```
+So this is building the executable `torque`, but it has not been run yet.
+```console
+$ gn ls out/x64.release_gcc/ --type=action
+//:generate_bytecode_builtins_list
+//:postmortem-metadata
+//:run_gen-regexp-special-case
+//:run_mksnapshot_default
+//:run_torque
+//:v8_dump_build_config
+//src/inspector:protocol_compatibility
+//src/inspector:protocol_generated_sources
+//tools/debug_helper:gen_heap_constants
+//tools/debug_helper:run_mkgrokdump
+```
+Notice the `run_torque` target
+```console
+$ gn desc out/x64.release_gcc/ //:run_torque
+```
+If we look in toolchain.ninja we have a rule named `___run_torque___build_toolchain_linux_x64__rule`
+```console
+command = python ../../tools/run.py ./torque -o gen/torque-generated -v8-root ../.. 
+  src/builtins/array-copywithin.tq
+  src/builtins/array-every.tq
+  src/builtins/array-filter.tq
+  src/builtins/array-find.tq
+  ...
+```
+And there is a build that specifies the .h and cc files in gen/torque-generated
+which has this rule in it if they change.
 
 
 ## Building chromium
@@ -5413,8 +5529,41 @@ So one "only" has to implement one component/function/feature (not sure what to
 call this) and then it can be made available to all platforms. They no longer
 have to maintain all that handwritten assembly.
 
+Just to be clear CSA is a C++ API that is used to generate IR which is then
+compiled in to machine code for the target instruction set architectur.
+
 ### [Torque](https://v8.dev/docs/torque)
-Is a language to void having to use the CodeStubAssembler.
+Is a DLS language to void having to use the CodeStubAssembler. This language
+is statically typed, garbage collected, and compatible with JavaScript.
+
+The JavaScript standard library was implemented in V8 previously using hand
+written assembly. But as we mentioned in the previous section this did not scale.
+
+It could have been written in JavaScript too, and I think this was done in the
+past but this has some issues as builtins would need warmup time to become
+optimized, there are issues with monkey-patching and exposing VM internals
+unintentionally.
+
+Is torgue run a build time, I'm thinking yes as it would have to generate the
+c++ code.
+
+There is a main function in torque.cc which will be built into an executable
+```console
+$ ./out/x64.release_gcc/torque --help
+Unexpected command-line argument "--help", expected a .tq file.
+```
+
+The files that are processed by torque are defined in BUILD.gc in the 
+`torque_files` section. There is also a template named `run_torque`.
+I've noticed that this template and others in GN use the script  `tools/run.py`.
+This is apperently because GN an only execute scripts at the moment and what this
+script does is use python to create a subprocess with the passed in argument:
+```console
+$ gn help action
+```
+And a template is way to reuse code in GN.
+
+Goma is googles internal distributed compile service.
 
 
 
