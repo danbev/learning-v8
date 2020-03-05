@@ -2,6 +2,7 @@
 #include "gtest/gtest.h"
 #include "v8.h"
 #include "v8_test_fixture.h"
+#include "src/objects/objects.h"
 
 class PersistentTest : public V8TestFixture {
 };
@@ -69,6 +70,7 @@ TEST_F(PersistentTest, object) {
   EXPECT_EQ(false, s.persistent().IsEmpty()) << "Default constructed Local should be empty";
 }
 
+/*
 TEST_F(PersistentTest, PrintObject) {
   const v8::HandleScope handle_scope(isolate_);
   v8::Isolate::Scope isolate_scope(isolate_);
@@ -82,3 +84,4 @@ TEST_F(PersistentTest, PrintObject) {
   //_v8_internal_Print_Object(*ppo);
   _v8_internal_Print_Object(*((v8::internal::Object**)*obj));
 }
+*/
