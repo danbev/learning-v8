@@ -4,6 +4,7 @@
 #include "libplatform/libplatform.h"
 #include "v8_test_fixture.h"
 #include "src/execution/isolate.h"
+#include "src/execution/isolate-inl.h"
 
 using namespace v8;
 namespace i = v8::internal;
@@ -35,4 +36,30 @@ TEST_F(IsolateTest, Members) {
   std::cout << "handler: " << v8::internal::kHandlerAddress << '\n';
   std::cout << "c_entry_fp: " << v8::internal::kCEntryFPAddress << '\n';
   std::cout << "c_function: " << v8::internal::kCFunctionAddress << '\n';
+  std::cout << "context: " << v8::internal::kContextAddress << '\n';
+
+  i::Builtins* builtins = i_isolate->builtins();
+  std::cout << "builtins count: " << builtins->builtin_count << '\n';
+  i::Code code = builtins->builtin(3);
+  std::cout << "Builtins::Name::kRecordWrite: " << i::Builtins::Name::kRecordWrite <<
+  ", name: " << i::Builtins::name(i::Builtins::Name::kRecordWrite) << '\n';
+
+  i::ThreadLocalTop* tlt = i_isolate->thread_local_top();
+  std::cout << "thread_local_top bytes size: " << tlt->kSizeInBytes  << '\n';
+  std::cout << "thread_local_top thread_id_: " << tlt->thread_id_.ToInteger()  << '\n';
+
+  // Verify that the handler_ addresses are the same going via the Isolate
+  // or the ThreadLocalTop pointer.
+  i::Address* handler_address = i_isolate->handler_address();
+  i::Address& handler_address2 = tlt->handler_;
+  std::cout << "handler_address: " << handler_address << '\n';
+  std::cout << "handler_address2: " << &handler_address2 << '\n';
+
+
+  // ReadOnlyRoots
+  i::ReadOnlyRoots ro_roots = i::ReadOnlyRoots(i_isolate);
+  std::cout << "read only root entries: " << ro_roots.kEntriesCount << '\n';
+  i::Map free_space_map = ro_roots.free_space_map();
+  std::cout << "free_space_map instance size: " << free_space_map.instance_size() << '\n';
+  i::Handle<i::Map> free_space_map_handle = ro_roots.free_space_map_handle();
 }
