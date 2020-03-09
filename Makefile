@@ -7,7 +7,7 @@ current_dir=$(shell pwd)
 v8_include_dir = $(V8_HOME)/include
 v8_src_dir = $(V8_HOME)/src
 v8_gen_dir = $(v8_build_dir)/gen
-v8_dylibs=-lv8_for_testing -lv8_libplatform -lv8_libbase
+v8_dylibs=-lv8 -lv8_libplatform -lv8_libbase
 GTEST_FILTER ?= "*"
 clang = "$(V8_HOME)/third_party/llvm-build/Release+Asserts/bin/clang"
 
@@ -16,7 +16,7 @@ clang_cmd=g++ -Wall -g $@.cc -o $@ -std=c++14 -Wcast-function-type \
           -I$(v8_include_dir) \
           -I$(V8_HOME) \
           -I$(v8_build_dir)/gen \
-          -L$(v8_build_dir)/obj \
+          -L$(v8_build_dir) \
           $(v8_dylibs) \
           -Wl,-L$(v8_build_dir) -Wl,-lpthread
 
@@ -31,7 +31,6 @@ clang_test_cmd=g++ -Wall -g test/main.cc $@.cc -o $@  ./lib/gtest/libgtest-linux
           -L$(v8_build_dir) \
           -I./deps/googletest/googletest/include \
           $(v8_dylibs) \
-          -Wl,--verbose \
           -Wl,-L$(v8_build_dir) -Wl,-L/usr/lib64 -Wl,-lstdc++ -Wl,-lpthread
 
 clang_gtest_cmd=g++ --verbose -Wall -O0 -g -c $(gtest_home)/src/gtest-all.cc \
@@ -63,7 +62,8 @@ run-hello:
 
 .PHONY: gdb-hello
 gdb-hello:
-	gdb --cd=$(v8_build_dir) --args $(current_dir)/hello-world
+	@LD_LIBRARY_PATH=$(v8_build_dir)/ gdb --cd=$(v8_build_dir) --args $(current_dir)/hello-world
+	
 
 contexts: snapshot_blob.bin contexts.cc
 	clang++ -O0 -g -I$(v8_include_dir) $(v8_dylibs) -L$(v8_build_dir) $@.cc -o $@ -pthread -std=c++0x -rpath $(v8_build_dir)
@@ -114,6 +114,9 @@ test/heap_test: test/heap_test.cc
 	$(clang_test_cmd)
 
 test/map_test: test/map_test.cc
+	$(clang_test_cmd)
+
+test/isolate_test: test/isolate_test.cc
 	$(clang_test_cmd)
 
 list-gtest:

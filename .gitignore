@@ -22,3 +22,4 @@ test/context_test
 contexts
 test/heap_test
 test/map_test
+test/isolate_test
