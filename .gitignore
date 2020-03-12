@@ -24,3 +24,4 @@ test/heap_test
 test/map_test
 test/isolate_test
 test/tagged_test
+test/heapobject_test
