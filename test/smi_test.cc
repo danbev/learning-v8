@@ -2,6 +2,9 @@
 #include "gtest/gtest.h"
 #include "v8.h"
 #include <bitset>
+#include "src/objects/objects-inl.h"
+
+namespace i = v8::internal;
 
 /*
  * Small integer (SMI) example. These are tagged values.
@@ -17,21 +20,26 @@
  * Remember that we are talking about the value stored in a memory location, 
  * which in this case is interpreted as an address. It is this value that 
  * will be a multiple of 8 like described above. As seen above there will be
- * a three of the lowest order bits that will always be zero. This allows us to
+ * three of the lowest order bits that will always be zero. This allows us to
  * use them for other purposes. This is done as using a pointer for everything
  * is not efficient. For example, using this for small integers 
- *
  */
-TEST(Smi, IntToSmi) {
-  int value = 2;
+TEST(Smi, SmiFromInt) {
+  i::Smi smi = i::Smi::FromInt(2);
+  EXPECT_EQ("00000000000000000000000000000010", std::bitset<32>(smi.value()).to_string());
+  EXPECT_EQ(smi.value(), 2);
+  EXPECT_EQ(smi.ptr(), static_cast<uintptr_t>(smi.ptr()));
+  EXPECT_EQ(smi.ptr(), static_cast<i::Address>(smi.ptr()));
+  std::cout << smi.ptr() << " " << static_cast<uintptr_t>(smi.ptr()) <<  '\n';
+
   int smiShiftTagSize = 1;
   int smiShiftSize = 0;
   int smi_shift_bits = smiShiftTagSize + smiShiftSize;
   int smiTag = 0;
-  EXPECT_EQ("00000000000000000000000000000010", std::bitset<32>(value).to_string());
+  EXPECT_EQ("00000000000000000000000000000010", std::bitset<32>(smi.value()).to_string());
   // unintptr_t is being used because bitwise operations cannot be done on pointers
   // according to the standard. 
-  uintptr_t tagged = (static_cast<uintptr_t>(value) << smi_shift_bits) | smiTag;
+  uintptr_t tagged = (static_cast<uintptr_t>(smi.value()) << smi_shift_bits) | smiTag;
   EXPECT_EQ("00000000000000000000000000000100", std::bitset<32>(tagged).to_string());
   // so we are left shifting one position and then ORing with 0 keeping the int
   // intact. 

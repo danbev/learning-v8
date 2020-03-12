@@ -96,7 +96,7 @@ test/maybe_test: test/maybe_test.cc
 	$(COMPILE_TEST) test/main.cc $< -o $@
 
 test/smi_test: test/smi_test.cc
-	$(COMPILE_TEST) test/main.cc $< -o $@
+	$(clang_test_cmd)
 
 test/string_test: test/string_test.cc
 	$(COMPILE_TEST) test/main.cc $< -o $@
