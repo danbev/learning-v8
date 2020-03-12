@@ -125,7 +125,13 @@ test/builtins_test: test/builtins_test.cc
 test/tagged_test: test/tagged_test.cc
 	$(clang_test_cmd)
 
+test/object_test: test/object_test.cc
+	$(clang_test_cmd)
+
 test/heapobject_test: test/heapobject_test.cc
+	$(clang_test_cmd)
+
+test/objectslot_test: test/objectslot_test.cc
 	$(clang_test_cmd)
 
 list-gtest:
