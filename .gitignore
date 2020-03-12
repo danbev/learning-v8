@@ -26,3 +26,4 @@ test/isolate_test
 test/tagged_test
 test/heapobject_test
 test/object_test
+test/objectslot_test
