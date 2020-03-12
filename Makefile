@@ -119,6 +119,12 @@ test/map_test: test/map_test.cc
 test/isolate_test: test/isolate_test.cc
 	$(clang_test_cmd)
 
+test/builtins_test: test/builtins_test.cc
+	$(clang_test_cmd)
+
+test/tagged_test: test/tagged_test.cc
+	$(clang_test_cmd)
+
 list-gtest:
 	./test/smi_test --gtest_list_test
 
