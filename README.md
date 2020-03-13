@@ -79,6 +79,71 @@ code using the `new` operator:
 const obj = new Something(1, 2, "3");
 ```
 
+### TaggedImpl
+Has a single private member which is declared as:
+```c++
+StorageType ptr_;
+```
+An instance can be created using:
+```c++
+  i::TaggedImpl<i::HeapObjectReferenceType::STRONG, i::Address>  tagged{};
+```
+Storage type can also be `Tagged_t` which is defined in globals.h:
+```c++
+ using Tagged_t = uint32_t;
+```
+It looks like it can be a different value when using pointer compression.
+
+### Object (internal)
+This class extends TaggedImpl:
+```c++
+class Object : public TaggedImpl<HeapObjectReferenceType::STRONG, Address> {       
+```
+An Object can be created using the default constructor, or by passing in an 
+Address which will delegate to TaggedImpl constructors. Object itself does
+not have any members (apart from ptr_ which is inherited from TaggedImpl that is). 
+So if we create an Object on the stack this is like a pointer/reference to
+an object: 
+```
++------+
+|Object|
+|------|
+|ptr_  |---->
++------+
+```
+Now, `ptr_` is a TaggedImpl so it would be a Smi in which case it would just
+contains the value directly, for example a small integer:
+```
++------+
+|Object|
+|------|
+|  18  |
++------+
+```
+
+### ObjectSlot
+```c++
+  i::Object obj{18};
+  i::FullObjectSlot slot{&obj};
+```
+
+```
++----------+      +---------+
+|ObjectSlot|      | Object  |
+|----------|      |---------|
+| address  | ---> |   18    |
++----------+      +---------+
+```
+
+### Handle
+A Handle is similar to a Object and ObjectSlot in that it also contains
+an Address member (called location_ and declared in HandleBase), but with the
+difference is that Handles can be relocated by the garbage collector.
+
+### HeapObject
+TODO:
+
+
 ### PrintObject
 Using _v8_internal_Print_Object from c++:
 ```console
