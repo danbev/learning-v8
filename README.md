@@ -141,8 +141,42 @@ See [objectslot_test.cc](./test/objectslot_test.cc) for an example.
 
 ### Handle
 A Handle is similar to a Object and ObjectSlot in that it also contains
-an Address member (called location_ and declared in HandleBase), but with the
-difference is that Handles can be relocated by the garbage collector.
+an Address member (called `location_` and declared in `HandleBase`), but with the
+difference is that Handles acts as a layer of abstraction and can be relocated
+by the garbage collector.
+
+```
++----------+                  +--------+         +---------+
+|  Handle  |                  | Object |         |   int   |
+|----------|      +-----+     |--------|         |---------|
+|*location_| ---> |&ptr_| --> | ptr_   | ----->  |     5   |
++----------+      +-----+     +--------+         +---------+
+```
+```console
+(gdb) p handle
+$8 = {<v8::internal::HandleBase> = {location_ = 0x7ffdf81d60c0}, <No data fields>}
+```
+Notice that `location_` contains a pointer:
+```console
+(gdb) p /x *(int*)0x7ffdf81d60c0
+$9 = 0xa9d330
+```
+And this is the same as the value in obj:
+```console
+(gdb) p /x obj.ptr_
+$14 = 0xa9d330
+```
+And we can access the int using any of the pointers:
+```console
+(gdb) p /x *value
+$16 = 0x5
+(gdb) p /x *obj.ptr_
+$17 = 0x5
+(gdb) p /x *(int*)0x7ffdf81d60c0
+$18 = 0xa9d330
+(gdb) p /x *(*(int*)0x7ffdf81d60c0)
+$19 = 0x5
+```
 
 See [handle_test.cc](./test/handle_test.cc) for an example.
 
