@@ -19,7 +19,7 @@ TEST_F(TaggedTest, Create) {
   i::Isolate* i_isolate = asInternal(isolate_);
 
   i::TaggedImpl<i::HeapObjectReferenceType::STRONG, i::Address>  tagged{};
-  EXPECT_EQ(tagged.ptr(), static_cast<i::Address>(0));
+  EXPECT_EQ(tagged.ptr(), i::kNullAddress);
   EXPECT_EQ(tagged.IsObject(), true);
   EXPECT_EQ(tagged.IsSmi(), true);
 
