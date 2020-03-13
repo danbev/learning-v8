@@ -94,6 +94,8 @@ Storage type can also be `Tagged_t` which is defined in globals.h:
 ```
 It looks like it can be a different value when using pointer compression.
 
+See [tagged_test.cc](./test/tagged_test.cc) for an example.
+
 ### Object (internal)
 This class extends TaggedImpl:
 ```c++
@@ -120,6 +122,7 @@ contains the value directly, for example a small integer:
 |  18  |
 +------+
 ```
+See [object_test.cc](./test/object_test.cc) for an example.
 
 ### ObjectSlot
 ```c++
@@ -134,11 +137,14 @@ contains the value directly, for example a small integer:
 | address  | ---> |   18    |
 +----------+      +---------+
 ```
+See [objectslot_test.cc](./test/objectslot_test.cc) for an example.
 
 ### Handle
 A Handle is similar to a Object and ObjectSlot in that it also contains
 an Address member (called location_ and declared in HandleBase), but with the
 difference is that Handles can be relocated by the garbage collector.
+
+See [handle_test.cc](./test/handle_test.cc) for an example.
 
 ### HeapObject
 TODO:
