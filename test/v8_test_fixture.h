@@ -5,6 +5,9 @@
 #include "gtest/gtest.h"
 #include "v8.h"
 #include "libplatform/libplatform.h"
+#include "src/execution/isolate-inl.h"
+
+namespace i = v8::internal;
 
 class V8TestFixture : public ::testing::Test {
  protected:
@@ -28,6 +31,7 @@ class V8TestFixture : public ::testing::Test {
 
   virtual void SetUp() {
     isolate_ = v8::Isolate::New(create_params_);
+    asInternal(isolate_)->handle_scope_data()->Initialize();
   }
 
   virtual void TearDown() {
