@@ -3783,25 +3783,29 @@ A little further down in src/api.h there is another macro which looks like this:
     OPEN_HANDLE_LIST(MAKE_OPEN_HANDLE)
 
 MAKE_OPEN_HANDLE:
-
+```c++
     #define MAKE_OPEN_HANDLE(From, To)
       v8::internal::Handle<v8::internal::To> Utils::OpenHandle( 
       const v8::From* that, bool allow_empty_handle) {         
-      DCHECK(allow_empty_handle || that != NULL);             
-      DCHECK(that == NULL ||                                 
-           (*reinterpret_cast<v8::internal::Object* const*>(that))->Is##To());
       return v8::internal::Handle<v8::internal::To>(                         
-        reinterpret_cast<v8::internal::To**>(const_cast<v8::From*>(that))); 
+        reinterpret_cast<v8::internal::Address*>(const_cast<v8::From*>(that))); 
       }
-And remember that JSFunction is included in the OPEN_HANDLE_LIST so there will
+```
+And remember that JSFunction is included in the `OPEN_HANDLE_LIST` so there will
 be the following in the source after the preprocessor has processed this header:
+A concrete example would look like this:
+```c++
+v8::internal::Handle<v8::internal::JSFunction> Utils::OpenHandle(
+    const v8::Script* that, bool allow_empty_handle) {
+  return v8::internal::Handle<v8::internal::JSFunction>(
+      reinterpret_cast<v8::internal::Address*>(const_cast<v8::Script*>(that))); }
+```
 
-      v8::internal::Handle<v8::internal::JSFunction> Utils::OpenHandle( 
-        const v8::Script* that, bool allow_empty_handle) {         
-          DCHECK(allow_empty_handle || that != NULL);             
-          DCHECK(that == NULL ||                                 
-           (*reinterpret_cast<v8::internal::Object* const*>(that))->IsJSFunction());
-          return v8::internal::Handle<v8::internal::JSFunction>(                               reinterpret_cast<v8::internal::JSFunction**>(const_cast<v8::Script*>(that))); 
+You can inspect the output of the preprocessor using:
+```console
+$ clang++ -I./out/x64.release/gen -I. -I./include -E src/api/api-inl.h > api-inl.output
+```
+
 
 So where is JSFunction declared? 
 It is defined in objects.h
