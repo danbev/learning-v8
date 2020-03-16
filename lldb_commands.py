@@ -21,6 +21,19 @@ def current_frame(debugger):
   return current_thread(debugger).GetSelectedFrame()
 
 def no_arg_cmd(debugger, cmd):
+  evaluate_result = current_frame(debugger).EvaluateExpression(cmd)
+  # When a void function is called the return value type is 0x1001 which
+  # is specified in http://tiny.cc/bigskz. This does not indicate
+  # an error so we check for that value below.
+  kNoResult = 0x1001
+  error = evaluate_result.GetError()
+  if error.fail and error.value != kNoResult:
+      print("Failed to evaluate command {} :".format(cmd))
+      print(error.description)
+  else:
+    print("")
+
+def no_arg_cmd(debugger, cmd):
   error = current_frame(debugger).EvaluateExpression(cmd).error
   if not error.success and error.value != 0x1001:
       print("Failed to evaluate command {} :".format(cmd))
