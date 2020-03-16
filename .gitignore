@@ -27,3 +27,5 @@ test/tagged_test
 test/heapobject_test
 test/object_test
 test/objectslot_test
+test/handle_test
+test/handlescope_test

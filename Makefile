@@ -134,6 +134,12 @@ test/heapobject_test: test/heapobject_test.cc
 test/objectslot_test: test/objectslot_test.cc
 	$(clang_test_cmd)
 
+test/handle_test: test/handle_test.cc
+	$(clang_test_cmd)
+
+test/handlescope_test: test/handlescope_test.cc
+	$(clang_test_cmd)
+
 list-gtest:
 	./test/smi_test --gtest_list_test
 
