@@ -42,7 +42,6 @@ int main(int argc, char* argv[]) {
 
     // Set up thread pool etc.
     std::unique_ptr<Platform> platform = platform::NewDefaultPlatform();
-    platform::NewDefaultPlatform();
     // Just sets the platform created above.
     V8::InitializePlatform(platform.get());
     V8::Initialize();
