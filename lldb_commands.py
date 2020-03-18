@@ -33,14 +33,6 @@ def no_arg_cmd(debugger, cmd):
   else:
     print("")
 
-def no_arg_cmd(debugger, cmd):
-  error = current_frame(debugger).EvaluateExpression(cmd).error
-  if not error.success and error.value != 0x1001:
-      print("Failed to evaluate command {} :".format(cmd))
-      print(error.description)
-  else:
-    print("")
-
 def ptr_arg_cmd(debugger, name, param, cmd):
   if not param:
     print("'{}' requires an argument".format(name))
