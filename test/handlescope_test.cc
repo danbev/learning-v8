@@ -37,11 +37,17 @@ TEST_F(HandleScopeTest, Create) {
 TEST_F(HandleScopeTest, HandleScopeImplementer) {
   i::Isolate* i_isolate = asInternal(isolate_);
   i::HandleScopeImplementer implementer{i_isolate};
-  // Context is just a HeapObject so we can construct one using 
+  // Context is just a HeapObject so we can construct one the default not
+  // args constructor.
   i::Context context{};
 
   implementer.SaveContext(context);
   EXPECT_TRUE(implementer.HasSavedContexts());
+
+  implementer.EnterContext(context);
+  EXPECT_EQ(static_cast<int>(implementer.EnteredContextCount()), 1);
+  implementer.LeaveContext();
+  EXPECT_EQ(static_cast<int>(implementer.EnteredContextCount()), 0);
 
   i::DetachableVector<i::Address*>* blocks = implementer.blocks();
   EXPECT_TRUE(blocks->empty());

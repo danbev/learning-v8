@@ -180,8 +180,126 @@ $19 = 0x5
 
 See [handle_test.cc](./test/handle_test.cc) for an example.
 
+### HandleScope
+A HandleScope only has three members:
+```c++
+  internal::Isolate* isolate_;
+  internal::Address* prev_next_;
+  internal::Address* prev_limit_;
+```
+
+Lets take a closer look at what happens when we construct a HandleScope:
+```c++
+  v8::HandleScope handle_scope{isolate_};
+```
+The constructor call will end up in `src/api/api.cc` and the constructor simply delegates to
+`Initialize`:
+```c++
+HandleScope::HandleScope(Isolate* isolate) { Initialize(isolate); }
+
+void HandleScope::Initialize(Isolate* isolate) {
+  i::Isolate* internal_isolate = reinterpret_cast<i::Isolate*>(isolate);
+  ...
+  i::HandleScopeData* current = internal_isolate->handle_scope_data();
+  isolate_ = internal_isolate;
+  prev_next_ = current->next;
+  prev_limit_ = current->limit;
+  current->level++;
+}
+```
+Every v8::internal::Isolate has member of type HandleScopeData:
+```c++
+HandleScopeData handle_scope_data_;
+HandleScopeData* handle_scope_data() { return &handle_scope_data_; }
+```
+HandleScopeData is a struct defined in `src/handles/handles.h`:
+```c++
+struct HandleScopeData final {
+  Address* next;
+  Address* limit;
+  int level;
+  int sealed_level;
+  CanonicalHandleScope* canonical_scope;
+
+  void Initialize() {
+    next = limit = nullptr;
+    sealed_level = level = 0;
+    canonical_scope = nullptr;
+  }
+};
+```
+Notice that there are two pointers (Address*) to next and a limit. When a 
+HandleScope is Initialized the current handle_scope_data will be retrieved 
+from the internal isolate. The HandleScope instance that is getting created
+stores the next/limit pointers of the current isolate so that they can be restored
+when this HandleScope is closed (see CloseScope).
+
+So with a HandleScope created, how does a Local<T> interact with this instance?  
+HandleScope:CreateHandle will get the handle_scope_data from the isolate:
+```c++
+Address* HandleScope::CreateHandle(Isolate* isolate, Address value) {
+  HandleScopeData* data = isolate->handle_scope_data();
+  if (result == data->limit) {
+    result = Extend(isolate);
+  }
+  // Update the current next field, set the value in the created handle,        
+  // and return the result.
+  data->next = reinterpret_cast<Address*>(reinterpret_cast<Address>(result) + sizeof(Address));
+  *result = value;
+  return result;
+}                         
+```
+
+When a Local<T> is created this will/might go through FactoryBase::NewStruct
+which will allocate a new Map and then create a Handle for the InstanceType
+being created:
+```c++
+Handle<Struct> str = handle(Struct::cast(result), isolate()); 
+```
+This will land in the constructor Handle<T>src/handles/handles-inl.h
+```c++
+template <typename T>                                                           
+Handle<T>::Handle(T object, Isolate* isolate): HandleBase(object.ptr(), isolate) {}
+
+HandleBase::HandleBase(Address object, Isolate* isolate)                        
+    : location_(HandleScope::GetHandle(isolate, object)) {}
+```
+Notice that `object.ptr()` is used to pass the Address to HandleBase.
+And also notice that HandleBase sets its location_ to the result of HandleScope::GetHandle.
+
+```c++
+Address* HandleScope::GetHandle(Isolate* isolate, Address value) {              
+  DCHECK(AllowHandleAllocation::IsAllowed());                                   
+  HandleScopeData* data = isolate->handle_scope_data();                         
+  CanonicalHandleScope* canonical = data->canonical_scope;                      
+  return canonical ? canonical->Lookup(value) : CreateHandle(isolate, value);   
+}
+```
+Which will call CreateHandle in this case and this function will retrieve the
+current isolate's handle_scope_data:
+```c++
+  HandleScopeData* data = isolate->handle_scope_data();                         
+  Address* result = data->next;                                                 
+  if (result == data->limit) {                                                  
+    result = Extend(isolate);                                                   
+  }     
+```
+In this case both next and limit will be 0x0 so Extend will be called.
+Extend will also get the isolates handle_scope_data and check the current level
+and after that get the isolates HandleScopeImplementer:
+```c++
+  HandleScopeImplementer* impl = isolate->handle_scope_implementer();           
+```
+`HandleScopeImplementer` is declared in `src/api/api.h`
+
+
+The destructor for HandleScope will call CloseScope.
+See [handlescope_test.cc](./test/handlescope_test.cc) for an example.
+
 ### HeapObject
 TODO:
+
+
 
 
 ### PrintObject
