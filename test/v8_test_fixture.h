@@ -31,7 +31,6 @@ class V8TestFixture : public ::testing::Test {
 
   virtual void SetUp() {
     isolate_ = v8::Isolate::New(create_params_);
-    asInternal(isolate_)->handle_scope_data()->Initialize();
   }
 
   virtual void TearDown() {
