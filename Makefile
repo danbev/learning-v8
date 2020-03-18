@@ -98,7 +98,7 @@ snapshot_blob.bin:
 check: test/local_test test/persistent-object_test test/maybe_test test/smi_test test/string_test test/context_test
 
 test/local_test: test/local_test.cc
-	$(COMPILE_TEST) test/main.cc $< -o $@
+	$(clang_test_cmd)
 
 test/persistent-object_test: test/persistent-object_test.cc
 	$(clang_test_cmd)
