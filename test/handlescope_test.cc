@@ -27,6 +27,7 @@ TEST_F(HandleScopeTest, HandleScopeData) {
 
 TEST_F(HandleScopeTest, Create) {
   i::Isolate* i_isolate = asInternal(isolate_);
+  i_isolate->handle_scope_data()->Initialize();
   i::HandleScope handle_scope{i_isolate};
   i::Object obj{18};
   i::Handle<i::Object> handle(obj, i_isolate);
