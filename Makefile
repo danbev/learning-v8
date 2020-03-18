@@ -39,6 +39,17 @@ clang_gtest_cmd=g++ --verbose -Wall -O0 -g -c $(gtest_home)/src/gtest-all.cc \
           -I$(gtest_home) \
           -I$(gtest_home)/include
 
+clang_torque_cmd=g++ -Wall -g -c gen/torque-generated/exported-macros-assembler-tq.cc \
+	  -o exported-macros-assembler.o -std=c++14 -Wcast-function-type \
+	  -fno-exceptions -fno-rtti \
+          -I$(v8_include_dir) \
+          -I$(V8_HOME) \
+          -I$(v8_build_dir)/gen \
+          -Igen \
+          -L$(v8_build_dir) \
+          $(v8_dylibs) \
+          -Wl,-L$(v8_build_dir) -Wl,-lpthread
+
 
 COMPILE_TEST = g++ -v -std=c++11 -O0 -g -I$(V8_HOME)/third_party/googletest/src/googletest/include -I$(v8_include_dir) -I$(v8_gen_dir) -I$(V8_HOME) $(v8_dylibs) -L$(v8_build_dir) -pthread  lib/gtest/libgtest.a
 
@@ -108,7 +119,7 @@ test/ast_test: test/ast_test.cc
 	$(COMPILE_TEST) -Wno-everything test/main.cc $< -o $@
 
 test/context_test: test/context_test.cc
-	$(COMPILE_TEST) test/main.cc $< -o $@
+	$(clang_test_cmd)
 
 test/heap_test: test/heap_test.cc
 	$(clang_test_cmd)
@@ -140,8 +151,25 @@ test/handle_test: test/handle_test.cc
 test/handlescope_test: test/handlescope_test.cc
 	$(clang_test_cmd)
 
-list-gtest:
-	./test/smi_test --gtest_list_test
+
+V8_TORQUE_BUILTINS_FILES=$(addprefix src/builtins/,$(notdir $(wildcard $(V8_HOME)/src/builtins/*.tq)))
+V8_TORQUE_OBJECTS_FILES=$(addprefix src/objects/,$(notdir $(wildcard $(V8_HOME)/src/objects/*.tq)))
+V8_TORQUE_WASM_FILES=$(addprefix src/wasm/,$(notdir $(wildcard $(V8_HOME)/src/wasm/*.tq)))
+V8_TORQUE_TP_FILES=$(addprefix src/third_party/,$(notdir $(wildcard $(V8_HOME)/src/third_party/*.tq)))
+V8_TORQUE_TEST_FILES=$(addprefix test/torque/,$(notdir $(wildcard $(V8_HOME)/test/torque/*.tq)))
+
+torque-example: torque-example.tq
+	@mkdir -p gen/torque-generated
+	$(info Generating Torque files in gen/torque-generated)
+	@cp $< $(V8_HOME)
+	@$(v8_build_dir)/torque -o gen/torque-generated -v8-root $(V8_HOME) \
+		$(V8_TORQUE_BUILTINS_FILES) \
+		$(V8_TORQUE_OBJECTS_FILES) \
+		$(V8_TORQUE_WASM_FILES) \
+		$(V8_TORQUE_TP_FILES) \
+		$(V8_TORQUE_TEST_FILES) \
+		$<
+	@rm $(V8_HOME)/$<
 
 .PHONY: clean list-gtest
 
