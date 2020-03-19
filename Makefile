@@ -151,6 +151,9 @@ test/handle_test: test/handle_test.cc
 test/handlescope_test: test/handlescope_test.cc
 	$(clang_test_cmd)
 
+test/objecttemplate_test: test/objecttemplate_test.cc
+	$(clang_test_cmd)
+
 
 V8_TORQUE_BUILTINS_FILES=$(addprefix src/builtins/,$(notdir $(wildcard $(V8_HOME)/src/builtins/*.tq)))
 V8_TORQUE_OBJECTS_FILES=$(addprefix src/objects/,$(notdir $(wildcard $(V8_HOME)/src/objects/*.tq)))
