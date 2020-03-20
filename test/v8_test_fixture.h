@@ -7,9 +7,15 @@
 #include "libplatform/libplatform.h"
 #include "src/execution/isolate-inl.h"
 
+extern void _v8_internal_Print_Object(void* object);
+
 namespace i = v8::internal;
 
 class V8TestFixture : public ::testing::Test {
+ public:
+  static void print_local(v8::Local<v8::Object> obj) {
+    _v8_internal_Print_Object(*((v8::internal::Object**)*obj));
+  }
  protected:
   static std::unique_ptr<v8::Platform> platform_;
   static std::unique_ptr<v8::ArrayBuffer::Allocator> allocator_;
@@ -40,6 +46,7 @@ class V8TestFixture : public ::testing::Test {
   v8::internal::Isolate* asInternal(v8::Isolate* isolate) {
     return reinterpret_cast<v8::internal::Isolate*>(isolate);
   }
+
 
  private:
 };
