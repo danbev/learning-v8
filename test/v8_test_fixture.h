@@ -13,7 +13,8 @@ namespace i = v8::internal;
 
 class V8TestFixture : public ::testing::Test {
  public:
-  static void print_local(v8::Local<v8::Object> obj) {
+  template<typename T>
+  static void print_local(v8::Local<T> obj) {
     _v8_internal_Print_Object(*((v8::internal::Object**)*obj));
   }
  protected:
