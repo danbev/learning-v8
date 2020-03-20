@@ -29,3 +29,6 @@ test/object_test
 test/objectslot_test
 test/handle_test
 test/handlescope_test
+torque-example
+test/objecttemplate_test
+test/functiontemplate_test

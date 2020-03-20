@@ -151,7 +151,13 @@ test/handle_test: test/handle_test.cc
 test/handlescope_test: test/handlescope_test.cc
 	$(clang_test_cmd)
 
+test/csa_test: test/csa_test.cc
+	$(clang_test_cmd)
+
 test/objecttemplate_test: test/objecttemplate_test.cc
+	$(clang_test_cmd)
+
+test/functiontemplate_test: test/functiontemplate_test.cc
 	$(clang_test_cmd)
 
 
