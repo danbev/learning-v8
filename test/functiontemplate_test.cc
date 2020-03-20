@@ -32,7 +32,7 @@ void function_callback(const FunctionCallbackInfo<Value>& info) {
   Local<Object> holder = info.Holder();
 
   ReturnValue<Value> return_value = info.GetReturnValue();
-  double nr2 = nr->Value();
+  double nr2 = nr->Value() + 2;
   return_value.Set(nr2);
 
   EXPECT_STREQ(*String::Utf8Value(isolate, info.Data()), "some info");
@@ -58,7 +58,7 @@ TEST_F(FunctionTemplateTest, FunctionTemplate) {
   MaybeLocal<Value> ret = function->Call(context, recv, 0, nullptr);
   if (!ret.IsEmpty()) {
     Local<Number> nr = ret.ToLocalChecked()->ToNumber(context).ToLocalChecked();
-    EXPECT_EQ(nr->Value(), 18);
+    EXPECT_EQ(nr->Value(), 20);
   }
 
   //Local<Function> function2 = ft->GetFunction(context).ToLocalChecked();
