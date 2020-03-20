@@ -12,7 +12,7 @@ using namespace v8;
 class ObjectTemplateTest : public V8TestFixture {
 };
 
-TEST_F(ObjectTemplateTest, Scopes) {
+TEST_F(ObjectTemplateTest, AddProperty) {
   const HandleScope handle_scope(isolate_);
   Local<FunctionTemplate> constructor = Local<FunctionTemplate>();
   Local<ObjectTemplate> ot = ObjectTemplate::New(isolate_, constructor);
