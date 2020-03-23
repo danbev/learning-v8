@@ -71,12 +71,395 @@ This would be something like:
 ```js
 const obj = {};
 ```
+This class is declared in include/v8.h and extends Template:
+```c++
+class V8_EXPORT ObjectTemplate : public Template { 
+  ...
+}
+class V8_EXPORT Template : public Data {
+  ...
+}
+class V8_EXPORT Data {
+ private:                                                                       
+  Data();                                                                       
+};
+```
+Template does not have any members/fields, it only declared functions.
+
+We create an instance of ObjectTemplate and we can add properties to it that
+all instance created using this ObjectTemplate instance will have. This is done
+by calling Set which is member of the Template class. You specify a Local<Name>
+for the property. Name is a superclass for Symbols and Strings which can be both
+be used as names for a property.
+
+The implementation for `Set` can be found in `src/api/api.cc`:
+```c++
+void Template::Set<v8::Local<Name> name, v8::Local<Data> value, v8::PropertyAttribute attribute) {
+  ...
+
+  i::ApiNatives::AddDataProperty(isolate, templ, Utils::OpenHandle(*name),           
+                                 value_obj,                                     
+                                 static_cast<i::PropertyAttributes>(attribute));
+}
+```
+
+There is an example in [objecttemplate_test.cc](./test/objecttemplate_test.cc)
 
 ### FunctionTemplate
-Allows us to provide a constructor function that can be called from JavaScript
-code using the `new` operator:
-```js
-const obj = new Something(1, 2, "3");
+Is a template that is used to create functions.
+
+There is an example in [functionttemplate_test.cc](./test/functiontemplate_test.cc)
+
+And instance of a function template can be created using:
+```c++
+  Local<FunctionTemplate> ft = FunctionTemplate::New(isolate_, function_callback, data);
+  Local<Function> function = ft->GetFunction(context).ToLocalChecked();
+```
+And the function can be called using:
+```c++
+  MaybeLocal<Value> ret = function->Call(context, recv, 0, nullptr);
+```
+Function::Call can be found in src/api/api.cc: 
+```c++
+  bool has_pending_exception = false;
+  auto self = Utils::OpenHandle(this);                                               
+  i::Handle<i::Object> recv_obj = Utils::OpenHandle(*recv);                          
+  i::Handle<i::Object>* args = reinterpret_cast<i::Handle<i::Object>*>(argv);   
+  Local<Value> result;                                                               
+  has_pending_exception = !ToLocal<Value>(                                           
+      i::Execution::Call(isolate, self, recv_obj, argc, args), &result);
+```
+Notice that the result of `Call` which is a `MaybeHandle<Object>` will be
+passed to ToLocal<Value> which is defined in `api.h`:
+```c++
+template <class T>                                                              
+inline bool ToLocal(v8::internal::MaybeHandle<v8::internal::Object> maybe,      
+                    Local<T>* local) {                                          
+  v8::internal::Handle<v8::internal::Object> handle;                            
+  if (maybe.ToHandle(&handle)) {                                                   
+    *local = Utils::Convert<v8::internal::Object, T>(handle);                   
+    return true;                                                                
+  }                                                                                
+  return false;                                                                 
+```
+So lets take a look at `Execution::Call` which can be found in `execution/execution.cc`
+and it calls:
+```c++
+return Invoke(isolate, InvokeParams::SetUpForCall(isolate, callable, receiver, argc, argv));
+```
+`SetUpForCall` will return an `InvokeParams`. TODO: Take a closer look at InvokeParams.
+```c++
+V8_WARN_UNUSED_RESULT MaybeHandle<Object> Invoke(Isolate* isolate,              
+                                                 const InvokeParams& params) {
+```
+```c++
+Handle<Object> receiver = params.is_construct                             
+                                    ? isolate->factory()->the_hole_value()         
+                                    : params.receiver; 
+```
+In our case `is_construct` is false as we are not using `new` and the receiver,
+the `this` in the function should be set to the receiver that we passed in. After
+that we have `Builtins::InvokeApiFunction` 
+```c++
+auto value = Builtins::InvokeApiFunction(                                 
+          isolate, params.is_construct, function, receiver, params.argc,        
+          params.argv, Handle<HeapObject>::cast(params.new_target)); 
+```
+
+```c++
+result = HandleApiCallHelper<false>(isolate, function, new_target,        
+                                    fun_data, receiver, arguments);
+```
+
+api-arguments-inl.h has 
+```c++
+FunctionCallbackArguments::Call(CallHandlerInfo handler) {
+  ...
+  ExternalCallbackScope call_scope(isolate, FUNCTION_ADDR(f));                  
+  FunctionCallbackInfo<v8::Value> info(values_, argv_, argc_);                  
+  f(info);
+  return GetReturnValue<Object>(isolate);
+}
+```
+The call to f(info) is what invokes the callback, which is just a normal
+function call. 
+
+Back in `HandleApiCallHelper` we have:
+```c++
+Handle<Object> result = custom.Call(call_data);                             
+                                                                                
+RETURN_EXCEPTION_IF_SCHEDULED_EXCEPTION(isolate, Object);
+```
+`RETURN_EXCEPTION_IF_SCHEDULED_EXCEPTION` expands to:
+```c++
+Handle<Object> result = custom.Call(call_data);                             
+do { 
+  Isolate* __isolate__ = (isolate); 
+  ((void) 0); 
+  if (__isolate__->has_scheduled_exception()) { 
+    __isolate__->PromoteScheduledException(); 
+    return MaybeHandle<Object>(); 
+  }
+} while (false);
+```
+Notice that if there was an exception an empty object is returned.
+Later in `Invoke` execution.cc 
+```c++
+  auto value = Builtins::InvokeApiFunction(                                 
+          isolate, params.is_construct, function, receiver, params.argc,        
+          params.argv, Handle<HeapObject>::cast(params.new_target));            
+  bool has_exception = value.is_null();                                     
+  if (has_exception) {                                                      
+    if (params.message_handling == Execution::MessageHandling::kReport) {   
+      isolate->ReportPendingMessages();                                     
+    }                                                                       
+    return MaybeHandle<Object>();                                           
+  } else {                                                                  
+    isolate->clear_pending_message();                                       
+  }                                                                         
+  return value;                         
+```
+Looking at this is looks like passing back an empty object will cause an 
+exception to be triggered?
+
+
+### Exceptions
+When a function is called how is an exception reported/triggered in the call
+chain?  
+
+```c++
+  Local<FunctionTemplate> ft = FunctionTemplate::New(isolate_, function_callback);
+  Local<Function> function = ft->GetFunction(context).ToLocalChecked();
+  Local<Object> recv = Object::New(isolate_);
+  MaybeLocal<Value> ret = function->Call(context, recv, 0, nullptr);
+```
+`function->Call` will end up in `src/api/api.cc` `Function::Call` and will
+in turn call `v8::internal::Execution::Call`:
+```c++
+  has_pending_exception = !ToLocal<Value>(                                           
+      i::Execution::Call(isolate, self, recv_obj, argc, args), &result);             
+  RETURN_ON_FAILED_EXECUTION(Value);                                                 
+  RETURN_ESCAPED(result);            
+```
+Notice that the result of `Call` which is a `MaybeHandle<Object>` will be
+passed to ToLocal<Value> which is defined in `api.h`:
+```c++
+template <class T>                                                              
+inline bool ToLocal(v8::internal::MaybeHandle<v8::internal::Object> maybe,      
+                    Local<T>* local) {                                          
+  v8::internal::Handle<v8::internal::Object> handle;                            
+  if (maybe.ToHandle(&handle)) {                                                   
+    *local = Utils::Convert<v8::internal::Object, T>(handle);                   
+    return true;                                                                
+  }                                                                                
+  return false;                                                                 
+```
+So lets take a look at `Execution::Call` which can be found in `execution/execution.cc`
+and it calls:
+```c++
+return Invoke(isolate, InvokeParams::SetUpForCall(isolate, callable, receiver, argc, argv));
+```
+`InvokeParams` is a struct in execution.cc which has a few static functions
+(one being `SetupForCall`) and also the following fields:
+```
+Handle<Object> target;                                                        
+  Handle<Object> receiver;                                                      
+  int argc;                                                                     
+  Handle<Object>* argv;                                                         
+  Handle<Object> new_target;                                                    
+  MicrotaskQueue* microtask_queue;                                              
+  Execution::MessageHandling message_handling;                                  
+  MaybeHandle<Object>* exception_out;                                           
+  bool is_construct;                                                            
+  Execution::Target execution_target;                                           
+  bool reschedule_terminate;               
+```
+`SetupUpForNew` will set up defaults in addition to set the values for the
+constructor, new_target, argc, and argv.
+Related to exception handling is:
+```c++
+params.message_handling = Execution::MessageHandling::kReport;
+```
+So with that out of the way lets focos on the `Invoke` function in execution.cc
+around line 240 at the time of this writing.
+Now, if the target which is our case is the `Function` is a JSFunction there is
+a path which will be true in our case:
+```c++
+Handle<JSFunction> function = Handle<JSFunction>::cast(params.target);
+```
+Next `SaveAndSwitchContext` is called:
+```c++
+SaveAndSwitchContext save(isolate, function->context());
+```
+Which will call isolate->set_context(function_context).
+Next, we have:
+```c++
+Handle<Object> receiver = params.is_construct                             
+                                    ? isolate->factory()->the_hole_value()         
+                                    : params.receiver;     
+```
+And in our case `params.is_construct` is false:
+```c++
+(gdb) p params.is_construct
+$1 = false
+```
+So the receiver will just be set to the reciever set on the param which is the
+receiver we passed in. Next, we have the call to `Builtins::InvokeApiFunction`
+which can be found in `builtins/builtins-api.cc:
+```c++
+Handle<FunctionTemplateInfo> fun_data = function->IsFunctionTemplateInfo()
+          ? Handle<FunctionTemplateInfo>::cast(function)
+          : handle(JSFunction::cast(*function).shared().get_api_func_data(),
+                   isolate);
+```
+```console
+(gdb) p function->IsFunctionTemplateInfo()
+$2 = false
+```
+So in our case the following will be executed:
+```c++
+          : handle(JSFunction::cast(*function).shared().get_api_func_data(),
+                   isolate);
+```
+TODO: Look into JSFunction and SharedFunctionInfo.
+```c++
+Address small_argv[kBufferSize];
+Address* argv;                                                                
+const int frame_argc = argc + BuiltinArguments::kNumExtraArgsWithReceiver;
+```
+In our case we did not pass any arguments so argc is 0. 
+```console
+(gdb) p kBufferSize
+$7 = 32
+(gdb) p argc
+$8 = 0
+(gdb) p BuiltinArguments::kNumExtraArgsWithReceiver
+$9 = 5
+```
+```c++
+if (frame_argc <= kBufferSize) {
+    argv = small_argv;
+```
+So in our case we will be using `small_argv` which is an Array of Address:es.
+Next, this array will be populated:
+```c++
+int cursor = frame_argc - 1;                                                  
+argv[cursor--] = receiver->ptr();
+```
+So we are setting the argv[4] to the receiver. The next argument set is:
+```c++
+argv[BuiltinArguments::kPaddingOffset] = ReadOnlyRoots(isolate).the_hole_value().ptr();  
+argv[BuiltinArguments::kArgcOffset] = Smi::FromInt(frame_argc).ptr();         
+argv[BuiltinArguments::kTargetOffset] = function->ptr();             
+argv[BuiltinArguments::kNewTargetOffset] = new_target->ptr()
+
+RelocatableArguments arguments(isolate, frame_argc, &argv[frame_argc - 1]);
+result = HandleApiCallHelper<false>(isolate, function, new_target,        
+                                    fun_data, receiver, arguments); 
+```
+So we can see that we are passing the function, new_target, `HandleApiCallHelper` 
+
+```c++
+Object raw_call_data = fun_data->call_code(); 
+CallHandlerInfo call_data = CallHandlerInfo::cast(raw_call_data);
+Object data_obj = call_data.data();
+Handle<Object> result = custom.Call(call_data);
+```
+`Call` will land in `src/api/api-arguments-inl.h`:
+```c++
+Handle<Object> FunctionCallbackArguments::Call(CallHandlerInfo handler) {
+  ...
+  v8::FunctionCallback f = v8::ToCData<v8::FunctionCallback>(handler.callback()); 
+
+}
+```
+This is the function callback in our example which is named `function_callback`:
+```console
+(gdb) p f
+$14 = (v8::FunctionCallback) 0x413ec6 <function_callback(v8::FunctionCallbackInfo<v8::Value> const&)>
+```
+```c++
+  VMState<EXTERNAL> state(isolate);                                             
+  ExternalCallbackScope call_scope(isolate, FUNCTION_ADDR(f));                  
+  FunctionCallbackInfo<v8::Value> info(values_, argv_, argc_); 
+  f(info);                                                                      
+  return GetReturnValue<Object>(isolate);                                       
+}
+```
+This return will return to:
+```c++
+  RETURN_EXCEPTION_IF_SCHEDULED_EXCEPTION(isolate, Object);
+```
+Which will be expanded by the preprocessor into:
+```c++
+  do {
+    Isolate* __isolate__ = (isolate);
+    ((void) 0);
+    if (__isolate__->has_scheduled_exception()) {
+      __isolate__->PromoteScheduledException();
+      return MaybeHandle<Object>();
+    }
+  } while (false);
+```
+In our case there was not exception so the following line will be reached:
+```c++
+if (result.is_null()) { 
+  return isolate->factory()->undefined_value();
+}
+```
+So, we returned an empty/null value from our function and the leads to the
+undefined value to be returned. Just noting this as I'm not sure if it is
+important of not but CustomArguments has a destructor that will be called
+when the `FunctionCallbackArguments` instance goes out of scope:
+```
+template <typename T>                                                           
+CustomArguments<T>::~CustomArguments() {                                        
+  slot_at(kReturnValueOffset).store(Object(kHandleZapValue));                   
+```
+Back now in `Builtins::InvokeApiFunction`:
+```c++
+  MaybeHandle<Object> result;
+  ... // HandleApiCallHelper was shown above 
+  if (argv != small_argv) delete[] argv;                                        
+  return result;
+```
+So after this return we will be back in `Invoke` in execution.cc:
+```c++
+  auto value = Builtins::InvokeApiFunction(
+      isolate, params.is_construct, function, receiver, params.argc,
+      params.argv, Handle<HeapObject>::cast(params.new_target));
+  bool has_exception = value.is_null();
+```
+Now, even though are callback returned nothing/null, that was checked for and
+instead undefined was returned. 
+After this we will return to `Execution::Call` which will just return to
+v8::ToLocal which will turn the Handle into a MaybeHandle.
+This will then return us to Function::Call:
+```c++
+RETURN_ON_FAILED_EXECUTION(Value);
+RETURN_ESCAPED(result);
+```
+`RETURN_ON_FAILED_EXECUTION` will expand to:
+```c++
+ do {
+  if (has_pending_exception) {
+    call_depth_scope.Escape();
+    return MaybeLocal<Value>();
+  }
+} while (false);
+```
+And RETURN_ESCAPED:
+```c++
+return handle_scope.Escape(result);;
+```
+I wonder why this last line is a macro when it is just one line.
+
+
+
+
+```console
+(gdb) p result.is_null()
+$15 = true
 ```
 
 ### TaggedImpl
@@ -95,6 +478,16 @@ Storage type can also be `Tagged_t` which is defined in globals.h:
 It looks like it can be a different value when using pointer compression.
 
 See [tagged_test.cc](./test/tagged_test.cc) for an example.
+
+### Value
+Value extends Data and adds a number of methods to check if a Value
+is of a certain type, like `IsUndefined()`, `IsNull`, `IsNumber` etc.
+It also has useful methods to convert to a Local<T>, for example:
+```c++
+V8_WARN_UNUSED_RESULT MaybeLocal<Number> ToNumber(Local<Context> context) const;
+V8_WARN_UNUSED_RESULT MaybeLocal<String> ToNumber(Local<String> context) const;
+...
+```
 
 ### Object (internal)
 This class extends TaggedImpl:
@@ -144,6 +537,19 @@ A Handle is similar to a Object and ObjectSlot in that it also contains
 an Address member (called `location_` and declared in `HandleBase`), but with the
 difference is that Handles acts as a layer of abstraction and can be relocated
 by the garbage collector.
+Can be found in `src/handles/handles.h`.
+
+```c++
+class HandleBase {  
+ ...
+ protected:
+  Address* location_; 
+}
+template <typename T>                                                           
+class Handle final : public HandleBase {
+  ...
+}
+```
 
 ```
 +----------+                  +--------+         +---------+
@@ -299,6 +705,20 @@ See [handlescope_test.cc](./test/handlescope_test.cc) for an example.
 ### HeapObject
 TODO:
 
+### Local
+Has a single mem
+```c++
+template <class T> class Local { 
+...
+ private:
+  T* val_
+}
+```
+Notice that this is a pointer to T. We could create a local using:
+```c++
+  v8::Local<v8::Value> empty_value;
+```
+
 
 
 
@@ -331,16 +751,81 @@ be of type pointer-to-pointer to Object.
 An instance of v8::internal::Object only has a single data member which is a
 field named `ptr_` of type `Address`:
 
+`src/objects/objects.h:
 ```c++
 class Object : public TaggedImpl<HeapObjectReferenceType::STRONG, Address> {
-}
+ public:
+  constexpr Object() : TaggedImpl(kNullAddress) {}
+  explicit constexpr Object(Address ptr) : TaggedImpl(ptr) {}
 
+#define IS_TYPE_FUNCTION_DECL(Type) \
+  V8_INLINE bool Is##Type() const;  \
+  V8_INLINE bool Is##Type(const Isolate* isolate) const;
+  OBJECT_TYPE_LIST(IS_TYPE_FUNCTION_DECL)
+  HEAP_OBJECT_TYPE_LIST(IS_TYPE_FUNCTION_DECL)
+  IS_TYPE_FUNCTION_DECL(HashTableBase)
+  IS_TYPE_FUNCTION_DECL(SmallOrderedHashTable)
+#undef IS_TYPE_FUNCTION_DECL
+  V8_INLINE bool IsNumber(ReadOnlyRoots roots) const;
+}
+```
+Lets take a look at one of these functions and see how it is implemented. For
+example in the OBJECT_TYPE_LIST we have:
+```c++
+#define OBJECT_TYPE_LIST(V) \
+  V(LayoutDescriptor)       \
+  V(Primitive)              \
+  V(Number)                 \
+  V(Numeric)
+```
+So the object class will have a function that looks like:
+```c++
+inline bool IsNumber() const;
+inline bool IsNumber(const Isolate* isolate) const;
+```
+And in src/objects/objects-inl.h we will have the implementations:
+```c++
+bool Object::IsNumber() const {
+  return IsHeapObject() && HeapObject::cast(*this).IsNumber();
+}
+```
+`IsHeapObject` is defined in TaggedImpl:
+```c++
+  constexpr inline bool IsHeapObject() const { return IsStrong(); }
+
+  constexpr inline bool IsStrong() const {
+#if V8_HAS_CXX14_CONSTEXPR
+    DCHECK_IMPLIES(!kCanBeWeak, !IsSmi() == HAS_STRONG_HEAP_OBJECT_TAG(ptr_));
+#endif
+    return kCanBeWeak ? HAS_STRONG_HEAP_OBJECT_TAG(ptr_) : !IsSmi();
+  }
+```
+
+The macro can be found in src/common/globals.h:
+```c++
+#define HAS_STRONG_HEAP_OBJECT_TAG(value)                          \
+  (((static_cast<i::Tagged_t>(value) & ::i::kHeapObjectTagMask) == \
+    ::i::kHeapObjectTag))
+```
+So we are casting `ptr_` which is of type Address into type `Tagged_t` which
+is defined in src/common/global.h and can be different depending on if compressed
+pointers are used or not. If they are  not supported it is the same as Address:
+``` 
+using Tagged_t = Address;
+```
+
+`src/objects/tagged-impl.h`:
+```c++
 template <HeapObjectReferenceType kRefType, typename StorageType>
 class TaggedImpl {
 
   StorageType ptr_;
 }
 ```
+The HeapObjectReferenceType can be either WEAK or STRONG. And the storage type
+is `Address` in this case. So Object itself only has one member that is inherited
+from its only super class and this is `ptr_`.
+
 So the following is telling the compiler to treat the value of our Local,
 `*global`, as a pointer (which it already is) to a pointer that points to
 a memory location that confirms to the layout of an v8::internal::Object type,
@@ -371,6 +856,52 @@ static Local<ObjectTemplate> ObjectTemplateNew(
   return Utils::ToLocal(obj);
 }
 ```
+What is a `Struct` in this context?  
+`src/objects/struct.h`
+```c++
+#include "torque-generated/class-definitions-tq.h"
+
+class Struct : public TorqueGeneratedStruct<Struct, HeapObject> {
+ public:
+  inline void InitializeBody(int object_size);
+  void BriefPrintDetails(std::ostream& os);
+  TQ_OBJECT_CONSTRUCTORS(Struct)
+```
+Notice that the include is specifying `torque-generated` include which can be
+found `out/x64.release_gcc/gen/torque-generated/class-definitions-tq`. So, somewhere
+there must be an call to the `torque` executable which generates the Code Stub
+Assembler C++ headers and sources before compiling the main source files. There is
+and there is a section about this in `Building V8`.
+The macro `TQ_OBJECT_CONSTRUCTORS` can be found in `src/objects/object-macros.h`
+and expands to:
+```c++
+  constexpr Struct() = default;
+
+ protected:
+  template <typename TFieldType, int kFieldOffset>
+  friend class TaggedField;
+
+  inline explicit Struct(Address ptr);
+```
+
+So what does the TorqueGeneratedStruct look like?
+```
+template <class D, class P>
+class TorqueGeneratedStruct : public P {
+ public:
+```
+Where D is Struct and P is HeapObject in this case. But the above is the declartion
+of the type but what we have in the .h file is what was generated. 
+
+This type is defined in `src/objects/struct.tq`:
+```
+@abstract                                                                       
+@generatePrint                                                                  
+@generateCppClass                                                               
+extern class Struct extends HeapObject {                                        
+} 
+```
+
 `NewStruct` can be found in `src/heap/factory-base.cc`
 ```c++
 template <typename Impl>
@@ -2767,7 +3298,7 @@ Builtins need to have bytecode generated for them so that they can be run in Tur
 `src/code-stub-assembler.h`
 
 All the builtins are declared in `src/builtins/builtins-definitions.h` by the
-`BUILTIN_LIST_BASE` macro.
+`BUILTIN_LIST_BASE` macro. 
 There are different type of builtins (TF = Turbo Fan):
 * TFJ 
 JavaScript linkage which means it is callable as a JavaScript function  
@@ -3306,7 +3837,7 @@ ninja: Entering directory `out/x64.release_gcc/'
 [1/1] LINK ./bytecode_builtins_list_generator
 ```
 
-Alright, so I'd like to understand when in the process torgue is run to
+Alright, so I'd like to understand when in the process torque is run to
 generate classes like TorqueGeneratedStruct:
 ```c++
 class Struct : public TorqueGeneratedStruct<Struct, HeapObject> {
@@ -4191,11 +4722,13 @@ void HandleScopeImplementer::EnterContext(Handle<Context> context) {
 ...
 DetachableVector<Context*> entered_contexts_;
 ```
+```c++
 DetachableVector is a delegate/adaptor with some additonaly features on a std::vector.
 Handle<Context> context1 = NewContext(isolate);
 Handle<Context> context2 = NewContext(isolate);
 Context::Scope context_scope1(context1);        // entered_contexts_ [context1], saved_contexts_[isolateContext]
 Context::Scope context_scope2(context2);        // entered_contexts_ [context1, context2], saved_contexts[isolateContext, context1]
+```
 
 Now, `SaveContext` is using the current context, not `this` context (`env`) and pushing that to the end of the saved_contexts_ vector.
 We can look at this as we entered context_scope2 from context_scope1:
@@ -5900,5 +6433,831 @@ $ nm -C out/x64.release_gcc/obj/v8_libbase/logging.o | grep V8_Fatal
 
 
 
+
+What is actually build when you specify 
+v8_monolithic:
+When this type is chosen the build cannot be a component build, there is an
+assert for this. In this case a static library build:
+```
+if (v8_monolithic) {                                                            
+  # A component build is not monolithic.                                        
+  assert(!is_component_build)                                                   
+                                                                                
+  # Using external startup data would produce separate files.                   
+  assert(!v8_use_external_startup_data)                                         
+  v8_static_library("v8_monolith") {                                            
+    deps = [                                                                    
+      ":v8",                                                                    
+      ":v8_libbase",                                                            
+      ":v8_libplatform",                                                        
+      ":v8_libsampler",                                                         
+      "//build/win:default_exe_manifest",                                       
+    ]                                                                           
+                                                                                
+    configs = [ ":internal_config" ]                                            
+  }                                                                             
+}
+```
+Notice that the builtin function is called `static_library` so is a template
+that can be found in `gni/v8.gni` 
+
+v8_static_library:
+This will use source_set instead of creating a static library when compiling.
+When set to false, the object files that would be included in the linker command.
+The can speed up the build as the creation of the static libraries is skipped.
+But this does not really help when linking to v8 externally as from this project.
+
+is_component_build:
+This will compile targets declared as components as shared libraries.
+All the v8_components in BUILD.gn will be built as .so files in the output
+director (not the obj directory which is the case for static libraries).
+
+So the only two options are the v8_monolith or is_component_build where it
+might be an advantage of being able to build a single component and not have
+to rebuild the whole monolith at times.
+
+
+### V8 Internal Isolate
+`src/execution/isolate.h` is where you can find the v8::internal::Isolate.
+```c++
+class V8_EXPORT_PRIVATE Isolate final : private HiddenFactory {
+
+```
+And HiddenFactory is just to allow Isolate to inherit privately from Factory
+which can be found in src/heap/factory.h.
+
+### Startup Walk through
+This section will walk through the start up on V8 by using the hello_world example
+in this project:
+```console
+$ LD_LIBRARY_PATH=../v8_src/v8/out/x64.release_gcc/ lldb ./hello-world
+(lldb) br s -n main
+Breakpoint 1: where = hello-world`main + 25 at hello-world.cc:41:38, address = 0x0000000000402821
+```
+```console
+    V8::InitializeExternalStartupData(argv[0]);
+```
+This call will land in `api.cc` which will just delegate the call to and internal
+(internal namespace that is). If you try to step into this function you will
+just land on the next line in hello_world. This is because we compiled v8 without
+external start up data so this function will be empty:
+```console
+$ objdump -Cd out/x64.release_gcc/obj/v8_base_without_compiler/startup-data-util.o
+Disassembly of section .text._ZN2v88internal37InitializeExternalStartupDataFromFileEPKc:
+
+0000000000000000 <v8::internal::InitializeExternalStartupDataFromFile(char const*)>:
+   0:	c3                   	retq
+```
+Next, we have:
+```console
+    std::unique_ptr<Platform> platform = platform::NewDefaultPlatform();
+```
+This will land in `src/libplatform/default-platform.cc` which will create a new
+DefaultPlatform.
+
+```c++
+Isolate* isolate = Isolate::New(create_params);
+```
+This will call Allocate: 
+```c++
+Isolate* isolate = Allocate();
+```
+```c++
+Isolate* Isolate::Allocate() {
+  return reinterpret_cast<Isolate*>(i::Isolate::New());
+}
+```
+
+Remember that the internal Isolate can be found in `src/execution/isolate.h`.
+In `src/execution/isolate.cc` we find `Isolate::New`
+```c++
+Isolate* Isolate::New(IsolateAllocationMode mode) {
+  std::unique_ptr<IsolateAllocator> isolate_allocator = std::make_unique<IsolateAllocator>(mode);
+  void* isolate_ptr = isolate_allocator->isolate_memory();
+  Isolate* isolate = new (isolate_ptr) Isolate(std::move(isolate_allocator));
+```
+So we first create an IsolateAllocator instance which will allocate memory for
+a single Isolate instance. This is then passed into the Isolate constructor,
+notice the usage of `new` here, this is just a normal heap allocation. 
+
+The default new operator has been deleted and an override provided that takes
+a void pointer, which is just returns: 
+```c++
+  void* operator new(size_t, void* ptr) { return ptr; }
+  void* operator new(size_t) = delete;
+  void operator delete(void*) = delete;
+```
+In this case it just returns the memory allocateed by isolate-memory().
+The reason for doing this is that using the new operator not only invoked the
+new operator but the compiler will also add a call the types constructor passing
+in the address of the allocated memory.
+But why is the cast required?
+
+```console 
+../../src/execution/isolate.cc:2794:62: error: use of deleted function ‘static void* v8::internal::Isolate::operator new(size_t)’
+ 2794 |   Isolate* isolate = new Isolate(std::move(isolate_allocator));
+      |                                                              ^
+In file included from ../../src/execution/isolate.cc:5:
+../../src/execution/isolate.h:1863:9: note: declared here
+ 1863 |   void* operator new(size_t) = delete;
+      |         ^~~~~~~~
+```
+
+```c++
+Isolate::Isolate(std::unique_ptr<i::IsolateAllocator> isolate_allocator)
+    : isolate_data_(this),
+      isolate_allocator_(std::move(isolate_allocator)),
+      id_(isolate_counter.fetch_add(1, std::memory_order_relaxed)),
+      allocator_(FLAG_trace_zone_stats
+                     ? new VerboseAccountingAllocator(&heap_, 256 * KB)
+                     : new AccountingAllocator()),
+      builtins_(this),
+      rail_mode_(PERFORMANCE_ANIMATION),
+      code_event_dispatcher_(new CodeEventDispatcher()),
+      jitless_(FLAG_jitless),
+#if V8_SFI_HAS_UNIQUE_ID
+      next_unique_sfi_id_(0),
+#endif
+      cancelable_task_manager_(new CancelableTaskManager()) {
+```
+Notice that  `isolate_data_` will be populated by calling the constructor which
+takes an pointer to an Isolate.
+```c++
+class IsolateData final {
+ public:
+  explicit IsolateData(Isolate* isolate) : stack_guard_(isolate) {}
+```
+
+Back in Isolate's constructor we have:
+```c++
+#define ISOLATE_INIT_LIST(V)                                                   \
+  /* Assembler state. */                                                       \
+  V(FatalErrorCallback, exception_behavior, nullptr)                           \
+  ...
+
+#define ISOLATE_INIT_EXECUTE(type, name, initial_value) \                           
+  name##_ = (initial_value);                                                        
+  ISOLATE_INIT_LIST(ISOLATE_INIT_EXECUTE)                                           
+#undef ISOLATE_INIT_EXECUTE
+```
+So lets expand the first entry to understand what is going on:
+```c++
+  exception_behavior_ = nullptr;
+gt
+```
+These variables are declared in isolate.h:
+```c++
+#define GLOBAL_BACKING_STORE(type, name, initialvalue) type name##_;
+  ISOLATE_INIT_LIST(GLOBAL_BACKING_STORE)
+#undef GLOBAL_BACKING_STORE
+```
+So this would expand to:
+```c++
+FatalErrorCallback exception_behavior_;
+```
+So all of the entries in this list will become private members of the
+Isolate class after the preprocessor is finished. There will also be public
+assessor to get and set these values.
+```
+(gdb) p isolate->exception_behavior_
+$6 = (v8::FatalErrorCallback) 0x0
+```
+
+Back in isolate.cc constructor we have:
+```c++
+#define ISOLATE_INIT_ARRAY_EXECUTE(type, name, length) \
+  memset(name##_, 0, sizeof(type) * length);
+  ISOLATE_INIT_ARRAY_LIST(ISOLATE_INIT_ARRAY_EXECUTE)
+#undef ISOLATE_INIT_ARRAY_EXECUTE
+#define ISOLATE_INIT_ARRAY_LIST(V)                                             \
+  /* SerializerDeserializer state. */                                          \
+  V(int32_t, jsregexp_static_offsets_vector, kJSRegexpStaticOffsetsVectorSize) \
+  ...
+
+  InitializeDefaultEmbeddedBlob();
+  MicrotaskQueue::SetUpDefaultMicrotaskQueue(this);
+```
+After that we have created a new Isolate, we were in this function call:
+```c++
+  Isolate* isolate = new (isolate_ptr) Isolate(std::move(isolate_allocator));
+```
+After this we will be back in api.cc:
+```c++
+  Initialize(isolate, params);
+```
+```c++
+void Isolate::Initialize(Isolate* isolate,
+                         const v8::Isolate::CreateParams& params) {
+```
+We are not using any external snapshot data so this will be false:
+```c++
+  if (params.snapshot_blob != nullptr) {
+    i_isolate->set_snapshot_blob(params.snapshot_blob);
+  } else {
+    i_isolate->set_snapshot_blob(i::Snapshot::DefaultSnapshotBlob());
+```
+```console
+(gdb) p snapshot_blob_
+$7 = (const v8::StartupData *) 0x0
+(gdb) n
+(gdb) p i_isolate->snapshot_blob_
+$8 = (const v8::StartupData *) 0x7ff92d7d6cf0 <v8::internal::blob>
+```
+`snapshot_blob_` is also one of the members that was set up with ISOLATE_INIT_LIST.
+So we are setting up the Isolate instance for creation. 
+
+```
+Isolate::Scope isolate_scope(isolate);                                        
+if (!i::Snapshot::Initialize(i_isolate)) { 
+```
+In `src/snapshot/snapshot-common.cc` we find 
+```c++
+bool Snapshot::Initialize(Isolate* isolate) {
+  ...
+  const v8::StartupData* blob = isolate->snapshot_blob();
+  Vector<const byte> startup_data = ExtractStartupData(blob);
+  Vector<const byte> read_only_data = ExtractReadOnlyData(blob);
+  SnapshotData startup_snapshot_data(MaybeDecompress(startup_data));
+  SnapshotData read_only_snapshot_data(MaybeDecompress(read_only_data));
+  StartupDeserializer startup_deserializer(&startup_snapshot_data);
+  ReadOnlyDeserializer read_only_deserializer(&read_only_snapshot_data);
+  startup_deserializer.SetRehashability(ExtractRehashability(blob));
+  read_only_deserializer.SetRehashability(ExtractRehashability(blob));
+  bool success = isolate->InitWithSnapshot(&read_only_deserializer, &startup_deserializer);
+```
+So we get the blob and create deserializers for it which are then passed to
+`isolate->InitWithSnapshot`.
+
+All the roots in a heap are declared in src/roots/roots.h. You can access the
+roots using RootsTable via the Isolate using isolate_data->roots() or by using
+isolate->roots_table.
+
+The unit test [isolate_test](./test/isolate_test.cc) explores the internal 
+isolate and has example of usages of the above mentioned methods.
+
+InitwithSnapshot will call Isolate::Init:
+```c++
+bool Isolate::Init(ReadOnlyDeserializer* read_only_deserializer,
+                   StartupDeserializer* startup_deserializer) {
+
+#define ASSIGN_ELEMENT(CamelName, hacker_name)                  \
+  isolate_addresses_[IsolateAddressId::k##CamelName##Address] = \
+      reinterpret_cast<Address>(hacker_name##_address());
+  FOR_EACH_ISOLATE_ADDRESS_NAME(ASSIGN_ELEMENT)
+#undef ASSIGN_ELEMENT
+```
+```c++
+  Address isolate_addresses_[kIsolateAddressCount + 1] = {};
+```
+```console
+(gdb) p isolate_addresses_
+$16 = {0 <repeats 13 times>}
+```
+
+Lets take a look at the expanded code in Isolate::Init:
+```console
+$ clang++ -I./out/x64.release/gen -I. -I./include -E src/execution/isolate.cc > output
+```
+```c++
+isolate_addresses_[IsolateAddressId::kHandlerAddress] = reinterpret_cast<Address>(handler_address());
+isolate_addresses_[IsolateAddressId::kCEntryFPAddress] = reinterpret_cast<Address>(c_entry_fp_address());
+isolate_addresses_[IsolateAddressId::kCFunctionAddress] = reinterpret_cast<Address>(c_function_address());
+isolate_addresses_[IsolateAddressId::kContextAddress] = reinterpret_cast<Address>(context_address());
+isolate_addresses_[IsolateAddressId::kPendingExceptionAddress] = reinterpret_cast<Address>(pending_exception_address());
+isolate_addresses_[IsolateAddressId::kPendingHandlerContextAddress] = reinterpret_cast<Address>(pending_handler_context_address());
+isolate_addresses_[IsolateAddressId::kPendingHandlerEntrypointAddress] = reinterpret_cast<Address>(pending_handler_entrypoint_address());
+isolate_addresses_[IsolateAddressId::kPendingHandlerConstantPoolAddress] = reinterpret_cast<Address>(pending_handler_constant_pool_address());
+isolate_addresses_[IsolateAddressId::kPendingHandlerFPAddress] = reinterpret_cast<Address>(pending_handler_fp_address());
+isolate_addresses_[IsolateAddressId::kPendingHandlerSPAddress] = reinterpret_cast<Address>(pending_handler_sp_address());
+isolate_addresses_[IsolateAddressId::kExternalCaughtExceptionAddress] = reinterpret_cast<Address>(external_caught_exception_address());
+isolate_addresses_[IsolateAddressId::kJSEntrySPAddress] = reinterpret_cast<Address>(js_entry_sp_address());
+```
+Then functions, like handler_address() are implemented as:
+```c++ 
+inline Address* handler_address() { return &thread_local_top()->handler_; }   
+```
+```console
+(gdb) x/x isolate_addresses_[0]
+0x1a3500003240:	0x00000000
+```
+At this point in the program we have only set the entries to point contain
+the addresses specified in ThreadLocalTop, At the time there are initialized
+the will mostly be initialized to `kNullAddress`:
+```c++
+static const Address kNullAddress = 0;
+```
+And notice that the functions above return pointers so later these pointers can
+be updated to point to something. What/when does this happen?  Lets continue and
+find out...
+
+Back in Isolate::Init we have:
+```c++
+  compilation_cache_ = new CompilationCache(this);
+  descriptor_lookup_cache_ = new DescriptorLookupCache();
+  inner_pointer_to_code_cache_ = new InnerPointerToCodeCache(this);
+  global_handles_ = new GlobalHandles(this);
+  eternal_handles_ = new EternalHandles();
+  bootstrapper_ = new Bootstrapper(this);
+  handle_scope_implementer_ = new HandleScopeImplementer(this);
+  load_stub_cache_ = new StubCache(this);
+  store_stub_cache_ = new StubCache(this);
+  materialized_object_store_ = new MaterializedObjectStore(this);
+  regexp_stack_ = new RegExpStack();
+  regexp_stack_->isolate_ = this;
+  date_cache_ = new DateCache();
+  heap_profiler_ = new HeapProfiler(heap());
+  interpreter_ = new interpreter::Interpreter(this);
+
+  compiler_dispatcher_ =
+      new CompilerDispatcher(this, V8::GetCurrentPlatform(), FLAG_stack_size);
+
+  // SetUp the object heap.
+  DCHECK(!heap_.HasBeenSetUp());
+  heap_.SetUp();
+
+  ...
+  InitializeThreadLocal();
+```
+Lets take a look at `InitializeThreadLocal`
+
+```c++
+void Isolate::InitializeThreadLocal() {
+  thread_local_top()->Initialize(this);
+  clear_pending_exception();
+  clear_pending_message();
+  clear_scheduled_exception();
+}
+```
+```c++
+void Isolate::clear_pending_exception() {
+  DCHECK(!thread_local_top()->pending_exception_.IsException(this));
+  thread_local_top()->pending_exception_ = ReadOnlyRoots(this).the_hole_value();
+}
+```
+ReadOnlyRoots 
+```c++
+#define ROOT_ACCESSOR(Type, name, CamelName) \
+  V8_INLINE class Type name() const;         \
+  V8_INLINE Handle<Type> name##_handle() const;
+
+  READ_ONLY_ROOT_LIST(ROOT_ACCESSOR)
+#undef ROOT_ACCESSOR
+```
+This will expand to a number of function declarations that looks like this:
+```console
+$ clang++ -I./out/x64.release/gen -I. -I./include -E src/roots/roots.h > output
+```
+```c++
+inline __attribute__((always_inline)) class Map free_space_map() const;
+inline __attribute__((always_inline)) Handle<Map> free_space_map_handle() const;
+```
+The Map class is what all HeapObject use to describe their structure. Notice
+that there is also a Handle<Map> declared.
+There are then generated by a macro in roots-inl.h:
+```c++
+Map ReadOnlyRoots::free_space_map() const { 
+  ((void) 0);
+  return Map::unchecked_cast(Object(at(RootIndex::kFreeSpaceMap)));
+} 
+
+Handle<Map> ReadOnlyRoots::free_space_map_handle() const {
+  ((void) 0);
+  return Handle<Map>(&at(RootIndex::kFreeSpaceMap));
+}
+```
+Notice that this is using the RootIndex enum that was mentioned earlier:
+```c++
+  return Map::unchecked_cast(Object(at(RootIndex::kFreeSpaceMap)));
+```
+In object/map.h there is the following line:
+```c++
+  DECL_CAST(Map)
+```
+Which can be found in objects/object-macros.h:
+```c++
+#define DECL_CAST(Type)                                 \
+  V8_INLINE static Type cast(Object object);            \
+  V8_INLINE static Type unchecked_cast(Object object) { \
+    return bit_cast<Type>(object);                      \
+  }
+```
+This will expand to something like
+```c++
+  static Map cast(Object object);
+  static Map unchecked_cast(Object object) {
+    return bit_cast<Map>(object);
+  }
+```
+And the `Object` part is the Object contructor that takes an Address: 
+```c++
+  explicit constexpr Object(Address ptr) : TaggedImpl(ptr) {}
+```
+That leaves the at function which is a private function in ReadOnlyRoots:
+```c++
+  V8_INLINE Address& at(RootIndex root_index) const;
+```
+
+So we are now back in Isolate::Init after the call to InitializeThreadLocal we
+have:
+```c++
+setup_delegate_->SetupBuiltins(this);
+```
+
+In the following line in api.cc, where does `i::OBJECT_TEMPLATE_INFO_TYPE` come from:
+```c++
+  i::Handle<i::Struct> struct_obj = isolate->factory()->NewStruct(
+      i::OBJECT_TEMPLATE_INFO_TYPE, i::AllocationType::kOld);
+```
+The enum `InstanceType` is defined in `src/objects/instance-type.h`:
+```c++
+#include "torque-generated/instance-types-tq.h" 
+
+enum InstanceType : uint16_t {
+  ...   
+#define MAKE_TORQUE_INSTANCE_TYPE(TYPE, value) TYPE = value,                    
+  TORQUE_ASSIGNED_INSTANCE_TYPES(MAKE_TORQUE_INSTANCE_TYPE)                     
+#undef MAKE_TORQUE_INSTANCE_TYPE 
+  ...
+};
+```
+And in `gen/torque-generated/instance-types-tq.h` we can find:
+```c++
+#define TORQUE_ASSIGNED_INSTANCE_TYPES(V) \                                     
+  ...
+  V(OBJECT_TEMPLATE_INFO_TYPE, 79) \                                      
+  ...
+```
+There is list in `src/objects/objects-definitions.h`:
+```c++
+#define STRUCT_LIST_GENERATOR_BASE(V, _)                                      \
+  ...
+  V(_, OBJECT_TEMPLATE_INFO_TYPE, ObjectTemplateInfo, object_template_info)   \
+  ...
+```
+```c++
+template <typename Impl>
+Handle<Struct> FactoryBase<Impl>::NewStruct(InstanceType type,
+                                            AllocationType allocation) {
+  Map map = Map::GetInstanceTypeMap(read_only_roots(), type);
+```
+If we look in `Map::GetInstanceTypeMap` in map.cc we find:
+```c++
+  Map map;
+  switch (type) {
+#define MAKE_CASE(TYPE, Name, name) \
+  case TYPE:                        \
+    map = roots.name##_map();       \
+    break;
+    STRUCT_LIST(MAKE_CASE)
+#undef MAKE_CASE
+```
+Now, we know that our type is:
+```console
+(gdb) p type
+$1 = v8::internal::OBJECT_TEMPLATE_INFO_TYPE
+```
+```c++
+    map = roots.object_template_info_map();       \
+```
+And we can inspect the output of the preprocessor of roots.cc and find:
+```c++
+Map ReadOnlyRoots::object_template_info_map() const { 
+  ((void) 0);
+  return Map::unchecked_cast(Object(at(RootIndex::kObjectTemplateInfoMap)));
+}
+```
+And this is something we have seen before. 
+
+One things I ran into was wanting to print the InstanceType using the overloaded
+<< operator which is defined for the InstanceType in objects.cc.
+```c++
+std::ostream& operator<<(std::ostream& os, InstanceType instance_type) {
+  switch (instance_type) {
+#define WRITE_TYPE(TYPE) \
+  case TYPE:             \
+    return os << #TYPE;
+    INSTANCE_TYPE_LIST(WRITE_TYPE)
+#undef WRITE_TYPE
+  }
+  UNREACHABLE();
+}
+```
+The code I'm using is the followig:
+```c++
+  i::InstanceType type = map.instance_type();
+  std::cout << "object_template_info_map type: " << type << '\n';
+```
+This will cause the `UNREACHABLE()` function to be called and a Fatal error
+thrown. But note that the following line works:
+```c++
+  std::cout << "object_template_info_map type: " << v8::internal::OBJECT_TEMPLATE_INFO_TYPE << '\n';
+```
+And prints
+```console
+object_template_info_map type: OBJECT_TEMPLATE_INFO_TYPE
+```
+In the switch/case block above the case for this value is:
+```c++
+  case OBJECT_TEMPLATE_INFO_TYPE:
+    return os << "OBJECT_TEMPLATE_INFO_TYPE"
+```
+When map.instance_type() is called, it returns a value of `1023` but the value
+of OBJECT_TEMPLATE_INFO_TYPE is:
+```c++
+OBJECT_TEMPLATE_INFO_TYPE = 79
+```
+And we can confirm this using:
+```console
+  std::cout << "object_template_info_map type: " << static_cast<uint16_t>(v8::internal::OBJECT_TEMPLATE_INFO_TYPE) << '\n';
+```
+Which will print:
+```console
+object_template_info_map type: 79
+```
+
+### IsolateData
+
+
+
+### Context creation
+When we create a new context using:
+```c++
+  Local<ObjectTemplate> global = ObjectTemplate::New(isolate_);
+  Local<Context> context = Context::New(isolate_, nullptr, global);
+```
+The Context class in `include/v8.h` declares New as follows:
+```c++
+static Local<Context> New(Isolate* isolate,
+    ExtensionConfiguration* extensions = nullptr,
+    MaybeLocal<ObjectTemplate> global_template = MaybeLocal<ObjectTemplate>(),
+    MaybeLocal<Value> global_object = MaybeLocal<Value>(),
+    DeserializeInternalFieldsCallback internal_fields_deserializer = DeserializeInternalFieldsCallback(),
+    MicrotaskQueue* microtask_queue = nullptr);
+```
+
+When a step into Context::New(isolate_, nullptr, global) this will first break
+in the constructor of DeserializeInternalFieldsCallback in v8.h which has default
+values for the callback function and data_args (both are nullptr). After that
+gdb will break in MaybeLocal<Value> and setting val_ to nullptr. Next it will
+break in Local::operator* for the value of `global` which is then passed to the
+MaybeLocal<v8::ObjectTemplate> constructor. After those break points the break
+point will be in api.cc and v8::Context::New. New will call NewContext in api.cc.
+
+There will be some checks and logging/tracing and then a call to CreateEnvironment:
+```c++
+i::Handle<i::Context> env = CreateEnvironment<i::Context>(                         
+    isolate,
+    extensions,
+    global_template, 
+    global_object,                           
+    context_snapshot_index, 
+    embedder_fields_deserializer, 
+    microtask_queue); 
+```
+The first line in CreateEnironment is:
+```c++
+ENTER_V8_FOR_NEW_CONTEXT(isolate);
+```
+Which is a macro defined in api.cc
+```c++
+i::VMState<v8::OTHER> __state__((isolate)); \                                 
+i::DisallowExceptions __no_exceptions__((isolate)) 
+```
+So the first break point we break on will be the execution/vm-state-inl.h and
+VMState's constructor:
+```c++
+template <StateTag Tag>                                                         
+VMState<Tag>::VMState(Isolate* isolate)                                         
+    : isolate_(isolate), previous_tag_(isolate->current_vm_state()) {           
+  isolate_->set_current_vm_state(Tag);                                          
+} 
+```
+In gdb you'll see this:
+```console
+(gdb) s
+v8::internal::VMState<(v8::StateTag)5>::VMState (isolate=0x372500000000, this=<synthetic pointer>) at ../../src/api/api.cc:6005
+6005	      context_snapshot_index, embedder_fields_deserializer, microtask_queue);
+(gdb) s
+v8::internal::Isolate::current_vm_state (this=0x372500000000) at ../../src/execution/isolate.h:1072
+1072	  THREAD_LOCAL_TOP_ACCESSOR(StateTag, current_vm_state)
+```
+Notice that VMState's constructor sets its `previous_tag_` to isolate->current_vm_state()
+which is generated by the macro THREAD_LOCAL_TOP_ACCESSOR.
+The next break point will be:
+```console
+#0  v8::internal::PerIsolateAssertScopeDebugOnly<(v8::internal::PerIsolateAssertType)5, false>::PerIsolateAssertScopeDebugOnly (
+    isolate=0x372500000000, this=0x7ffc7b51b500) at ../../src/common/assert-scope.h:107
+107	  explicit PerIsolateAssertScopeDebugOnly(Isolate* isolate)
+```
+We can find that `DisallowExceptions` is defined in src/common/assert-scope.h as:
+```c++
+using DisallowExceptions =                                                      
+    PerIsolateAssertScopeDebugOnly<NO_EXCEPTION_ASSERT, false>;
+```
+After all that we can start to look at the code in CreateEnvironment.
+
+```c++
+    // Create the environment.                                                       
+    InvokeBootstrapper<ObjectType> invoke;                                           
+    result = invoke.Invoke(isolate, maybe_proxy, proxy_template, extensions,    
+                           context_snapshot_index, embedder_fields_deserializer,
+                           microtask_queue);  
+
+
+template <typename ObjectType>                                                  
+struct InvokeBootstrapper;                                                        
+                                                                                     
+template <>                                                                     
+struct InvokeBootstrapper<i::Context> {                                         
+  i::Handle<i::Context> Invoke(                                                 
+      i::Isolate* isolate, i::MaybeHandle<i::JSGlobalProxy> maybe_global_proxy, 
+      v8::Local<v8::ObjectTemplate> global_proxy_template,                      
+      v8::ExtensionConfiguration* extensions, size_t context_snapshot_index,    
+      v8::DeserializeInternalFieldsCallback embedder_fields_deserializer,       
+      v8::MicrotaskQueue* microtask_queue) {                                         
+    return isolate->bootstrapper()->CreateEnvironment(                               
+        maybe_global_proxy, global_proxy_template, extensions,                       
+        context_snapshot_index, embedder_fields_deserializer, microtask_queue); 
+  }                                                                                  
+};
+```
+Bootstrapper can be found in `src/init/bootstrapper.cc`:
+```console
+HandleScope scope(isolate_);                                                      
+Handle<Context> env;                                                              
+  {                                                                                 
+    Genesis genesis(isolate_, maybe_global_proxy, global_proxy_template,            
+                    context_snapshot_index, embedder_fields_deserializer,           
+                    microtask_queue);                                               
+    env = genesis.result();                                                         
+    if (env.is_null() || !InstallExtensions(env, extensions)) {                     
+      return Handle<Context>();                                                     
+    }                                                                               
+  }                 
+```
+Notice that the break point will be in the HandleScope constructor. Then a 
+new instance of Genesis is created which performs some actions in its constructor.
+```c++
+global_proxy = isolate->factory()->NewUninitializedJSGlobalProxy(instance_size);
+```
+
+This will land in factory.cc:
+```c++
+Handle<Map> map = NewMap(JS_GLOBAL_PROXY_TYPE, size);
+```
+`size` will be 16 in this case. `NewMap` is declared in factory.h which has
+default values for its parameters:
+```c++
+  Handle<Map> NewMap(InstanceType type, int instance_size,                      
+                     ElementsKind elements_kind = TERMINAL_FAST_ELEMENTS_KIND,  
+                     int inobject_properties = 0);
+```
+
+In Factory::InitializeMap we have the following check:
+```c++
+DCHECK_EQ(map.GetInObjectProperties(), inobject_properties);
+```
+Remember that I called `Context::New` with the following arguments:
+```c++
+  Local<ObjectTemplate> global = ObjectTemplate::New(isolate_);
+  Local<Context> context = Context::New(isolate_, nullptr, global);
+```
+
+
+### VMState
+
+
+
+### TaggedImpl
+Has a single private member which is declared as:
+```c++
+StorageType ptr_;
+```
+An instance can be created using:
+```c++
+  i::TaggedImpl<i::HeapObjectReferenceType::STRONG, i::Address>  tagged{};
+```
+Storage type can also be `Tagged_t` which is defined in globals.h:
+```c++
+ using Tagged_t = uint32_t;
+```
+It looks like it can be a different value when using pointer compression.
+
+### Object (internal)
+This class extends TaggedImpl:
+```c++
+class Object : public TaggedImpl<HeapObjectReferenceType::STRONG, Address> {       
+```
+An Object can be created using the default constructor, or by passing in an 
+Address which will delegate to TaggedImpl constructors. Object itself does
+not have any members (apart from ptr_ which is inherited from TaggedImpl that is). 
+So if we create an Object on the stack this is like a pointer/reference to
+an object: 
+```
++------+
+|Object|
+|------|
+|ptr_  |---->
++------+
+```
+Now, `ptr_` is a TaggedImpl so it would be a Smi in which case it would just
+contains the value directly, for example a small integer:
+```
++------+
+|Object|
+|------|
+|  18  |
++------+
+```
+
+### ObjectSlot
+```c++
+  i::Object obj{18};
+  i::FullObjectSlot slot{&obj};
+```
+
+```
++----------+      +---------+
+|ObjectSlot|      | Object  |
+|----------|      |---------|
+| address  | ---> |   18    |
++----------+      +---------+
+```
+
+### Handle
+A Handle is similar to a Object and ObjectSlot in that it also contains
+an Address member (called location_ and declared in HandleBase), but with the
+difference is that Handles can be relocated by the garbage collector.
+
+### HeapObject
+
+
+### NewContext
+When we create a new context using:
+```c++
+const v8::Local<v8::ObjectTemplate> obt = v8::Local<v8::ObjectTemplate>();
+v8::Handle<v8::Context> context = v8::Context::New(isolate_, nullptr, obt);
+```
+The above is using the static function New declared in `include/v8.h`
+```c++
+static Local<Context> New(                                                    
+    Isolate* isolate,
+    ExtensionConfiguration* extensions = nullptr,           
+    MaybeLocal<ObjectTemplate> global_template = MaybeLocal<ObjectTemplate>(),
+    MaybeLocal<Value> global_object = MaybeLocal<Value>(),                    
+    DeserializeInternalFieldsCallback internal_fields_deserializer = DeserializeInternalFieldsCallback(),                                  
+    MicrotaskQueue* microtask_queue = nullptr);
+```
+The implementation for this function can be found in `src/api/api.cc`
+How does a Local become a MaybeLocal in this above case?  
+This is because MaybeLocal has a constructor that takes a Local<S> and this will
+be casted into the `val_` member of the MaybeLocal instance.
+
+
+### Genesis::Genesis
+if (context_snapshot_index == 0) {                                              
+  Handle<JSGlobalObject> global_object = CreateNewGlobals(global_proxy_template, global_proxy);
+  HookUpGlobalObject(global_object);
+
+
+### What is the difference between a Local and a Handle?
+
+Currently, the torque generator will generate Print functions that look like
+the following:
+```c++
+template <>                                                                     
+void TorqueGeneratedEnumCache<EnumCache, Struct>::EnumCachePrint(std::ostream& os) {
+  this->PrintHeader(os, "TorqueGeneratedEnumCache");
+  os << "\n - keys: " << Brief(this->keys());
+  os << "\n - indices: " << Brief(this->indices());
+  os << "\n";
+}
+```
+Notice the last line where the newline character is printed as a string. This
+would just be a char instead `'\n'`.
+
+There are a number of things that need to happen only once upon startup for
+each process. These things are placed in `V8::InitializeOncePerProcessImpl` which
+can be found in `src/init/v8.cc`. This is called by v8::V8::Initialize().
+```c++
+  CpuFeatures::Probe(false);                                                    
+  ElementsAccessor::InitializeOncePerProcess();                                 
+  Bootstrapper::InitializeOncePerProcess();                                     
+  CallDescriptors::InitializeOncePerProcess();                                  
+  wasm::WasmEngine::InitializeOncePerProcess();
+```
+ElementsAccessor populates the accessor_array with Elements listed in 
+`ELEMENTS_LIST`. TODO: take a closer look at Elements. 
+
+v8::Isolate::Initialize will set up the heap.
+```c++
+i_isolate->heap()->ConfigureHeap(params.constraints);
+```
+
+It is when we create an new Context that Genesis is created. This will call
+Snapshot::NewContextFromSnapshot.
+So the context is read from the StartupData* blob with ExtractContextData(blob).
+
+What is the global proxy?
 
 
