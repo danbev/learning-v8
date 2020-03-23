@@ -11,7 +11,7 @@ v8_dylibs=-lv8 -lv8_libplatform -lv8_libbase
 GTEST_FILTER ?= "*"
 clang = "$(V8_HOME)/third_party/llvm-build/Release+Asserts/bin/clang"
 
-clang_cmd=g++ -Wall -g $@.cc -o $@ -std=c++14 -Wcast-function-type \
+clang_cmd=g++ -Wall -g -O0 $@.cc -o $@ -std=c++14 -Wcast-function-type \
 	  -fno-exceptions -fno-rtti \
           -I$(v8_include_dir) \
           -I$(V8_HOME) \
@@ -20,7 +20,7 @@ clang_cmd=g++ -Wall -g $@.cc -o $@ -std=c++14 -Wcast-function-type \
           $(v8_dylibs) \
           -Wl,-L$(v8_build_dir) -Wl,-lpthread
 
-clang_test_cmd=g++ -Wall -g test/main.cc $@.cc -o $@  ./lib/gtest/libgtest-linux.a -std=c++14 \
+clang_test_cmd=g++ -Wall -g -O0 test/main.cc $@.cc -o $@  ./lib/gtest/libgtest-linux.a -std=c++14 \
 	  -fno-exceptions -fno-rtti -Wcast-function-type -Wno-unused-variable \
 	  -Wno-class-memaccess -Wno-comment -Wno-unused-but-set-variable \
 	  -DV8_INTL_SUPPORT \
@@ -39,7 +39,7 @@ clang_gtest_cmd=g++ --verbose -Wall -O0 -g -c $(gtest_home)/src/gtest-all.cc \
           -I$(gtest_home) \
           -I$(gtest_home)/include
 
-clang_torque_cmd=g++ -Wall -g -c gen/torque-generated/exported-macros-assembler-tq.cc \
+clang_torque_cmd=g++ -Wall -g -O0 -c gen/torque-generated/exported-macros-assembler-tq.cc \
 	  -o exported-macros-assembler.o -std=c++14 -Wcast-function-type \
 	  -fno-exceptions -fno-rtti \
           -I$(v8_include_dir) \
@@ -158,6 +158,9 @@ test/objecttemplate_test: test/objecttemplate_test.cc
 	$(clang_test_cmd)
 
 test/functiontemplate_test: test/functiontemplate_test.cc
+	$(clang_test_cmd)
+
+test/exceptions_test: test/exceptions_test.cc
 	$(clang_test_cmd)
 
 

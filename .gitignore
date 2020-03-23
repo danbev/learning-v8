@@ -32,3 +32,4 @@ test/handlescope_test
 torque-example
 test/objecttemplate_test
 test/functiontemplate_test
+test/exceptions_test
