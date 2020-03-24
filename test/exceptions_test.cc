@@ -19,9 +19,15 @@ void function_callback(const FunctionCallbackInfo<Value>& info) {
   i::Isolate* i_isolate = reinterpret_cast<v8::internal::Isolate*>(isolate);
   std::cout << "function_callback args...\n";
 
-  i::ErrorUtils::ThrowLoadFromNullOrUndefined(i_isolate, i::Handle<i::Object>());
+  i::Object exception{};
+  //i::Object o = i_isolate->Throw(exception);
+  isolate->ThrowException(String::NewFromUtf8(isolate, "some error").ToLocalChecked());
+  std::cout << "has_pending_exception: " << i_isolate->has_pending_exception() << '\n';
+  std::cout << "has_scheduled_exception: " << i_isolate->has_scheduled_exception() << '\n';
 
+  // Set a return value
   ReturnValue<Value> return_value = info.GetReturnValue();
+  return_value.Set(8);
 }
 
 TEST_F(ExceptionsTest, Exception) {
@@ -34,8 +40,8 @@ TEST_F(ExceptionsTest, Exception) {
   Local<Function> function = ft->GetFunction(context).ToLocalChecked();
 
   Local<Object> recv = Object::New(isolate_);
+  TryCatch try_catch{isolate_};
   MaybeLocal<Value> ret = function->Call(context, recv, 0, nullptr);
-  EXPECT_FALSE(ret.IsEmpty());
-  Local<Value> value = ret.ToLocalChecked();
-  V8TestFixture::print_local(value);
+  EXPECT_TRUE(ret.IsEmpty());
+  EXPECT_TRUE(try_catch.HasCaught());
 }
