@@ -50,6 +50,21 @@ clang_torque_cmd=g++ -Wall -g -O0 -c gen/torque-generated/exported-macros-assemb
           $(v8_dylibs) \
           -Wl,-L$(v8_build_dir) -Wl,-lpthread
 
+define run_compile
+g++ -Wall -g -O0 test/main.cc $(subst ", ,$1) $@.cc -o $@  ./lib/gtest/libgtest-linux.a -std=c++14 \
+	  -fno-exceptions -fno-rtti -Wcast-function-type -Wno-unused-variable \
+	  -Wno-class-memaccess -Wno-comment -Wno-unused-but-set-variable \
+	  -DV8_INTL_SUPPORT \
+          -I$(v8_include_dir) \
+          -I$(V8_HOME) \
+          -I$(V8_HOME)/third_party/icu/source/common/ \
+          -I$(v8_build_dir)/gen \
+          -L$(v8_build_dir) \
+          -I./deps/googletest/googletest/include \
+          $(v8_dylibs) \
+          -Wl,-L$(v8_build_dir) -Wl,-L/usr/lib64 -Wl,-lstdc++ -Wl,-lpthread
+endef
+
 
 COMPILE_TEST = g++ -v -std=c++11 -O0 -g -I$(V8_HOME)/third_party/googletest/src/googletest/include -I$(v8_include_dir) -I$(v8_gen_dir) -I$(V8_HOME) $(v8_dylibs) -L$(v8_build_dir) -pthread  lib/gtest/libgtest.a
 
@@ -131,7 +146,7 @@ test/isolate_test: test/isolate_test.cc
 	$(clang_test_cmd)
 
 test/builtins_test: test/builtins_test.cc
-	$(clang_test_cmd)
+	$(call run_compile, "${v8_build_dir}/obj/v8_base_without_compiler/builtins.o ${v8_build_dir}/obj/v8_base_without_compiler/code.o ")
 
 test/tagged_test: test/tagged_test.cc
 	$(clang_test_cmd)
