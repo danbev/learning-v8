@@ -31,16 +31,6 @@ void propertyListener(Local<String> name, const PropertyCallbackInfo<Value>& inf
 }
 
 int main(int argc, char* argv[]) {
-    // Now this is where the files snapshot_blob.bin' comes into play. But what
-    // is this bin file?
-    // JavaScript specifies a lot of built-in functionality which every V8 context must provide.
-    // For example, you can run Math.PI and that will work in a JavaScript console/repl. The global object
-    // and all the built-in functionality must be setup and initialized into the V8 heap. This can be time
-    // consuming and affect runtime performance if this has to be done every time. The blob above is prepared
-    // snapshot that get directly deserialized into the heap to provide an initilized context.
-    V8::InitializeExternalStartupData(argv[0]);
-
-    // Set up thread pool etc.
     std::unique_ptr<Platform> platform = platform::NewDefaultPlatform();
     // Just sets the platform created above.
     V8::InitializePlatform(platform.get());
