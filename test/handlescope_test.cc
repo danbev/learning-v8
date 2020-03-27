@@ -12,7 +12,6 @@ namespace i = v8::internal;
 class HandleScopeTest : public V8TestFixture { };
 
 TEST_F(HandleScopeTest, HandleScopeData) {
-  /*
   i::Isolate* isolate = asInternal(isolate_);
   i::HandleScope handle_scope(isolate);
   i::HandleScopeData data{};
@@ -22,7 +21,6 @@ TEST_F(HandleScopeTest, HandleScopeData) {
   EXPECT_EQ(data.canonical_scope, nullptr);
   EXPECT_EQ(data.level, 0);
   EXPECT_EQ(data.sealed_level, 0);
-  */
 }
 
 TEST_F(HandleScopeTest, Create) {
@@ -33,12 +31,15 @@ TEST_F(HandleScopeTest, Create) {
   i::Handle<i::Object> handle(obj, i_isolate);
   EXPECT_FALSE(handle.is_null());
   EXPECT_EQ(*handle, obj);
+
+  i::HandleScopeData* data = i_isolate->handle_scope_data();
+  EXPECT_EQ(data->level, 1);
 }
 
 TEST_F(HandleScopeTest, HandleScopeImplementer) {
   i::Isolate* i_isolate = asInternal(isolate_);
   i::HandleScopeImplementer implementer{i_isolate};
-  // Context is just a HeapObject so we can construct one the default not
+  // Context is just a HeapObject so we can construct using the default not
   // args constructor.
   i::Context context{};
 
