@@ -119,7 +119,7 @@ test/persistent-object_test: test/persistent-object_test.cc
 	$(clang_test_cmd)
 
 test/maybe_test: test/maybe_test.cc
-	$(COMPILE_TEST) test/main.cc $< -o $@
+	$(clang_test_cmd)
 
 test/smi_test: test/smi_test.cc
 	$(clang_test_cmd)
