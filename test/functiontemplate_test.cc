@@ -5,7 +5,7 @@
 #include "v8_test_fixture.h"
 #include "src/objects/objects.h"
 #include "src/objects/objects-inl.h"
-#include "src/api/api.h"
+#include "src/api/api-inl.h"
 
 using namespace v8;
 
@@ -39,6 +39,7 @@ void function_callback(const FunctionCallbackInfo<Value>& info) {
 }
 
 TEST_F(FunctionTemplateTest, FunctionTemplate) {
+  i::Isolate* i_isolate = V8TestFixture::asInternal(isolate_);
   const HandleScope handle_scope(isolate_);
   Handle<Context> context = Context::New(isolate_);
   Context::Scope context_scope(context);
@@ -47,6 +48,10 @@ TEST_F(FunctionTemplateTest, FunctionTemplate) {
   Local<Value> data = String::NewFromUtf8(isolate_, "some info", NewStringType::kNormal).ToLocalChecked();
   Local<FunctionTemplate> ft = FunctionTemplate::New(isolate_, function_callback, data);
   Local<Function> function = ft->GetFunction(context).ToLocalChecked();
+  Local<String> func_name = String::NewFromUtf8(isolate_, "SomeFunc", NewStringType::kNormal).ToLocalChecked();
+  function->SetName(func_name);
+  Local<Value> prototype = function->GetPrototype();
+  V8TestFixture::print_local(prototype);
 
   Local<Object> recv = Object::New(isolate_);
   Local<Name> name = String::NewFromUtf8(isolate_, "nr", NewStringType::kNormal).ToLocalChecked();
@@ -55,12 +60,32 @@ TEST_F(FunctionTemplateTest, FunctionTemplate) {
 
   int argc = 0;
   Local<Value> argv[] = {}; 
-  MaybeLocal<Value> ret = function->Call(context, recv, 0, nullptr);
+  MaybeLocal<Value> ret = function->Call(context, recv, argc, nullptr);
   if (!ret.IsEmpty()) {
     Local<Number> nr = ret.ToLocalChecked()->ToNumber(context).ToLocalChecked();
     EXPECT_EQ(nr->Value(), 20);
   }
 
+  i::RootsTable roots_table = i_isolate->roots_table();
+  i::Heap* heap = i_isolate->heap();
+
   //Local<Function> function2 = ft->GetFunction(context).ToLocalChecked();
   //MaybeLocal<Value> ret = function->Call(context, recv, 0, nullptr);
+}
+
+TEST_F(FunctionTemplateTest, FunctionTemplateInfo) {
+  const HandleScope handle_scope(isolate_);
+  Handle<Context> context = Context::New(isolate_);
+  Context::Scope context_scope(context);
+
+  // This value, data, will be made available via the FunctionCallbackInfo:
+  Local<Value> data = String::NewFromUtf8(isolate_, "some info", NewStringType::kNormal).ToLocalChecked();
+  Local<FunctionTemplate> ft = FunctionTemplate::New(isolate_, function_callback, data);
+  i::Handle<i::FunctionTemplateInfo> ft_info = i::Handle<i::FunctionTemplateInfo>(
+      reinterpret_cast<i::Address*>(const_cast<FunctionTemplate*>(*ft)));
+  i::Isolate* i_isolate = V8TestFixture::asInternal(isolate_);
+  i::Handle<i::SharedFunctionInfo> sfi = i::FunctionTemplateInfo::GetOrCreateSharedFunctionInfo(
+      i_isolate, ft_info, i::MaybeHandle<i::Name>());
+  //std::cout << sfi->Name() << '\n';
+  //ft_info->GetCFunction(i_isolate);
 }
