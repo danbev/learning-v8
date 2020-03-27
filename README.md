@@ -432,6 +432,7 @@ So after this return we will be back in `Invoke` in execution.cc:
 ```
 Now, even though are callback returned nothing/null, that was checked for and
 instead undefined was returned. 
+
 After this we will return to `Execution::Call` which will just return to
 v8::ToLocal which will turn the Handle into a MaybeHandle.
 This will then return us to Function::Call:
@@ -453,7 +454,10 @@ And RETURN_ESCAPED:
 return handle_scope.Escape(result);;
 ```
 I wonder why this last line is a macro when it is just one line.
-
+Finally we will be back in our test 
+```c++
+  MaybeLocal<Value> ret = function->Call(context, recv, 0, nullptr);
+```
 
 
 
@@ -461,6 +465,121 @@ I wonder why this last line is a macro when it is just one line.
 (gdb) p result.is_null()
 $15 = true
 ```
+
+### Exception
+When calling a Function one can throw an exception using:
+```c++
+  isolate->ThrowException(String::NewFromUtf8(isolate, "some error").ToLocalChecked());
+```
+`ThrowException` can be found in `src/api/api.cc` and what it does is:
+```c++
+  ENTER_V8_DO_NOT_USE(isolate);                                                 
+  // If we're passed an empty handle, we throw an undefined exception           
+  // to deal more gracefully with out of memory situations.                     
+  if (value.IsEmpty()) {                                                        
+    isolate->ScheduleThrow(i::ReadOnlyRoots(isolate).undefined_value());             
+  } else {                                                                           
+    isolate->ScheduleThrow(*Utils::OpenHandle(*value));                              
+  }                                                                                  
+  return v8::Undefined(reinterpret_cast<v8::Isolate*>(isolate));      
+```
+Lets take a closer look at `ScheduleThrow`. 
+```c++
+void Isolate::ScheduleThrow(Object exception) {                                     
+  Throw(exception);                                                                 
+  PropagatePendingExceptionToExternalTryCatch();                                    
+  if (has_pending_exception()) {                                                    
+    thread_local_top()->scheduled_exception_ = pending_exception();                 
+    thread_local_top()->external_caught_exception_ = false;                         
+    clear_pending_exception();                                                      
+  }                                                                                 
+}
+```
+`Throw` will end by setting the pending_exception to the exception passed in.
+Next, `PropagatePendingExceptionToExternalTryCatch` will be called. This is
+where a `TryCatch` handler comes into play. If one had been registered, which as
+I'm writing this I did not have one (but will add one to try it out and verify).
+The code for this part looks like this:
+```c++
+  v8::TryCatch* handler = try_catch_handler();
+  handler->can_continue_ = true;
+  handler->has_terminated_ = false;
+  handler->exception_ = reinterpret_cast<void*>(pending_exception().ptr());
+  // Propagate to the external try-catch only if we got an actual message.
+  if (thread_local_top()->pending_message_obj_.IsTheHole(this)) return true;
+  handler->message_obj_ = reinterpret_cast<void*>(thread_local_top()->pending_message_obj_.ptr());
+```  
+When a TryCatch is created its constructor will call `RegisterTryCatchHandler`
+which will set the thread_local_top try_catch_handler which is retrieved above.
+
+Prior to this there will be a call to `IsJavaScriptHandlerOnTop`:
+```c++
+// For uncatchable exceptions, the JavaScript handler cannot be on top.           
+if (!is_catchable_by_javascript(exception)) return false;
+```
+```c++
+  return exception != ReadOnlyRoots(heap()).termination_exception();               
+}
+```
+I really need to understand this better and the various ways to catch/handle
+exceptions (from C++ and JavaScript). 
+Next (in PropagatePendingExceptionToExternalTryCatch) we have:
+```c++
+  // Get the top-most JS_ENTRY handler, cannot be on top if it doesn't exist.   
+  Address entry_handler = Isolate::handler(thread_local_top());                 
+  if (entry_handler == kNullAddress) return false;
+```
+Next, he have the following:
+```c++
+  if (!IsExternalHandlerOnTop(exception)) {                                     
+    thread_local_top()->external_caught_exception_ = false;                     
+    return true;                                                                
+  }
+```
+I'm really confused at the moment with these different handler, we have one
+for. 
+
+
+Now, for a javascript function that is executed using `Run` what would be
+used in execution.cc Execution::Call would be:
+```c++
+Handle<Code> code = JSEntry(isolate, params.execution_target, params.is_construct);
+```
+```c++
+Handle<Code> JSEntry(Isolate* isolate, Execution::Target execution_target, bool is_construct) {
+  if (is_construct) {
+    return BUILTIN_CODE(isolate, JSConstructEntry);
+  } else if (execution_target == Execution::Target::kCallable) {
+    return BUILTIN_CODE(isolate, JSEntry);
+    isolate->builtins()->builtin_handle(Builtins::kJSEntry)
+  } else if (execution_target == Execution::Target::kRunMicrotasks) {
+    return BUILTIN_CODE(isolate, JSRunMicrotasksEntry);
+  }
+  UNREACHABLE();
+}
+```
+
+```c++
+if (params.execution_target == Execution::Target::kCallable) {
+  // clang-format off
+  // {new_target}, {target}, {receiver}, return value: tagged pointers
+  // {argv}: pointer to array of tagged pointers
+  using JSEntryFunction = GeneratedCode<Address(
+      Address root_register_value, Address new_target, Address target,
+      Address receiver, intptr_t argc, Address** argv)>;
+  JSEntryFunction stub_entry =
+      JSEntryFunction::FromAddress(isolate, code->InstructionStart());
+  Address orig_func = params.new_target->ptr();
+  Address func = params.target->ptr();
+  Address recv = params.receiver->ptr();
+  Address** argv = reinterpret_cast<Address**>(params.argv);
+
+  RuntimeCallTimerScope timer(isolate, RuntimeCallCounterId::kJS_Execution);
+
+  value = Object(stub_entry.Call(isolate->isolate_data()->isolate_root(),
+                                 orig_func, func, recv, params.argc, argv));
+```
+
 
 ### TaggedImpl
 Has a single private member which is declared as:
