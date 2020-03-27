@@ -125,7 +125,7 @@ test/smi_test: test/smi_test.cc
 	$(clang_test_cmd)
 
 test/string_test: test/string_test.cc
-	$(COMPILE_TEST) test/main.cc $< -o $@
+	$(clang_test_cmd)
 
 test/jsobject_test: test/jsobject_test.cc
 	$(clang_test_cmd)
