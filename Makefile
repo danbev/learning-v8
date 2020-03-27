@@ -140,7 +140,7 @@ test/heap_test: test/heap_test.cc
 	$(clang_test_cmd)
 
 test/map_test: test/map_test.cc
-	$(clang_test_cmd)
+	$(call run_compile, "${v8_build_dir}/obj/v8_base_without_compiler/map.o")
 
 test/isolate_test: test/isolate_test.cc
 	$(clang_test_cmd)
