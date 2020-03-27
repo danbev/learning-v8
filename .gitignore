@@ -34,3 +34,4 @@ test/objecttemplate_test
 test/functiontemplate_test
 test/exceptions_test
 test/builtins_test
+test/arrays_test
