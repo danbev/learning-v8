@@ -19,6 +19,7 @@ TEST_F(StringTest, create) {
   String::Utf8Value value(isolate_, str);
   EXPECT_STREQ("bajja", *value);
   EXPECT_EQ(str->Length(), 6);
+  EXPECT_EQ(str->Utf8Length(isolate_), 6);
   EXPECT_EQ(str->IsOneByte(), true);
   EXPECT_EQ(str->IsExternal(), false);
   EXPECT_EQ(str->IsExternalOneByte(), false);
@@ -29,6 +30,7 @@ TEST_F(StringTest, empty) {
   Isolate::Scope isolate_scope(isolate_);
   Local<String> str = String::Empty(isolate_); 
   EXPECT_EQ(str->Length(), 0);
+  EXPECT_EQ(str->Utf8Length(isolate_), 0);
   EXPECT_EQ(str->IsOneByte(), true);
   EXPECT_EQ(str->ContainsOnlyOneByte(), true);
 }
