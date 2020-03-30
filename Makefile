@@ -1,5 +1,6 @@
 V8_HOME ?= /home/danielbevenius/work/google/v8_src/v8
 v8_build_dir = $(V8_HOME)/out/x64.release_gcc
+#v8_build_dir = $(V8_HOME)/out/x64.debug
 v8_buildtools_dir = $(V8_HOME)/buildtools/third_party
 gtest_home = $(PWD)/deps/googletest/googletest
 current_dir=$(shell pwd)
@@ -143,6 +144,9 @@ test/map_test: test/map_test.cc
 	$(call run_compile, "${v8_build_dir}/obj/v8_base_without_compiler/map.o")
 
 test/isolate_test: test/isolate_test.cc
+	$(clang_test_cmd)
+
+test/roots_test: test/roots_test.cc
 	$(clang_test_cmd)
 
 test/builtins_test: test/builtins_test.cc
