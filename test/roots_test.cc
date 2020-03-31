@@ -32,6 +32,18 @@ TEST_F(RootsTest, visitor_roots) {
   }
 }
 
+TEST_F(RootsTest, list_root_index) {
+  Isolate::Scope isolate_scope(isolate_);
+  const v8::HandleScope handle_scope(isolate_);
+  i::Isolate* i_isolate = asInternal(isolate_);
+
+  // from src/objects/visitors.h
+  std::cout << "Number of roots: " << i::RootsTable::kEntriesCount << '\n';
+  for (size_t i = 0; i < i::RootsTable::kEntriesCount; i++) {
+    std::cout << i << ": " <<  i::RootsTable::name(static_cast<i::RootIndex>(i)) << '\n';
+  }
+}
+
 TEST_F(RootsTest, roots) {
   Isolate::Scope isolate_scope(isolate_);
   const v8::HandleScope handle_scope(isolate_);
