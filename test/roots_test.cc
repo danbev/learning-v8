@@ -1,6 +1,7 @@
 #include <iostream>
 #include "gtest/gtest.h"
 #include "v8.h"
+#include "src/objects/visitors.h"
 #include "src/roots/roots.h"
 #include "libplatform/libplatform.h"
 #include "v8_test_fixture.h"
@@ -11,6 +12,25 @@ using namespace v8;
 namespace i = v8::internal;
 
 class RootsTest : public V8TestFixture {};
+
+class DummyVisitor : public i::RootVisitor {
+ public:
+  void VisitRootPointers(i::Root root, const char* description,
+                         i::FullObjectSlot start, i::FullObjectSlot end) override {}
+};
+
+TEST_F(RootsTest, visitor_roots) {
+  Isolate::Scope isolate_scope(isolate_);
+  const v8::HandleScope handle_scope(isolate_);
+  i::Isolate* i_isolate = asInternal(isolate_);
+
+  // from src/objects/visitors.h
+  int nr_of_roots = static_cast<int>(i::Root::kNumberOfRoots);
+  std::cout << "Number of roots: " << nr_of_roots << '\n';
+  for (int i = 0; i < nr_of_roots; i++) {
+    std::cout << DummyVisitor::RootName(static_cast<i::Root>(i)) << '\n';
+  }
+}
 
 TEST_F(RootsTest, roots) {
   Isolate::Scope isolate_scope(isolate_);
