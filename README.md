@@ -6802,14 +6802,390 @@ bool Snapshot::Initialize(Isolate* isolate) {
   ReadOnlyDeserializer read_only_deserializer(&read_only_snapshot_data);
   startup_deserializer.SetRehashability(ExtractRehashability(blob));
   read_only_deserializer.SetRehashability(ExtractRehashability(blob));
+
   bool success = isolate->InitWithSnapshot(&read_only_deserializer, &startup_deserializer);
 ```
 So we get the blob and create deserializers for it which are then passed to
-`isolate->InitWithSnapshot`.
+`isolate->InitWithSnapshot` which delegated to `Isolate::Init`.
+This will use a `FOR_EACH_ISOLATE_ADDRESS_NAME` macro to assign to the
+`isolate_addresses_` field:
+```c++
+isolate_addresses_[IsolateAddressId::kHandlerAddress] = reinterpret_cast<Address>(handler_address());
+isolate_addresses_[IsolateAddressId::kCEntryFPAddress] = reinterpret_cast<Address>(c_entry_fp_address());
+isolate_addresses_[IsolateAddressId::kCFunctionAddress] = reinterpret_cast<Address>(c_function_address());
+isolate_addresses_[IsolateAddressId::kContextAddress] = reinterpret_cast<Address>(context_address());
+isolate_addresses_[IsolateAddressId::kPendingExceptionAddress] = reinterpret_cast<Address>(pending_exception_address());
+isolate_addresses_[IsolateAddressId::kPendingHandlerContextAddress] = reinterpret_cast<Address>(pending_handler_context_address());
+ isolate_addresses_[IsolateAddressId::kPendingHandlerEntrypointAddress] = reinterpret_cast<Address>(pending_handler_entrypoint_address());
+ isolate_addresses_[IsolateAddressId::kPendingHandlerConstantPoolAddress] = reinterpret_cast<Address>(pending_handler_constant_pool_address());
+ isolate_addresses_[IsolateAddressId::kPendingHandlerFPAddress] = reinterpret_cast<Address>(pending_handler_fp_address());
+ isolate_addresses_[IsolateAddressId::kPendingHandlerSPAddress] = reinterpret_cast<Address>(pending_handler_sp_address());
+ isolate_addresses_[IsolateAddressId::kExternalCaughtExceptionAddress] = reinterpret_cast<Address>(external_caught_exception_address());
+ isolate_addresses_[IsolateAddressId::kJSEntrySPAddress] = reinterpret_cast<Address>(js_entry_sp_address());
+```
+After this we have a number of member that are assigned to:
+```c++
+compilation_cache_ = new CompilationCache(this);
+  descriptor_lookup_cache_ = new DescriptorLookupCache();
+  inner_pointer_to_code_cache_ = new InnerPointerToCodeCache(this);
+  global_handles_ = new GlobalHandles(this);
+  eternal_handles_ = new EternalHandles();
+  bootstrapper_ = new Bootstrapper(this);
+  handle_scope_implementer_ = new HandleScopeImplementer(this);
+  load_stub_cache_ = new StubCache(this);
+  store_stub_cache_ = new StubCache(this);
+  materialized_object_store_ = new MaterializedObjectStore(this);
+  regexp_stack_ = new RegExpStack();
+  regexp_stack_->isolate_ = this;
+  date_cache_ = new DateCache();
+  heap_profiler_ = new HeapProfiler(heap());
+  interpreter_ = new interpreter::Interpreter(this);
+  compiler_dispatcher_ =
+      new CompilerDispatcher(this, V8::GetCurrentPlatform(), FLAG_stack_size);
+```
+After this we have:
+```c++
+isolate_data_.external_reference_table()->Init(this);
+```
+This will land in `src/codegen/external-reference-table.cc` where we have:
+```c++
+void ExternalReferenceTable::Init(Isolate* isolate) {                              
+  int index = 0;                                                                   
+  Add(kNullAddress, &index);                                                       
+  AddReferences(isolate, &index);                                                  
+  AddBuiltins(&index);                                                             
+  AddRuntimeFunctions(&index);                                                     
+  AddIsolateAddresses(isolate, &index);                                            
+  AddAccessors(&index);                                                            
+  AddStubCache(isolate, &index);                                                   
+  AddNativeCodeStatsCounters(isolate, &index);                                     
+  is_initialized_ = static_cast<uint32_t>(true);                                   
+                                                                                   
+  CHECK_EQ(kSize, index);                                                          
+}
+
+void ExternalReferenceTable::Add(Address address, int* index) {                 
+ref_addr_[(*index)++] = address;                                                
+} 
+
+Address ref_addr_[kSize];
+```
+
+Now, lets take a look at `AddReferences`: 
+```c++
+Add(ExternalReference::abort_with_reason().address(), index); 
+```
+What are ExternalReferences?   
+The represent c++ addresses used in generated code.
+
+After that we have AddBuiltins:
+```c++
+static const Address c_builtins[] = {                                         
+      (reinterpret_cast<v8::internal::Address>(&Builtin_HandleApiCall)), 
+      ...
+
+Address Builtin_HandleApiCall(int argc, Address* args, Isolate* isolate);
+```
+I can see that the function declaration is in external-reference.h but the
+implementation is not there. Instead this is defined in src/builtins/builtins-api.cc:
+```c++
+BUILTIN(HandleApiCall) {                                                           
+(will expand to:)
+
+V8_WARN_UNUSED_RESULT static Object Builtin_Impl_HandleApiCall(
+      BuiltinArguments args, Isolate* isolate);
+
+V8_NOINLINE static Address Builtin_Impl_Stats_HandleApiCall(
+      int args_length, Address* args_object, Isolate* isolate) {
+    BuiltinArguments args(args_length, args_object);
+    RuntimeCallTimerScope timer(isolate,
+                                RuntimeCallCounterId::kBuiltin_HandleApiCall);
+    TRACE_EVENT0(TRACE_DISABLED_BY_DEFAULT("v8.runtime"), "V8.Builtin_HandleApiCall");
+    return CONVERT
+}
+V8_WARN_UNUSED_RESULT Address Builtin_HandleApiCall(
+      int args_length, Address* args_object, Isolate* isolate) {
+    DCHECK(isolate->context().is_null() || isolate->context().IsContext());
+    if (V8_UNLIKELY(TracingFlags::is_runtime_stats_enabled())) {
+      return Builtin_Impl_Stats_HandleApiCall(args_length, args_object, isolate);
+    }
+    BuiltinArguments args(args_length, args_object);
+    return CONVERT_OBJECT(Builtin_Impl_HandleApiCall(args, isolate));
+  }
+
+  V8_WARN_UNUSED_RESULT static Object Builtin_Impl_HandleApiCall(
+      BuiltinArguments args, Isolate* isolate) {
+    HandleScope scope(isolate);                                                      
+    Handle<JSFunction> function = args.target();                                  
+    Handle<Object> receiver = args.receiver();                                    
+    Handle<HeapObject> new_target = args.new_target();                               
+    Handle<FunctionTemplateInfo> fun_data(function->shared().get_api_func_data(), 
+                                        isolate);                                  
+    if (new_target->IsJSReceiver()) {                                                
+      RETURN_RESULT_OR_FAILURE(                                                   
+          isolate, HandleApiCallHelper<true>(isolate, function, new_target,          
+                                             fun_data, receiver, args));             
+    } else {                                                                         
+      RETURN_RESULT_OR_FAILURE(                                                      
+          isolate, HandleApiCallHelper<false>(isolate, function, new_target,         
+                                            fun_data, receiver, args));            
+    }
+  }
+``` 
+The `BUILTIN` macro can be found in `src/builtins/builtins-utils.h`:
+```c++
+#define BUILTIN(name)                                                       \
+  V8_WARN_UNUSED_RESULT static Object Builtin_Impl_##name(                  \
+      BuiltinArguments args, Isolate* isolate);
+```
+
+```c++
+  if (setup_delegate_ == nullptr) {                                                 
+    setup_delegate_ = new SetupIsolateDelegate(create_heap_objects);            
+  } 
+
+  if (!setup_delegate_->SetupHeap(&heap_)) {                                    
+    V8::FatalProcessOutOfMemory(this, "heap object creation");                  
+    return false;                                                               
+  }    
+```
+This does nothing in the current code path and the code comment says that the
+heap will be deserialized from the snapshot and true will be returned.
+
+```c++
+InitializeThreadLocal();
+startup_deserializer->DeserializeInto(this);
+```
+```c++
+DisallowHeapAllocation no_gc;                                               
+isolate->heap()->IterateSmiRoots(this);                                     
+isolate->heap()->IterateStrongRoots(this, VISIT_FOR_SERIALIZATION);         
+Iterate(isolate, this);                                                     
+isolate->heap()->IterateWeakRoots(this, VISIT_FOR_SERIALIZATION);           
+DeserializeDeferredObjects();                                               
+RestoreExternalReferenceRedirectors(accessor_infos());                      
+RestoreExternalReferenceRedirectors(call_handler_infos());
+```
+In `heap.cc` we find IterateSmiRoots` which takes a pointer to a `RootVistor`.
+RootVisitor is used for visiting and modifying (optionally) the pointers contains
+in roots. This is used in garbage collection and also in serializing and deserializing
+snapshots.
+
+RootVistor:
+```c++
+class RootVisitor {
+ public:
+  virtual void VisitRootPointers(Root root, const char* description,
+                                 FullObjectSlot start, FullObjectSlot end) = 0;
+
+  virtual void VisitRootPointer(Root root, const char* description,
+                                FullObjectSlot p) {
+    VisitRootPointers(root, description, p, p + 1);
+  }
+ 
+  static const char* RootName(Root root);
+```
+Root is an enum in `src/object/visitors.h`. This enum is generated by a macro
+and expands to:
+```c++
+enum class Root {                                                               
+  kStringTable,
+  kExternalStringsTable,
+  kReadOnlyRootList,
+  kStrongRootList,
+  kSmiRootList,
+  kBootstrapper,
+  kTop,
+  kRelocatable,
+  kDebug,
+  kCompilationCache,
+  kHandleScope,
+  kBuiltins,
+  kGlobalHandles,
+  kEternalHandles,
+  kThreadManager,
+  kStrongRoots,
+  kExtensions,
+  kCodeFlusher,
+  kPartialSnapshotCache,
+  kReadOnlyObjectCache,
+  kWeakCollections,
+  kWrapperTracing,
+  kUnknown,
+  kNumberOfRoots                                                            
+}; 
+```
+These can be displayed using:
+```console
+$ ./test/roots_test --gtest_filter=RootsTest.visitor_roots
+```
+Just to keep things clear for myself here, these visitor roots are only used
+for GC and serialization/deserialization (at least I think so) and should not
+be confused with the RootIndex enum in `src/roots/roots.h`.
+
+Lets set a break point in `mksnapshot` and see if we can find where one of the
+above Root enum elements is used to make it a little more clear what these are
+used for.
+```console
+$ lldb ../v8_src/v8/out/x64.debug/mksnapshot 
+(lldb) target create "../v8_src/v8/out/x64.debug/mksnapshot"
+Current executable set to '../v8_src/v8/out/x64.debug/mksnapshot' (x86_64).
+(lldb) br s -n main
+Breakpoint 1: where = mksnapshot`main + 42, address = 0x00000000009303ca
+(lldb) r
+```
+What this does is that it starts creates an V8 instance and then saves it to
+a file, either a binary file on disk but it can also save it to a .cc file
+that can be used in programs in which case the binary is a byte array.
+It does this in much the same way as the hello-world example create a platform
+and then initializes it, and the creates and initalizes a new Isolate. 
+After the Isolate a new Context will be create using the Isolate. If there was
+an embedded-src flag passed to mksnaphot it will be run.
+
+StartupSerializer will use the Root enum elements for example.
+
+Adding a script to a snapshot:
+```
+$ gdb ../v8_src/v8/out/x64.release_gcc/mksnapshot --embedded-src="$PWD/embed.js"
+```
+
+TODO: Look into CreateOffHeapTrampolines.
+
+So the VisitRootPointers function takes on of these Root's and visits all those root.
+In our case the first Root to be visited is Heap::IterateSmiRoots:
+```c++
+void Heap::IterateSmiRoots(RootVisitor* v) {                                        
+  ExecutionAccess access(isolate());                                                
+  v->VisitRootPointers(Root::kSmiRootList, nullptr,                                 
+                       roots_table().smi_roots_begin(),                             
+                       roots_table().smi_roots_end());                              
+  v->Synchronize(VisitorSynchronization::kSmiRootList);                             
+}
+```
+And here we can see that it is using `Root::kSmiRootList`, and passing nullptr
+for the description argument (I wonder what this is used for?). Next, comes
+the start and end arguments. 
+```console
+(lldb) p roots_table().smi_roots_begin()
+(v8::internal::FullObjectSlot) $5 = {
+  v8::internal::SlotBase<v8::internal::FullObjectSlot, unsigned long, 8> = (ptr_ = 50680614097760)
+}
+```
+We can list all the values of roots_table using:
+```console
+(lldb) expr -A -- roots_table()
+```
+In `src/snapshot/deserializer.cc` we can find VisitRootPointers:
+```c++
+void Deserializer::VisitRootPointers(Root root, const char* description,
+                                     FullObjectSlot start, FullObjectSlot end)
+  ReadData(FullMaybeObjectSlot(start), FullMaybeObjectSlot(end),
+           SnapshotSpace::kNew, kNullAddress);
+```
+Notice that description is never used. `ReadData`is in the same source file:
+```c++
+template <typename TSlot>                                                       
+bool Deserializer::ReadData(TSlot current, TSlot limit,                         
+                            SnapshotSpace source_space,                         
+                            Address current_object_address) { 
+  ...
+   int size_in_tagged = data - kFixedRawDataStart;
+   source_.CopyRaw(current.ToVoidPtr(), size_in_tagged * kTaggedSize);
+   current += size_in_tagged;
+   break;
+```
+`CopyRaw` can be found in `src/snapshot/snapshot-source-sink.` and does a memcpy:
+```c++
+  void CopyRaw(void* to, int number_of_bytes) {                                 
+    memcpy(to, data_ + position_, number_of_bytes);                             
+    position_ += number_of_bytes;                                               
+  }
+```
+The class SnapshotByteSource has a data member that is initialized upon construction
+from a const char* or a Vector<const byte>. Where is this done?  
+This was done back in `Snapshot::Initialize`:
+```c++
+  const v8::StartupData* blob = isolate->snapshot_blob();                       
+  Vector<const byte> startup_data = ExtractStartupData(blob);                   
+  Vector<const byte> read_only_data = ExtractReadOnlyData(blob);                
+  SnapshotData startup_snapshot_data(MaybeDecompress(startup_data));            
+  SnapshotData read_only_snapshot_data(MaybeDecompress(read_only_data));        
+  StartupDeserializer startup_deserializer(&startup_snapshot_data); 
+```
+```console
+(lldb) expr *this
+(v8::internal::SnapshotByteSource) $30 = (data_ = "`\x04", length_ = 125752, position_ = 1)
+```
 
 All the roots in a heap are declared in src/roots/roots.h. You can access the
 roots using RootsTable via the Isolate using isolate_data->roots() or by using
-isolate->roots_table.
+isolate->roots_table. The roots_ field is an array of Address elements:
+```c++
+class RootsTable {                                                              
+ public:
+  static constexpr size_t kEntriesCount = static_cast<size_t>(RootIndex::kRootListLength);
+  ...
+ private:
+  Address roots_[kEntriesCount];                                                
+  static const char* root_names_[kEntriesCount]; 
+```
+RootIndex is generated by a macro
+```c++
+enum class RootIndex : uint16_t {
+```
+Lets take a look at an entry:
+```console
+(lldb) p roots_[(uint16_t)RootIndex::kError_string]
+(v8::internal::Address) $1 = 42318447256121
+```
+Now, there are functions in factory which can be used to retrieve these addresses,
+like factory->Error_string():
+```console
+(lldb) expr *isolate->factory()->Error_string()
+(v8::internal::String) $9 = {
+  v8::internal::TorqueGeneratedString<v8::internal::String, v8::internal::Name> = {
+    v8::internal::Name = {
+      v8::internal::TorqueGeneratedName<v8::internal::Name, v8::internal::PrimitiveHeapObject> = {
+        v8::internal::PrimitiveHeapObject = {
+          v8::internal::TorqueGeneratedPrimitiveHeapObject<v8::internal::PrimitiveHeapObject, v8::internal::HeapObject> = {
+            v8::internal::HeapObject = {
+              v8::internal::Object = {
+                v8::internal::TaggedImpl<v8::internal::HeapObjectReferenceType::STRONG, unsigned long> = (ptr_ = 42318447256121)
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
+(lldb) expr $9.length()
+(int32_t) $10 = 5
+(lldb) expr $9.Print()
+#Error
+```
+These accessor functions declarations are generated by the
+`ROOT_LIST(ROOT_ACCESSOR))` macros:
+```c++
+#define ROOT_ACCESSOR(Type, name, CamelName) inline Handle<Type> name();           
+  ROOT_LIST(ROOT_ACCESSOR)                                                         
+#undef ROOT_ACCESSOR
+```
+And the definitions can be found in `src/heap/factory-inl.h` and look like this
+The implementations then look like this:
+```c++
+String ReadOnlyRoots::Error_string() const { 
+  return  String::unchecked_cast(Object(at(RootIndex::kError_string)));
+} 
+
+Handle<String> ReadOnlyRoots::Error_string_handle() const {
+  return Handle<String>(&at(RootIndex::kError_string)); 
+}
+```
+The unit test [roots_test](./test/roots_test.cc) shows and example of this.
+
+This shows the usage of root entries but where are the roots added to this
+array.
 
 The unit test [isolate_test](./test/isolate_test.cc) explores the internal 
 isolate and has example of usages of the above mentioned methods.
