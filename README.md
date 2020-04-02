@@ -8000,4 +8000,85 @@ So the context is read from the StartupData* blob with ExtractContextData(blob).
 
 What is the global proxy?
 
+### Builtins runtime error
+Builtins is a member of Isolate and an instance is created by the Isolate constructor.
+We can inspect the value of `initialized_` and that it is false:
+```console
+(gdb) p *this->builtins()
+$3 = {static kNoBuiltinId = -1, static kFirstWideBytecodeHandler = 1248, static kFirstExtraWideBytecodeHandler = 1398, 
+  static kLastBytecodeHandlerPlusOne = 1548, static kAllBuiltinsAreIsolateIndependent = true, isolate_ = 0x0, initialized_ = false, 
+  js_entry_handler_offset_ = 0}
+```
+The above is printed form Isolate's constructor and it is not changes in the
+contructor.
 
+This is very strange, while I though that the `initialized_` was being updated
+it now looks like there might be two instances, one with has this value as false
+and the other as true. And also one has a nullptr as the isolate and the other
+as an actual value.
+For example, when I run the hello-world example:
+```console
+$4 = (v8::internal::Builtins *) 0x33b20000a248
+(gdb) p &builtins_
+$5 = (v8::internal::Builtins *) 0x33b20000a248
+```
+Notice that these are poiting to the same location in memory.
+```console
+(gdb) p &builtins_
+$1 = (v8::internal::Builtins *) 0x25210000a248
+(gdb) p builtins()
+$2 = (v8::internal::Builtins *) 0x25210000a228
+```
+Alright, so after looking into this closer I noticed that I was including
+internal headers in the test itself.
+When I include `src/builtins/builtins.h` I will get an implementation of
+isolate->builtins() in the object file which is in the shared library libv8.so,
+but the field is part of object file that is part of the cctest. This will be a
+different method and not the method that is in libv8_v8.so shared library.
+
+As I'm only interested in exploring v8 internals and my goal is only for each
+unit test to verify my understanding I've statically linked those object files
+needed, like builtins.o and code.o to the test.
+
+```console
+ Fatal error in ../../src/snapshot/read-only-deserializer.cc, line 35
+# Debug check failed: !isolate->builtins()->is_initialized().
+#
+#
+#
+#FailureMessage Object: 0x7ffed92ceb20
+==== C stack trace ===============================
+
+    /home/danielbevenius/work/google/v8_src/v8/out/x64.release_gcc/libv8_libbase.so(v8::base::debug::StackTrace::StackTrace()+0x1d) [0x7fabe6c348c1]
+    /home/danielbevenius/work/google/v8_src/v8/out/x64.release_gcc/libv8_libplatform.so(+0x652d9) [0x7fabe6cac2d9]
+    /home/danielbevenius/work/google/v8_src/v8/out/x64.release_gcc/libv8_libbase.so(V8_Fatal(char const*, int, char const*, ...)+0x172) [0x7fabe6c2416d]
+    /home/danielbevenius/work/google/v8_src/v8/out/x64.release_gcc/libv8_libbase.so(v8::base::SetPrintStackTrace(void (*)())+0) [0x7fabe6c23de0]
+    /home/danielbevenius/work/google/v8_src/v8/out/x64.release_gcc/libv8_libbase.so(V8_Dcheck(char const*, int, char const*)+0x2d) [0x7fabe6c241b1]
+    /home/danielbevenius/work/google/v8_src/v8/out/x64.release_gcc/libv8.so(v8::internal::ReadOnlyDeserializer::DeserializeInto(v8::internal::Isolate*)+0x192) [0x7fabe977c468]
+    /home/danielbevenius/work/google/v8_src/v8/out/x64.release_gcc/libv8.so(v8::internal::ReadOnlyHeap::DeseralizeIntoIsolate(v8::internal::Isolate*, v8::internal::ReadOnlyDeserializer*)+0x4f) [0x7fabe91e5a7d]
+    /home/danielbevenius/work/google/v8_src/v8/out/x64.release_gcc/libv8.so(v8::internal::ReadOnlyHeap::SetUp(v8::internal::Isolate*, v8::internal::ReadOnlyDeserializer*)+0x66) [0x7fabe91e5a2a]
+    /home/danielbevenius/work/google/v8_src/v8/out/x64.release_gcc/libv8.so(v8::internal::Isolate::Init(v8::internal::ReadOnlyDeserializer*, v8::internal::StartupDeserializer*)+0x70b) [0x7fabe90633bb]
+    /home/danielbevenius/work/google/v8_src/v8/out/x64.release_gcc/libv8.so(v8::internal::Isolate::InitWithSnapshot(v8::internal::ReadOnlyDeserializer*, v8::internal::StartupDeserializer*)+0x7b) [0x7fabe906299f]
+    /home/danielbevenius/work/google/v8_src/v8/out/x64.release_gcc/libv8.so(v8::internal::Snapshot::Initialize(v8::internal::Isolate*)+0x1e9) [0x7fabe978d941]
+    /home/danielbevenius/work/google/v8_src/v8/out/x64.release_gcc/libv8.so(v8::Isolate::Initialize(v8::Isolate*, v8::Isolate::CreateParams const&)+0x33d) [0x7fabe8d999e3]
+    /home/danielbevenius/work/google/v8_src/v8/out/x64.release_gcc/libv8.so(v8::Isolate::New(v8::Isolate::CreateParams const&)+0x28) [0x7fabe8d99b66]
+    ./test/builtins_test() [0x4135a2]
+    ./test/builtins_test() [0x43a1b7]
+    ./test/builtins_test() [0x434c99]
+    ./test/builtins_test() [0x41a3a7]
+    ./test/builtins_test() [0x41aafb]
+    ./test/builtins_test() [0x41b085]
+    ./test/builtins_test() [0x4238e0]
+    ./test/builtins_test() [0x43b1aa]
+    ./test/builtins_test() [0x435773]
+    ./test/builtins_test() [0x422836]
+    ./test/builtins_test() [0x412ea4]
+    ./test/builtins_test() [0x412e3d]
+    /lib64/libc.so.6(__libc_start_main+0xf3) [0x7fabe66b31a3]
+    ./test/builtins_test() [0x412d5e]
+Illegal instruction (core dumped)
+```
+The issue here is that I'm including the header in the test, which means that
+code will be in the object code of the test, while the implementation part will
+be in the linked dynamic library which is why these are pointing to different
+areas in memory. The one retreived by the function call will use the
