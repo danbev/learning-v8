@@ -6660,28 +6660,16 @@ a single Isolate instance. This is then passed into the Isolate constructor,
 notice the usage of `new` here, this is just a normal heap allocation. 
 
 The default new operator has been deleted and an override provided that takes
-a void pointer, which is just returns: 
+a void pointer, which is just returned: 
 ```c++
   void* operator new(size_t, void* ptr) { return ptr; }
   void* operator new(size_t) = delete;
   void operator delete(void*) = delete;
 ```
 In this case it just returns the memory allocateed by isolate-memory().
-The reason for doing this is that using the new operator not only invoked the
+The reason for doing this is that using the new operator not only invokes the
 new operator but the compiler will also add a call the types constructor passing
 in the address of the allocated memory.
-But why is the cast required?
-
-```console 
-../../src/execution/isolate.cc:2794:62: error: use of deleted function ‘static void* v8::internal::Isolate::operator new(size_t)’
- 2794 |   Isolate* isolate = new Isolate(std::move(isolate_allocator));
-      |                                                              ^
-In file included from ../../src/execution/isolate.cc:5:
-../../src/execution/isolate.h:1863:9: note: declared here
- 1863 |   void* operator new(size_t) = delete;
-      |         ^~~~~~~~
-```
-
 ```c++
 Isolate::Isolate(std::unique_ptr<i::IsolateAllocator> isolate_allocator)
     : isolate_data_(this),
@@ -6736,7 +6724,8 @@ FatalErrorCallback exception_behavior_;
 ```
 So all of the entries in this list will become private members of the
 Isolate class after the preprocessor is finished. There will also be public
-assessor to get and set these values.
+assessor to get and set these initial values values (which is the last entry
+in the ISOLATE_INIT_LIST above.
 ```
 (gdb) p isolate->exception_behavior_
 $6 = (v8::FatalErrorCallback) 0x0
@@ -6760,7 +6749,7 @@ After that we have created a new Isolate, we were in this function call:
 ```c++
   Isolate* isolate = new (isolate_ptr) Isolate(std::move(isolate_allocator));
 ```
-After this we will be back in api.cc:
+After this we will be back in `api.cc`:
 ```c++
   Initialize(isolate, params);
 ```
