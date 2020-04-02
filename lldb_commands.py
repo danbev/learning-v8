@@ -47,6 +47,11 @@ def job(debugger, param, *args):
   """Print a v8 heap object"""
   ptr_arg_cmd(debugger, 'job', param, "_v8_internal_Print_Object({})")
 
+def jih(debugger, param, *args):
+  """Print v8::internal::Handle handle value"""
+  ptr_arg_cmd(debugger, 'jlh', param,
+              "_v8_internal_Print_Object(*((v8::internal::Object**)({}.location_)))")
+
 def jlh(debugger, param, *args):
   """Print v8::Local handle value"""
   ptr_arg_cmd(debugger, 'jlh', param,
@@ -119,6 +124,6 @@ def bta(debugger, *args):
 
 def __lldb_init_module(debugger, dict):
   debugger.HandleCommand('settings set target.x86-disassembly-flavor intel')
-  for cmd in ('job', 'jlh', 'jco', 'jld', 'jtt', 'jst', 'jss', 'bta'):
+  for cmd in ('job', 'jlh', 'jih', 'jco', 'jld', 'jtt', 'jst', 'jss', 'bta'):
     debugger.HandleCommand(
       'command script add -f lldb_commands.{} {}'.format(cmd, cmd))
