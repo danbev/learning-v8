@@ -6710,7 +6710,6 @@ Back in Isolate's constructor we have:
 So lets expand the first entry to understand what is going on:
 ```c++
   exception_behavior_ = nullptr;
-gt
 ```
 These variables are declared in isolate.h:
 ```c++
