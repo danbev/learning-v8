@@ -6709,26 +6709,51 @@ Back in Isolate's constructor we have:
 ```
 So lets expand the first entry to understand what is going on:
 ```c++
-  exception_behavior_ = nullptr;
-```
-These variables are declared in isolate.h:
-```c++
-#define GLOBAL_BACKING_STORE(type, name, initialvalue) type name##_;
-  ISOLATE_INIT_LIST(GLOBAL_BACKING_STORE)
-#undef GLOBAL_BACKING_STORE
-```
-So this would expand to:
-```c++
-FatalErrorCallback exception_behavior_;
+   exception_behavior_ = (nullptr);
+   oom_behavior_ = (nullptr);
+   event_logger_ = (nullptr);
+   allow_code_gen_callback_ = (nullptr);
+   modify_code_gen_callback_ = (nullptr);
+   allow_wasm_code_gen_callback_ = (nullptr);
+   wasm_module_callback_ = (&NoExtension);
+   wasm_instance_callback_ = (&NoExtension);
+   wasm_streaming_callback_ = (nullptr);
+   wasm_threads_enabled_callback_ = (nullptr);
+   wasm_load_source_map_callback_ = (nullptr);
+   relocatable_top_ = (nullptr);
+   string_stream_debug_object_cache_ = (nullptr);
+   string_stream_current_security_token_ = (Object());
+   api_external_references_ = (nullptr);
+   external_reference_map_ = (nullptr);
+   root_index_map_ = (nullptr);
+   default_microtask_queue_ = (nullptr);
+   turbo_statistics_ = (nullptr);
+   code_tracer_ = (nullptr);
+   per_isolate_assert_data_ = (0xFFFFFFFFu);
+   promise_reject_callback_ = (nullptr);
+   snapshot_blob_ = (nullptr);
+   code_and_metadata_size_ = (0);
+   bytecode_and_metadata_size_ = (0);
+   external_script_source_size_ = (0);
+   is_profiling_ = (false);
+   num_cpu_profilers_ = (0);
+   formatting_stack_trace_ = (false);
+   debug_execution_mode_ = (DebugInfo::kBreakpoints);
+   code_coverage_mode_ = (debug::CoverageMode::kBestEffort);
+   type_profile_mode_ = (debug::TypeProfileMode::kNone);
+   last_stack_frame_info_id_ = (0);
+   last_console_context_id_ = (0);
+   inspector_ = (nullptr);
+   next_v8_call_is_safe_for_termination_ = (false);
+   only_terminate_in_safe_scope_ = (false);
+   detailed_source_positions_for_profiling_ = (FLAG_detailed_line_info);
+   embedder_wrapper_type_index_ = (-1);
+   embedder_wrapper_object_index_ = (-1);
 ```
 So all of the entries in this list will become private members of the
 Isolate class after the preprocessor is finished. There will also be public
 assessor to get and set these initial values values (which is the last entry
 in the ISOLATE_INIT_LIST above.
-```
-(gdb) p isolate->exception_behavior_
-$6 = (v8::FatalErrorCallback) 0x0
-```
 
 Back in isolate.cc constructor we have:
 ```c++
@@ -6756,7 +6781,7 @@ After this we will be back in `api.cc`:
 void Isolate::Initialize(Isolate* isolate,
                          const v8::Isolate::CreateParams& params) {
 ```
-We are not using any external snapshot data so this will be false:
+We are not using any external snapshot data so the following will be false:
 ```c++
   if (params.snapshot_blob != nullptr) {
     i_isolate->set_snapshot_blob(params.snapshot_blob);
@@ -6773,7 +6798,7 @@ $8 = (const v8::StartupData *) 0x7ff92d7d6cf0 <v8::internal::blob>
 `snapshot_blob_` is also one of the members that was set up with ISOLATE_INIT_LIST.
 So we are setting up the Isolate instance for creation. 
 
-```
+```c++
 Isolate::Scope isolate_scope(isolate);                                        
 if (!i::Snapshot::Initialize(i_isolate)) { 
 ```
@@ -6794,7 +6819,9 @@ bool Snapshot::Initialize(Isolate* isolate) {
   bool success = isolate->InitWithSnapshot(&read_only_deserializer, &startup_deserializer);
 ```
 So we get the blob and create deserializers for it which are then passed to
-`isolate->InitWithSnapshot` which delegated to `Isolate::Init`.
+`isolate->InitWithSnapshot` which delegated to `Isolate::Init`. The blob will
+have be create previously using `mksnapshot` (more on this can be found later).
+
 This will use a `FOR_EACH_ISOLATE_ADDRESS_NAME` macro to assign to the
 `isolate_addresses_` field:
 ```c++
@@ -6811,9 +6838,9 @@ isolate_addresses_[IsolateAddressId::kPendingHandlerContextAddress] = reinterpre
  isolate_addresses_[IsolateAddressId::kExternalCaughtExceptionAddress] = reinterpret_cast<Address>(external_caught_exception_address());
  isolate_addresses_[IsolateAddressId::kJSEntrySPAddress] = reinterpret_cast<Address>(js_entry_sp_address());
 ```
-After this we have a number of member that are assigned to:
+After this we have a number of members that are assigned to:
 ```c++
-compilation_cache_ = new CompilationCache(this);
+  compilation_cache_ = new CompilationCache(this);
   descriptor_lookup_cache_ = new DescriptorLookupCache();
   inner_pointer_to_code_cache_ = new InnerPointerToCodeCache(this);
   global_handles_ = new GlobalHandles(this);
@@ -7022,15 +7049,16 @@ Current executable set to '../v8_src/v8/out/x64.debug/mksnapshot' (x86_64).
 Breakpoint 1: where = mksnapshot`main + 42, address = 0x00000000009303ca
 (lldb) r
 ```
-What this does is that it starts creates an V8 instance and then saves it to
-a file, either a binary file on disk but it can also save it to a .cc file
-that can be used in programs in which case the binary is a byte array.
+What this does is that it creates an V8 environment (Platform, Isolate, Context)
+ and then saves it to a file, either a binary file on disk but it can also save
+it to a .cc file that can be used in programs in which case the binary is a byte array.
 It does this in much the same way as the hello-world example create a platform
 and then initializes it, and the creates and initalizes a new Isolate. 
 After the Isolate a new Context will be create using the Isolate. If there was
 an embedded-src flag passed to mksnaphot it will be run.
 
-StartupSerializer will use the Root enum elements for example.
+StartupSerializer will use the Root enum elements for example and the deserializer
+will use the same enum elements.
 
 Adding a script to a snapshot:
 ```
@@ -7039,8 +7067,8 @@ $ gdb ../v8_src/v8/out/x64.release_gcc/mksnapshot --embedded-src="$PWD/embed.js"
 
 TODO: Look into CreateOffHeapTrampolines.
 
-So the VisitRootPointers function takes on of these Root's and visits all those root.
-In our case the first Root to be visited is Heap::IterateSmiRoots:
+So the VisitRootPointers function takes one of these Root's and visits all those
+roots.  In our case the first Root to be visited is Heap::IterateSmiRoots:
 ```c++
 void Heap::IterateSmiRoots(RootVisitor* v) {                                        
   ExecutionAccess access(isolate());                                                
@@ -7071,25 +7099,8 @@ void Deserializer::VisitRootPointers(Root root, const char* description,
            SnapshotSpace::kNew, kNullAddress);
 ```
 Notice that description is never used. `ReadData`is in the same source file:
-```c++
-template <typename TSlot>                                                       
-bool Deserializer::ReadData(TSlot current, TSlot limit,                         
-                            SnapshotSpace source_space,                         
-                            Address current_object_address) { 
-  ...
-   int size_in_tagged = data - kFixedRawDataStart;
-   source_.CopyRaw(current.ToVoidPtr(), size_in_tagged * kTaggedSize);
-   current += size_in_tagged;
-   break;
-```
-`CopyRaw` can be found in `src/snapshot/snapshot-source-sink.` and does a memcpy:
-```c++
-  void CopyRaw(void* to, int number_of_bytes) {                                 
-    memcpy(to, data_ + position_, number_of_bytes);                             
-    position_ += number_of_bytes;                                               
-  }
-```
-The class SnapshotByteSource has a data member that is initialized upon construction
+
+The class SnapshotByteSource has a `data` member that is initialized upon construction
 from a const char* or a Vector<const byte>. Where is this done?  
 This was done back in `Snapshot::Initialize`:
 ```c++
@@ -7198,17 +7209,13 @@ frame #0: 0x00007ffff6261cdf libv8.so`v8::Isolate::Initialize(isolate=0x00000eb9
 ```
 So we can see that the roots are intially zero:ed out. And the type of `roots_`
 is an array of `Address`'s.
-
-ReadOnlyHeap::SetUp(this, read_only_deserializer);
-
-(lldb) br s -n ReadOnlyHeap::SetUp
-
-ReadOnlyHeap::DeseralizeIntoIsolate
-
-ReadOnlyRoots roots(isolate);
-   40  	
--> 41  	    roots.Iterate(this);
-
+```console
+    frame #3: 0x00007ffff6c33d58 libv8.so`v8::internal::Deserializer::VisitRootPointers(this=0x00007fffffffcce0, root=kReadOnlyRootList, description=0x0000000000000000, start=FullObjectSlot @ 0x00007fffffffc530, end=FullObjectSlot @ 0x00007fffffffc528) at deserializer.cc:94:11
+    frame #4: 0x00007ffff6b6212f libv8.so`v8::internal::ReadOnlyRoots::Iterate(this=0x00007fffffffc5c8, visitor=0x00007fffffffcce0) at roots.cc:21:29
+    frame #5: 0x00007ffff6c46fee libv8.so`v8::internal::ReadOnlyDeserializer::DeserializeInto(this=0x00007fffffffcce0, isolate=0x00000f7500000000) at read-only-deserializer.cc:41:18
+    frame #6: 0x00007ffff66af631 libv8.so`v8::internal::ReadOnlyHeap::DeseralizeIntoIsolate(this=0x000000000049afb0, isolate=0x00000f7500000000, des=0x00007fffffffcce0) at read-only-heap.cc:85:23
+    frame #7: 0x00007ffff66af5de libv8.so`v8::internal::ReadOnlyHeap::SetUp(isolate=0x00000f7500000000, des=0x00007fffffffcce0) at read-only-heap.cc:78:53
+```
 This will land us in `roots.cc` ReadOnlyRoots::Iterate(RootVisitor* visitor):
 ```c++
 void ReadOnlyRoots::Iterate(RootVisitor* visitor) {                                
@@ -7252,7 +7259,7 @@ bool Deserializer::ReadData(TSlot current, TSlot limit,
 So current is the start address of the read_only_list and limit the end. `source_`
 is a member of `ReadOnlyDeserializer` and is of type SnapshotByteSource.
 
-In Snapshot::Initialize(internal_isolate) we have:
+`source_` got populated back in Snapshot::Initialize(internal_isolate):
 ```
 const v8::StartupData* blob = isolate->snapshot_blob();
 Vector<const byte> read_only_data = ExtractReadOnlyData(blob);
@@ -7298,16 +7305,15 @@ mind lets take closer look at the switch statment:
         [[clang::fallthrough]];
       ...
 ```
-
-We can see that switch statement will assign the passed in `current` with a new
+We can see that switch statement will assign the passed-in `current` with a new
 instance of `ReadDataCase`.
 ```c++
   current = ReadDataCase<TSlot, kNewObject, SnapshotSpace::kNew>(isolate,
       current, current_object_address, data, write_barrier_needed);
 ```
-Notice that kNewObject is the type of SerializerDeserliaser::Bytecode that is
+Notice that kNewObject is the type of SerializerDeserliazer::Bytecode that is
 to be read (I think), this enum can be found in `src/snapshot/serializer-common.h`.
-`TSlot` I think stands for the Type of Slot, which in our case is a FullMaybyObjectSlot.
+`TSlot` I think stands for the "Type of Slot", which in our case is a FullMaybyObjectSlot.
 ```c++
   HeapObject heap_object;
   if (bytecode == kNewObject) {                                                 
@@ -7319,24 +7325,6 @@ Address address = allocator()->Allocate(space, size);
 HeapObject obj = HeapObject::FromAddress(address);
 isolate_->heap()->OnAllocationEvent(obj, size);
 
-
-source_.CopyRaw(current.ToVoidPtr(), size_in_tagged * kTaggedSize);
-```c++
-  void CopyRaw(void* to, int number_of_bytes) {
-    memcpy(to, data_ + position_, number_of_bytes);
-    position_ += number_of_bytes;
-  }
-```
-With the call to `memcpy` will are going to write to the address of `read_only_roots_`
-which we passed to `VisitRootPointers` in `ReadOnlyRoots::Iterate`:
-```console
-(lldb) p to
-(void *) $81 = 0x000017d90804014c
-(lldb) p number_of_bytes
-(int) $82 = 12
-(lldb) p position_
-(int) $84 = 8
-```
 Alright, lets set a watch point on the roots_ array to see when the first entry
 is populated and try to figure this out that way:
 ```console
@@ -7425,11 +7413,33 @@ You can also just cast it to an object and try printing it:
 #undefined
 ```
 This is actually the Oddball UndefinedValue so it makes sense in this case I think.
-
-
-
-(lldb) br s -f deserializer.cc -l 843
-Breakpoint 5: 16 locations.
+With this value in the roots_ array we can use the function ReadOnlyRoots::undefined_value():
+```console
+(lldb) expr v8::internal::ReadOnlyRoots(&isolate_->heap_).undefined_value()
+(v8::internal::Oddball) $265 = {
+  v8::internal::TorqueGeneratedOddball<v8::internal::Oddball, v8::internal::PrimitiveHeapObject> = {
+    v8::internal::PrimitiveHeapObject = {
+      v8::internal::TorqueGeneratedPrimitiveHeapObject<v8::internal::PrimitiveHeapObject, v8::internal::HeapObject> = {
+        v8::internal::HeapObject = {
+          v8::internal::Object = {
+            v8::internal::TaggedImpl<v8::internal::HeapObjectReferenceType::STRONG, unsigned long> = (ptr_ = 16995320070925)
+          }
+        }
+      }
+    }
+  }
+}
+```
+So how are these roots used, take the above `undefined_value` for example?  
+Well most things (perhaps all) that are needed go via the Factory which the
+internal Isolate is a type of. In factory we can find:
+```c++
+Handle<Oddball> Factory::undefined_value() {
+  return Handle<Oddball>(&isolate()->roots_table()[RootIndex::kUndefinedValue]);
+}
+```
+Notice that this is basically what we did in the debugger before but here
+it is wrapped in Handle so that it can be tracked by the GC.
 
 The unit test [isolate_test](./test/isolate_test.cc) explores the internal 
 isolate and has example of usages of the above mentioned methods.
