@@ -11,6 +11,8 @@ The sole purpose of this project is to aid me in leaning Google's V8 JavaScript 
 6. [Small Integers](#small-integers)
 7. [Building chromium](#building-chromium)
 8. [Compiler pipeline](#compiler-pipeline)
+9. [CodeStubAssembler](#codestubassembler)
+1. [Torque](#torque)
 
 ## Introduction
 V8 is bascially consists of the memory management of the heap and the execution stack (very simplified but helps
@@ -3515,7 +3517,7 @@ So the `CPP(ConsoleDebug)` will expand to an entry in the array which would look
 this:
 
     { ConsoleDebug, 
-      Builtings::CPP, 
+      Builtins::CPP, 
       {
         reinterpret_cast<v8::internal::Address>(reinterpret_cast<intptr_t>(Builtin_ConsoleDebug))
       }
@@ -3539,7 +3541,7 @@ macro. So the expansion for ConsoleDebug will look like:
 
     enum Name: int32_t {
       ...
-      kDebugConole,
+      kDebugConsole,
       ...
     };
 
@@ -3678,41 +3680,69 @@ RelocInfo (size = 7)
 ### TF_BUILTIN macro
 Is a macro to defining Turbofan (TF) builtins and can be found in `builtins/builtins-utils-gen.h`
 
-    TF_BUILTIN(GetStringLength, StringBuiltinsAssembler) {
-      Node* const str = Parameter(Descriptor::kReceiver);
-      Return(LoadStringLength(str));
-    }
-
+If we take a look at the file src/builtins/builtins-bigint-gen.cc and the following
+function:
+```c++
+TF_BUILTIN(BigIntToI64, CodeStubAssembler) {                                       
+  if (!Is64()) {                                                                   
+    Unreachable();                                                                 
+    return;                                                                        
+  }                                                                                
+                                                                                   
+  TNode<Object> value = CAST(Parameter(Descriptor::kArgument));                    
+  TNode<Context> context = CAST(Parameter(Descriptor::kContext));                  
+  TNode<BigInt> n = ToBigInt(context, value);                                      
+                                                                                   
+  TVARIABLE(UintPtrT, var_low);                                                    
+  TVARIABLE(UintPtrT, var_high);                                                   
+                                                                                   
+  BigIntToRawBytes(n, &var_low, &var_high);                                        
+  Return(var_low.value());                                                         
+}
+```
 Let's take our GetStringLength example from above and see what this will be expanded to after
 processing this macro:
+```console
+$ clang++ --sysroot=build/linux/debian_sid_amd64-sysroot -isystem=./buildtools/third_party/libc++/trunk/include -isystem=buildtools/third_party/libc++/trunk/include -I. -E src/builtins/builtins-bigint-gen.cc > builtins-bigint-gen.cc.pp
+```
+```c++
+static void Generate_BigIntToI64(compiler::CodeAssemblerState* state);
 
-    class GetStringLengthAssembler : public StringBuiltinsAssembler {
-      public:
-       typedef Builtin_GetStringLength_InterfaceDescriptor Descriptor;
+class BigIntToI64Assembler : public CodeStubAssembler { 
+ public:
+  using Descriptor = Builtin_BigIntToI64_InterfaceDescriptor; 
+  explicit BigIntToI64Assembler(compiler::CodeAssemblerState* state) : CodeStubAssembler(state) {} 
+  void GenerateBigIntToI64Impl(); 
+  Node* Parameter(Descriptor::ParameterIndices index) {
+    return CodeAssembler::Parameter(static_cast<int>(index));
+  }
+}; 
 
-       explicit GetStringLengthAssembler(compiler::CodeAssemblerState* state) : AssemblerBase(state) {}
-
-       void GenerateGetStringLengthImpl();
-
-       Node* Parameter(Descriptor::ParameterIndices index) {
-         return CodeAssembler::Parameter(static_cast<int>(index));
-       }
-
-       Node* Parameter(BuiltinDescriptor::ParameterIndices index) {
-         return CodeAssembler::Parameter(static_cast<int>(index));
-       }
-    };
-
-    void Builtins::Generate_GetStringLength(compiler::CodeAssemblerState* state) {
-      GetStringLengthAssembler assembler(state);
-      state->SetInitialDebugInformation(GetStringLength, __FILE__, __LINE__);
-      assembler.GenerateGetStringLenghtImpl();
-    }
-
-    void GetStringLengthAssembler::GenerateGetStringLengthImpl() {
-      Node* const str = Parameter(Descriptor::kReceiver);
-      Return(LoadStringLength(str));
-    }
+void Builtins::Generate_BigIntToI64(compiler::CodeAssemblerState* state) {
+  BigIntToI64Assembler assembler(state);
+  state->SetInitialDebugInformation("BigIntToI64", "src/builtins/builtins-bigint-gen.cc", 14);
+  if (Builtins::KindOf(Builtins::kBigIntToI64) == Builtins::TFJ) {
+    assembler.PerformStackCheck(assembler.GetJSContextParameter());
+  }
+  assembler.GenerateBigIntToI64Impl();
+} 
+void BigIntToI64Assembler::GenerateBigIntToI64Impl() {
+ if (!Is64()) {                                                                
+   Unreachable();                                                              
+   return;                                                                     
+ }                                                                             
+                                                                                
+ TNode<Object> value = Cast(Parameter(Descriptor::kArgument));                 
+ TNode<Context> context = Cast(Parameter(Descriptor::kContext));                
+ TNode<BigInt> n = ToBigInt(context, value);                                   
+                                                                               
+ TVariable<UintPtrT> var_low(this);                                            
+ TVariable<UintPtrT> var_high(this);                                           
+                                                                                
+ BigIntToRawBytes(n, &var_low, &var_high);                                     
+ Return(var_low.value());                                                      
+} 
+```
 
 From the resulting class you can see how `Parameter` can be used from within `TF_BUILTIN` macro.
 
@@ -6391,7 +6421,7 @@ gold:
 use_gold = false
 ```
 
-### CodeStubAssembler (CSA)
+### CodeStubAssembler
 This history of this is that JavaScript builtins used be written in assembly
 which gave very good performance but made porting V8 to different architectures
 more difficult as these builtins had to have specific implementations for each
@@ -6411,10 +6441,10 @@ have to maintain all that handwritten assembly.
 Just to be clear CSA is a C++ API that is used to generate IR which is then
 compiled in to machine code for the target instruction set architectur.
 
-### [Torque](https://v8.dev/docs/torque)
-Is a DLS language to avoid having to use the CodeStubAssembler directly (it is
-still used behind the scene. This language is statically typed, garbage
-collected, and compatible with JavaScript.
+### Torque
+[Torque](https://v8.dev/docs/torque) is a DLS language to avoid having to use
+the CodeStubAssembler directly (it is still used behind the scene. This language
+is statically typed, garbage collected, and compatible with JavaScript.
 
 The JavaScript standard library was implemented in V8 previously using hand
 written assembly. But as we mentioned in the previous section this did not scale.
@@ -6527,7 +6557,72 @@ create the actual machine code instructions. Where in the build does this happen
 I mean I'm assuming that all functions are compiled and then made available in
 the .text segment of the executable.
 
-TF_BUILTIN
+If we look at the generated code in `math-tq-csa.cc` we can find the following:
+```
+TF_BUILTIN(MathIs42, CodeStubAssembler) {   
+...
+}
+```
+Now, there is a section about the `TF_BUILTIN` macro, and it will create
+function declarations and function and class definitions:
+```console
+$ clang++ --sysroot=build/linux/debian_sid_amd64-sysroot -isystem=./buildtools/third_party/libc++/trunk/include -isystem=buildtools/third_party/libc++/trunk/include -I. -E out/x64.release_gcc/gen/torque-generated/src/builtins/math-tq-csa.cc > math.cc.pp
+```
+
+And if we search for `Is42` we can find:
+```c++
+lass MathIs42Assembler : public CodeStubAssembler {                            
+ public:                                                                        
+  using Descriptor = Builtin_MathIs42_InterfaceDescriptor;                      
+  explicit MathIs42Assembler(compiler::CodeAssemblerState* state) : CodeStubAssembler(state) {}
+  void GenerateMathIs42Impl();                                                  
+  Node* Parameter(Descriptor::ParameterIndices index) {                         
+    return CodeAssembler::Parameter(static_cast<int>(index));                   
+  }                                                                             
+};                                                                              
+                                                                                
+void Builtins::Generate_MathIs42(compiler::CodeAssemblerState* state) {         
+  MathIs42Assembler assembler(state);                                           
+  state->SetInitialDebugInformation("MathIs42", "out/x64.release_gcc/gen/torque-generated/src/builtins/math-tq-csa.cc", 2121);
+  if (Builtins::KindOf(Builtins::kMathIs42) == Builtins::TFJ) {                 
+    assembler.PerformStackCheck(assembler.GetJSContextParameter());             
+  }                                                                             
+  assembler.GenerateMathIs42Impl();                                             
+}                                                                               
+                                                                                
+void MathIs42Assembler::GenerateMathIs42Impl() {     
+  ...
+```
+So this is what gets generated by the Torque compiler and what we see
+above is CodeStubAssemble. 
+If we take a look in out/x64.release_gcc/gen/torque-generated/builtin-definitions-tq.h
+we can find the following line that has been generated:
+```c++
+TFJ(MathIs42, 1, kReceiver, kX) \                                               
+```
+Now, in src/builtins/builtins.h we have the following macro:
+```c++
+#define DECLARE_TF(Name, ...) \                                                 
+  static void Generate_##Name(compiler::CodeAssemblerState* state);             
+                                                                                
+  BUILTIN_LIST(IGNORE_BUILTIN, DECLARE_TF, DECLARE_TF, DECLARE_TF, DECLARE_TF,  
+               IGNORE_BUILTIN, DECLARE_ASM)
+```
+And `BUILTINS_LIST` is declared in src/builtins/builtins-definitions.h and this
+file includes:
+```c++
+#include "torque-generated/builtin-definitions-tq.h"
+
+#define BUILTIN_LIST(CPP, TFJ, TFC, TFS, TFH, BCH, ASM)  \                          
+  BUILTIN_LIST_BASE(CPP, TFJ, TFC, TFS, TFH, ASM)        \                          
+  BUILTIN_LIST_FROM_TORQUE(CPP, TFJ, TFC, TFS, TFH, ASM) \                          
+  BUILTIN_LIST_INTL(CPP, TFJ, TFS)                       \                          
+  BUILTIN_LIST_BYTECODE_HANDLERS(BCH)     
+```
+Notice `BUILTIN_LIST_FROM_TORQUE`, this is how our MathIs42 gets included. When
+this happens a function named Generate_MathIs42 will be added to the Builtins
+class. TODO: follow this path and see how Generate_MathIs42 is called!
+
 
 
 
