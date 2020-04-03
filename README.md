@@ -6482,7 +6482,7 @@ $ make torque-example
 This will create a directory in the current directory named `gen/torque-generated`.
 Notice that this directory contains c++ headers and sources.
 
-It take [torque-example.tq](./torque-example) as input. For this file the
+It take [torque-example.tq](./torque-example.tq) as input. For this file the
 following header will be generated:
 ```c++
 #ifndef V8_GEN_TORQUE_GENERATED_TORQUE_EXAMPLE_TQ_H_                            
