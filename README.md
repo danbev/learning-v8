@@ -4,15 +4,20 @@ The sole purpose of this project is to aid me in leaning Google's V8 JavaScript 
 
 ## Contents
 1. [Introduction](#introduction)
-2. [Building V8](#building-v8)
-3. [Contributing a change](#contributing-a-change)
-4. [Debugging](#debugging)
-5. [Inline caches](#inline-caches)
-6. [Small Integers](#small-integers)
-7. [Building chromium](#building-chromium)
-8. [Compiler pipeline](#compiler-pipeline)
-9. [CodeStubAssembler](#codestubassembler)
+1. [Address](#address)
+1. [TaggedImpl](#taggedimpl)
+1. [Object](#object)
+1. [Handle](#handle)
+1. [FunctionTemplate](#functiontemplate)
+1. [ObjectTemplate](#objecttemplate)
+1. [Small Integers](#small-integers)
+1. [Compiler pipeline](#compiler-pipeline)
+1. [CodeStubAssembler](#codestubassembler)
 1. [Torque](#torque)
+1. [Building V8](#building-v8)
+1. [Contributing a change](#contributing-a-change)
+1. [Debugging](#debugging)
+1. [Building chromium](#building-chromium)
 
 ## Introduction
 V8 is bascially consists of the memory management of the heap and the execution stack (very simplified but helps
@@ -112,7 +117,7 @@ Is a template that is used to create functions.
 
 There is an example in [functionttemplate_test.cc](./test/functiontemplate_test.cc)
 
-And instance of a function template can be created using:
+An instance of a function template can be created using:
 ```c++
   Local<FunctionTemplate> ft = FunctionTemplate::New(isolate_, function_callback, data);
   Local<Function> function = ft->GetFunction(context).ToLocalChecked();
@@ -121,7 +126,7 @@ And the function can be called using:
 ```c++
   MaybeLocal<Value> ret = function->Call(context, recv, 0, nullptr);
 ```
-Function::Call can be found in src/api/api.cc: 
+Function::Call can be found in `src/api/api.cc`: 
 ```c++
   bool has_pending_exception = false;
   auto self = Utils::OpenHandle(this);                                               
@@ -582,6 +587,15 @@ if (params.execution_target == Execution::Target::kCallable) {
                                  orig_func, func, recv, params.argc, argv));
 ```
 
+### Address
+`Address` can be found in `include/v8-internal.h`:
+
+```c++
+typedef uintptr_t Address;
+```
+`uintptr_t` is an optional type specified in cstdint and is capable of storing
+a data pointer. It is an unsigned integer type that any valid pointer to void
+can be converted to this type (and back).
 
 ### TaggedImpl
 Has a single private member which is declared as:
@@ -600,24 +614,14 @@ It looks like it can be a different value when using pointer compression.
 
 See [tagged_test.cc](./test/tagged_test.cc) for an example.
 
-### Value
-Value extends Data and adds a number of methods to check if a Value
-is of a certain type, like `IsUndefined()`, `IsNull`, `IsNumber` etc.
-It also has useful methods to convert to a Local<T>, for example:
-```c++
-V8_WARN_UNUSED_RESULT MaybeLocal<Number> ToNumber(Local<Context> context) const;
-V8_WARN_UNUSED_RESULT MaybeLocal<String> ToNumber(Local<String> context) const;
-...
-```
-
-### Object (internal)
+### Object
 This class extends TaggedImpl:
 ```c++
 class Object : public TaggedImpl<HeapObjectReferenceType::STRONG, Address> {       
 ```
 An Object can be created using the default constructor, or by passing in an 
 Address which will delegate to TaggedImpl constructors. Object itself does
-not have any members (apart from ptr_ which is inherited from TaggedImpl that is). 
+not have any members (apart from `ptr_` which is inherited from TaggedImpl that is). 
 So if we create an Object on the stack this is like a pointer/reference to
 an object: 
 ```
@@ -627,7 +631,7 @@ an object:
 |ptr_  |---->
 +------+
 ```
-Now, `ptr_` is a TaggedImpl so it would be a Smi in which case it would just
+Now, `ptr_` is a TaggedImpl so it could be a Smi in which case it would just
 contains the value directly, for example a small integer:
 ```
 +------+
@@ -652,6 +656,26 @@ See [object_test.cc](./test/object_test.cc) for an example.
 +----------+      +---------+
 ```
 See [objectslot_test.cc](./test/objectslot_test.cc) for an example.
+
+### Data
+Is the super class of all objects that can exist the V8 heap:
+```c++
+class V8_EXPORT Data {                                                          
+ private:                                                                       
+  Data();                                                                       
+};
+```
+
+### Value
+Value extends Data and adds a number of methods that check if a Value
+is of a certain type, like `IsUndefined()`, `IsNull`, `IsNumber` etc.
+It also has useful methods to convert to a Local<T>, for example:
+```c++
+V8_WARN_UNUSED_RESULT MaybeLocal<Number> ToNumber(Local<Context> context) const;
+V8_WARN_UNUSED_RESULT MaybeLocal<String> ToNumber(Local<String> context) const;
+...
+```
+
 
 ### Handle
 A Handle is similar to a Object and ObjectSlot in that it also contains
@@ -6757,7 +6781,6 @@ And Heap::set_builtin does:
 ```
 So this is how the builtins_table is populated.
  
-
 And when is `SetupBuiltinsInternal` called?  
 It is called from `SetupIsolateDelegat::SetupBuiltins` which is called from Isolate::Init.
 
@@ -8245,20 +8268,6 @@ contains the value directly, for example a small integer:
 |------|
 |  18  |
 +------+
-```
-
-### ObjectSlot
-```c++
-  i::Object obj{18};
-  i::FullObjectSlot slot{&obj};
-```
-
-```
-+----------+      +---------+
-|ObjectSlot|      | Object  |
-|----------|      |---------|
-| address  | ---> |   18    |
-+----------+      +---------+
 ```
 
 ### Handle
