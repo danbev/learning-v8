@@ -18,7 +18,7 @@ The sole purpose of this project is to aid me in leaning Google's V8 JavaScript 
 V8 is bascially consists of the memory management of the heap and the execution stack (very simplified but helps
 make my point). Things like the callback queue, the event loop and other things like the WebAPIs (DOM, ajax, 
 setTimeout etc) are found inside Chrome or in the case of Node the APIs are Node.js APIs:
-
+```
     +------------------------------------------------------------------------------------------+
     | Google Chrome                                                                            |
     |                                                                                          |
@@ -43,7 +43,7 @@ setTimeout etc) are found inside Chrome or in the case of Node the APIs are Node
     |                                                                                          |
     |                                                                                          |
     +------------------------------------------------------------------------------------------+
-
+```
 The execution stack is a stack of frame pointers. For each function called that function will be pushed onto 
 the stack. When that function returns it will be removed. If that function calls other functions
 they will be pushed onto the stack. When they have all returned execution can proceed from the returned to 
