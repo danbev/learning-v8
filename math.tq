@@ -1,0 +1,16 @@
+namespace math {
+
+  transitioning javascript builtin
+  MathIs42(js-implicit context: NativeContext, receiver: JSAny)(x: JSAny): Boolean {
+    const number: Number = ToNumber_Inline(x);
+    typeswitch (number) {
+      case (smi: Smi): {
+        return smi == 42 ? True : False;
+      }
+      case (heapNumber: HeapNumber): {
+        return Convert<float64>(heapNumber) == 42 ? True : False;
+      }
+    }
+  }
+
+}
