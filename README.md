@@ -14,6 +14,8 @@ The sole purpose of this project is to aid me in leaning Google's V8 JavaScript 
 1. [Compiler pipeline](#compiler-pipeline)
 1. [CodeStubAssembler](#codestubassembler)
 1. [Torque](#torque)
+1. [V8 Build artifacts](#v8_build_artifacts)
+1. [V8 Startup walkthroug](#startup_walk_through)
 1. [Building V8](#building-v8)
 1. [Contributing a change](#contributing-a-change)
 1. [Debugging](#debugging)
@@ -6557,6 +6559,8 @@ as a starting point:
     }                                                                           
   }                   
 ```
+This has been updated to work with the latest V8 version.
+
 Next, we need to update `src/init/bootstrappers.cc` to add/install this function
 on the math object:
 ```c++
@@ -6790,8 +6794,8 @@ will generate c++ headers and source files, one of which will be a
 CodeStubAssembler class for out MathI42 function. It will also generate the 
 "torque-generated/builtin-definitions-tq.h. 
 After this has happend the sources need to be compiled into object files. After
-that if a snapshot is configured to be created mksnapshot will create a new
-Isolate in that process the MathIs42 builin will get added. Then a context will
+that if a snapshot is configured to be created, mksnapshot will create a new
+Isolate and in that process the MathIs42 builin will get added. Then a context will
 be created and saved. The snapshot can then be deserialized into an Isoalte as
 some later point.
 
@@ -6819,14 +6823,11 @@ V8_NOINLINE Handle<JSFunction> SimpleInstallFunction(
 } 
 ```
 So we see that the function is added as a property to the Math object.
+Notice that we also have to add `kMathIs42` to the Builtins class which is now
+part of the builtins_table_ array which we went through above.
 
 
-Notice that we also have to add `kMathIs42` to the Builtins class.
-
-
-Bootstrapper::CreateEnvironment
-
-
+### Troubleshooting
 Compilation error when including `src/objects/objects-inl.h:
 ```console
 /home/danielbevenius/work/google/v8_src/v8/src/objects/object-macros.h:263:14: error: no declaration matches ‘bool v8::internal::HeapObject::IsJSCollator() const’
@@ -6902,8 +6903,7 @@ $ nm -C out/x64.release_gcc/obj/v8_libbase/logging.o | grep V8_Fatal
 ```
 
 
-
-
+### V8 Build artifacts
 What is actually build when you specify 
 v8_monolithic:
 When this type is chosen the build cannot be a component build, there is an
