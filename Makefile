@@ -1,5 +1,6 @@
 V8_HOME ?= /home/danielbevenius/work/google/v8_src/v8
 v8_build_dir = $(V8_HOME)/out/x64.release_gcc
+### The following is a build using clang which seems to work better with lldb
 #v8_build_dir = $(V8_HOME)/out/x64.debug
 v8_buildtools_dir = $(V8_HOME)/buildtools/third_party
 gtest_home = $(PWD)/deps/googletest/googletest
@@ -39,17 +40,6 @@ clang_gtest_cmd=g++ --verbose -Wall -O0 -g -c $(gtest_home)/src/gtest-all.cc \
 	  -fno-exceptions -fno-rtti \
           -I$(gtest_home) \
           -I$(gtest_home)/include
-
-clang_torque_cmd=g++ -Wall -g -O0 -c gen/torque-generated/exported-macros-assembler-tq.cc \
-	  -o exported-macros-assembler.o -std=c++14 -Wcast-function-type \
-	  -fno-exceptions -fno-rtti \
-          -I$(v8_include_dir) \
-          -I$(V8_HOME) \
-          -I$(v8_build_dir)/gen \
-          -Igen \
-          -L$(v8_build_dir) \
-          $(v8_dylibs) \
-          -Wl,-L$(v8_build_dir) -Wl,-lpthread
 
 define run_compile
 g++ -Wall -g -O0 test/main.cc $(subst ", ,$1) $@.cc -o $@  ./lib/gtest/libgtest-linux.a -std=c++14 \
