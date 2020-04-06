@@ -8300,7 +8300,7 @@ This is because MaybeLocal has a constructor that takes a Local<S> and this will
 be casted into the `val_` member of the MaybeLocal instance.
 
 
-### Genesis::Genesis
+### Genesis
 if (context_snapshot_index == 0) {                                              
   Handle<JSGlobalObject> global_object = CreateNewGlobals(global_proxy_template, global_proxy);
   HookUpGlobalObject(global_object);
