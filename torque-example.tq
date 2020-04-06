@@ -1,0 +1,4 @@
+@export
+macro HelloWorld() {
+  Print('Hello world');
+}
