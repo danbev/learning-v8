@@ -11,6 +11,9 @@ The sole purpose of this project is to aid me in leaning Google's V8 JavaScript 
 1. [FunctionTemplate](#functiontemplate)
 1. [ObjectTemplate](#objecttemplate)
 1. [Small Integers](#small-integers)
+1. [String types](#string-types)
+1. [Roots](#roots)
+1. [Builtins](#builtins)
 1. [Compiler pipeline](#compiler-pipeline)
 1. [CodeStubAssembler](#codestubassembler)
 1. [Torque](#torque)
@@ -3349,7 +3352,7 @@ only the syntax of the function declaration (parenthesis, arguments, brackets et
 ### Function methods
 The declaration of Function can be found in `include/v8.h` (just noting this as I've looked for it several times)
 
-## String types
+### String types
 There are a number of different String types in V8 which are optimized for various situations.
 If we look in src/objects/objects.h we can see the object hierarchy:
 ```
@@ -3378,20 +3381,22 @@ If we look in src/objects/objects.h we can see the object hierarchy:
                 ExternalTwoByteInternalizedString
 ```
 
-Do note that v8::String is declared in `include/v8.h`.
+Note that v8::String is declared in `include/v8.h`.
 
-`Name` as can be seen extends HeapObject and anything that can be used as a property name should extend Name.
+`Name` as can be seen extends HeapObject and anything that can be used as a
+property name should extend Name.
+
 Looking at the declaration in include/v8.h we find the following:
-
+```c++
     int GetIdentityHash();
     static Name* Cast(Value* obj)
-
-
+```
 
 #### String
-A String extends `Name` and has a length and content. The content can be made up of 1 or 2 byte characters.
+A String extends `Name` and has a length and content. The content can be made
+up of 1 or 2 byte characters.
 Looking at the declaration in include/v8.h we find the following:
-
+```c++
     enum Encoding {
       UNKNOWN_ENCODING = 0x1,
       TWO_BYTE_ENCODING = 0x0,
@@ -3401,18 +3406,21 @@ Looking at the declaration in include/v8.h we find the following:
     int Length() const;
     int Uft8Length const;
     bool IsOneByte() const;
-
+```
 Example usages can be found in [test/string_test.cc](./test/string_test.cc).
 Looking at the functions I've seen one that returns the actual bytes
 from the String. You can get at the in utf8 format using:
-
+```c++
     String::Utf8Value print_value(joined);
     std::cout << *print_value << '\n';
-
-So that is the only string class in include/v8.h, but there are a lot more implementations that we've seen above. There are used for various cases, for example for indexing, concatenation, and slicing).
+```
+So that is the only string class in include/v8.h, but there are a lot more
+implementations that we've seen above. There are used for various cases, for
+example for indexing, concatenation, and slicing).
 
 #### SeqString
-Represents a sequence of charaters which (the characters) are either one or two bytes in length
+Represents a sequence of charaters which (the characters) are either one or two
+bytes in length.
 
 #### ConsString
 These are string that are built using:
@@ -3427,13 +3435,12 @@ This would be represented as:
              |                       |
              +-----------------------+
 ```
-So we can see that one and two in str are pointer to existing strings. 
+So we can see that one and two in str are pointers to existing strings. 
 
 
 #### ExternalString
-These Strings located on the native heap. The ExternalString structure has a pointer to this external location and the usual length field for all Strings.
-
-Looking at `String` I was not able to find any construtor for it, nor the other subtypes.
+These strings are located on the native heap. The ExternalString structure has a
+pointer to this external location and the usual length field for all Strings.
 
 ## Builtins
 Are JavaScript functions/objects that are provided by V8. These are built using a
@@ -6399,7 +6406,6 @@ void V8::MakeWeak(i::Address* location, void* parameter,
 ```
 
 
-
 ### gdb warnings
 ```console
 warning: Could not find DWO CU obj/v8_compiler/common-node-cache.dwo(0x42b8adb87d74d56b) referenced by CU at offset 0x206f7 [in module /home/danielbevenius/work/google/learning-v8/hello-world]
@@ -7242,7 +7248,7 @@ Now, lets take a look at `AddReferences`:
 Add(ExternalReference::abort_with_reason().address(), index); 
 ```
 What are ExternalReferences?   
-The represent c++ addresses used in generated code.
+They represent c++ addresses used in generated code.
 
 After that we have AddBuiltins:
 ```c++
@@ -7253,7 +7259,7 @@ static const Address c_builtins[] = {
 Address Builtin_HandleApiCall(int argc, Address* args, Isolate* isolate);
 ```
 I can see that the function declaration is in external-reference.h but the
-implementation is not there. Instead this is defined in src/builtins/builtins-api.cc:
+implementation is not there. Instead this is defined in `src/builtins/builtins-api.cc`:
 ```c++
 BUILTIN(HandleApiCall) {                                                           
 (will expand to:)
@@ -7337,6 +7343,7 @@ RootVisitor is used for visiting and modifying (optionally) the pointers contain
 in roots. This is used in garbage collection and also in serializing and deserializing
 snapshots.
 
+### Roots
 RootVistor:
 ```c++
 class RootVisitor {
