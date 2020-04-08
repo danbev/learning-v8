@@ -1,7 +1,7 @@
 V8_HOME ?= /home/danielbevenius/work/google/v8_src/v8
-v8_build_dir = $(V8_HOME)/out/x64.release_gcc
+#v8_build_dir = $(V8_HOME)/out/x64.release_gcc
 ### The following is a build using clang which seems to work better with lldb
-#v8_build_dir = $(V8_HOME)/out/x64.debug
+v8_build_dir = $(V8_HOME)/out/x64.debug
 v8_buildtools_dir = $(V8_HOME)/buildtools/third_party
 gtest_home = $(PWD)/deps/googletest/googletest
 current_dir=$(shell pwd)
@@ -175,6 +175,8 @@ test/exceptions_test: test/exceptions_test.cc
 test/arrays_test: test/arrays_test.cc
 	$(clang_test_cmd)
 
+test/wasm_test: test/wasm_test.cc
+	$(clang_test_cmd)
 
 V8_TORQUE_BUILTINS_FILES=$(addprefix src/builtins/,$(notdir $(wildcard $(V8_HOME)/src/builtins/*.tq)))
 V8_TORQUE_OBJECTS_FILES=$(addprefix src/objects/,$(notdir $(wildcard $(V8_HOME)/src/objects/*.tq)))

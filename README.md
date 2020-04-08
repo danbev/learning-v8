@@ -17,6 +17,7 @@ The sole purpose of this project is to aid me in leaning Google's V8 JavaScript 
 1. [Compiler pipeline](#compiler-pipeline)
 1. [CodeStubAssembler](#codestubassembler)
 1. [Torque](#torque)
+1. [WebAssembly](#webassembly)
 1. [V8 Build artifacts](#v8-build-artifacts)
 1. [V8 Startup walkthrough](#startup-walk-through)
 1. [Building V8](#building-v8)
@@ -8439,3 +8440,133 @@ areas in memory. The one retreived by the function call will use the
 ### Goma
 I've goma referenced in a number of places so just makeing a note of what it is
 here: Goma is googles internal distributed compile service.
+
+### WebAssembly
+This section is going to take a closer look at how wasm works in V8.
+
+We can use a wasm module like this:
+```js
+  const buffer = fixtures.readSync('add.wasm'); 
+  const module = new WebAssembly.Module(buffer);                             
+  const instance = new WebAssembly.Instance(module);                        
+  instance.exports.add(3, 4);
+```
+Where is the WebAssembly object setup?  We have sen previously that objects and
+function are added in `src/init/bootstrapper.cc` and for Wasm there is a function
+named Genisis::InstallSpecialObjects which calls:
+```c++
+  WasmJs::Install(isolate, true);
+```
+This call will land in `src/wasm/wasm-js.cc` where we can find:
+```c++
+void WasmJs::Install(Isolate* isolate, bool exposed_on_global_object) {
+  ...
+  Handle<String> name = v8_str(isolate, "WebAssembly")
+  ...
+  NewFunctionArgs args = NewFunctionArgs::ForFunctionWithoutCode(               
+      name, isolate->strict_function_map(), LanguageMode::kStrict);             
+  Handle<JSFunction> cons = factory->NewFunction(args);                         
+  JSFunction::SetPrototype(cons, isolate->initial_object_prototype());          
+  Handle<JSObject> webassembly =                                                
+      factory->NewJSObject(cons, AllocationType::kOld); 
+  JSObject::AddProperty(isolate, webassembly, factory->to_string_tag_symbol(),  
+                        name, ro_attributes);                                   
+
+  InstallFunc(isolate, webassembly, "compile", WebAssemblyCompile, 1);          
+  InstallFunc(isolate, webassembly, "validate", WebAssemblyValidate, 1);            
+  InstallFunc(isolate, webassembly, "instantiate", WebAssemblyInstantiate, 1);
+  ...
+  Handle<JSFunction> module_constructor =                                       
+      InstallConstructorFunc(isolate, webassembly, "Module", WebAssemblyModule);
+  ...
+}
+```
+And all the rest of the functions that are available on the `WebAssembly` object
+are setup in the same function.
+```console
+(lldb) br s -name Genesis::InstallSpecialObjects
+```
+Now, lets also set a break point in WebAssemblyModule:
+```console
+(lldb) br s -n WebAssemblyModule
+(lldb) r
+```
+```c++
+  v8::Isolate* isolate = args.GetIsolate();                                         
+  i::Isolate* i_isolate = reinterpret_cast<i::Isolate*>(isolate);                   
+  if (i_isolate->wasm_module_callback()(args)) return;                              
+```
+Notice the `wasm_module_callback()` function which is a function that is setup
+on the internal Isolate in `src/execution/isolate.h`:
+```c++
+#define ISOLATE_INIT_LIST(V)                                                   \
+  ...
+  V(ExtensionCallback, wasm_module_callback, &NoExtension)                     \
+  V(ExtensionCallback, wasm_instance_callback, &NoExtension)                   \
+  V(WasmStreamingCallback, wasm_streaming_callback, nullptr)                   \
+  V(WasmThreadsEnabledCallback, wasm_threads_enabled_callback, nullptr)        \
+  V(WasmLoadSourceMapCallback, wasm_load_source_map_callback, nullptr) 
+
+#define GLOBAL_ACCESSOR(type, name, initialvalue)                \              
+  inline type name() const {                                     \              
+    DCHECK(OFFSET_OF(Isolate, name##_) == name##_debug_offset_); \              
+    return name##_;                                              \              
+  }                                                              \              
+  inline void set_##name(type value) {                           \              
+    DCHECK(OFFSET_OF(Isolate, name##_) == name##_debug_offset_); \              
+    name##_ = value;                                             \              
+  }                                                                             
+  ISOLATE_INIT_LIST(GLOBAL_ACCESSOR)                                            
+#undef GLOBAL_ACCESSOR
+```
+So this would be expanded by the preprocessor into:
+```c++
+inline ExtensionCallback wasm_module_callback() const {
+  ((void) 0);
+  return wasm_module_callback_;
+}
+inline void set_wasm_module_callback(ExtensionCallback value) {
+  ((void) 0);
+  wasm_module_callback_ = value;
+}
+```
+Also notice that if `wasm_module_callback()` return true the `WebAssemblyModule`
+fuction will return and no further processing of the instructions in that function
+will be done. `NoExtension` is a function that looks like this:
+```c++
+bool NoExtension(const v8::FunctionCallbackInfo<v8::Value>&) { return false; }
+```
+And is set as the default function for module/instance callbacks.
+
+The is an example in [wasm_test.cc](./test/wasm_test.cc).
+
+### ExtensionCallback
+Is a typedef defined in `include/v8.h`:
+```c++
+typedef bool (*ExtensionCallback)(const FunctionCallbackInfo<Value>&); 
+```
+
+
+
+
+### JSEntry
+TODO: This section should describe the functions calls below.
+```console
+ * frame #0: 0x00007ffff79a52e4 libv8.so`v8::(anonymous namespace)::WebAssemblyModule(v8::FunctionCallbackInfo<v8::Value> const&) [inlined] v8::FunctionCallbackInfo<v8::Value>::GetIsolate(this=0x00007fffffffc9a0) const at v8.h:11204:40
+    frame #1: 0x00007ffff79a52e4 libv8.so`v8::(anonymous namespace)::WebAssemblyModule(args=0x00007fffffffc9a0) at wasm-js.cc:638
+    frame #2: 0x00007ffff6fe9e92 libv8.so`v8::internal::FunctionCallbackArguments::Call(this=0x00007fffffffca40, handler=CallHandlerInfo @ 0x00007fffffffc998) at api-arguments-inl.h:158:3
+    frame #3: 0x00007ffff6fe7c42 libv8.so`v8::internal::MaybeHandle<v8::internal::Object> v8::internal::(anonymous namespace)::HandleApiCallHelper<true>(isolate=<unavailable>, function=Handle<v8::internal::HeapObject> @ 0x00007fffffffca20, new_target=<unavailable>, fun_data=<unavailable>, receiver=<unavailable>, args=BuiltinArguments @ 0x00007fffffffcae0) at builtins-api.cc:111:36
+    frame #4: 0x00007ffff6fe67d4 libv8.so`v8::internal::Builtin_Impl_HandleApiCall(args=BuiltinArguments @ 0x00007fffffffcb20, isolate=0x00000f8700000000) at builtins-api.cc:137:5
+    frame #5: 0x00007ffff6fe6319 libv8.so`v8::internal::Builtin_HandleApiCall(args_length=6, args_object=0x00007fffffffcc10, isolate=0x00000f8700000000) at builtins-api.cc:129:1
+    frame #6: 0x00007ffff6b2c23f libv8.so`Builtins_CEntry_Return1_DontSaveFPRegs_ArgvOnStack_BuiltinExit + 63
+    frame #7: 0x00007ffff68fde25 libv8.so`Builtins_JSBuiltinsConstructStub + 101
+    frame #8: 0x00007ffff6daf46d libv8.so`Builtins_ConstructHandler + 1485
+    frame #9: 0x00007ffff690e1d5 libv8.so`Builtins_InterpreterEntryTrampoline + 213
+    frame #10: 0x00007ffff6904b5a libv8.so`Builtins_JSEntryTrampoline + 90
+    frame #11: 0x00007ffff6904938 libv8.so`Builtins_JSEntry + 120
+    frame #12: 0x00007ffff716ba0c libv8.so`v8::internal::(anonymous namespace)::Invoke(v8::internal::Isolate*, v8::internal::(anonymous namespace)::InvokeParams const&) [inlined] v8::internal::GeneratedCode<unsigned long, unsigned long, unsigned long, unsigned long, unsigned long, long, unsigned long**>::Call(this=<unavailable>, args=17072495001600, args=<unavailable>, args=17072631376141, args=17072630006049, args=<unavailable>, args=<unavailable>) at simulator.h:142:12
+    frame #13: 0x00007ffff716ba01 libv8.so`v8::internal::(anonymous namespace)::Invoke(isolate=<unavailable>, params=0x00007fffffffcf50)::InvokeParams const&) at execution.cc:367
+    frame #14: 0x00007ffff716aa10 libv8.so`v8::internal::Execution::Call(isolate=0x00000f8700000000, callable=<unavailable>, receiver=<unavailable>, argc=<unavailable>, argv=<unavailable>) at execution.cc:461:10
+
+```
+
