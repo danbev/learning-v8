@@ -8538,7 +8538,7 @@ bool NoExtension(const v8::FunctionCallbackInfo<v8::Value>&) { return false; }
 ```
 And is set as the default function for module/instance callbacks.
 
-The is an example in [wasm_test.cc](./test/wasm_test.cc).
+There is an example in [wasm_test.cc](./test/wasm_test.cc).
 
 ### ExtensionCallback
 Is a typedef defined in `include/v8.h`:
@@ -8568,5 +8568,67 @@ TODO: This section should describe the functions calls below.
     frame #13: 0x00007ffff716ba01 libv8.so`v8::internal::(anonymous namespace)::Invoke(isolate=<unavailable>, params=0x00007fffffffcf50)::InvokeParams const&) at execution.cc:367
     frame #14: 0x00007ffff716aa10 libv8.so`v8::internal::Execution::Call(isolate=0x00000f8700000000, callable=<unavailable>, receiver=<unavailable>, argc=<unavailable>, argv=<unavailable>) at execution.cc:461:10
 
+```
+
+
+### CustomArguments
+Subclasses of CustomArguments, like PropertyCallbackArguments and 
+FunctionCallabackArguments are used for setting up and accessing values
+on the stack, and also the subclasses provide methods to call various things
+like `CallNamedSetter` for PropertyCallbackArguments and `Call` for
+FunctionCallbackArguments.
+
+#### FunctionCallbackArguments
+```c++
+class FunctionCallbackArguments                                                 
+    : public CustomArguments<FunctionCallbackInfo<Value> > {
+  FunctionCallbackArguments(internal::Isolate* isolate, internal::Object data,  
+                            internal::HeapObject callee,                        
+                            internal::Object holder,                            
+                            internal::HeapObject new_target,                    
+                            internal::Address* argv, int argc);
+```
+This class is in the namespace v8::internal so I'm curious why the explicit
+namespace is used here?
+
+#### BuiltinArguments
+This class extends `JavaScriptArguments`
+```c++
+class BuiltinArguments : public JavaScriptArguments {
+ public:
+  BuiltinArguments(int length, Address* arguments)
+      : Arguments(length, arguments) {
+
+  static constexpr int kNewTargetOffset = 0;
+  static constexpr int kTargetOffset = 1;
+  static constexpr int kArgcOffset = 2;
+  static constexpr int kPaddingOffset = 3;
+                                                                                
+  static constexpr int kNumExtraArgs = 4;
+  static constexpr int kNumExtraArgsWithReceiver = 5;
+```
+`JavaScriptArguments is declared in `src/common/global.h`:
+```c++
+using JavaScriptArguments = Arguments<ArgumentsType::kJS>;
+```
+`Arguments` can be found in `src/execution/arguments.h`and is templated with 
+the a type of `ArgumentsType` (in `src/common/globals.h`):
+```c++
+enum class ArgumentsType {                                                          
+  kRuntime,                                                                         
+  kJS,                                                                              
+}; 
+```
+An instance of Arguments only has a length which is the number of arguments,
+and an Address pointer which points to the first argument. The functions it
+provides allows for getting/setting specific arguments and handling various
+types (like Handle<S>, smi, etc). It also overloads the operator[] allowing
+to specify an index and getting back an Object to that argument.
+In `BuiltinArguments` the constants specify the index's and provides functions
+to get them:
+```c++
+  inline Handle<Object> receiver() const;                                       
+  inline Handle<JSFunction> target() const;                                     
+  inline Handle<HeapObject> new_target() const;
 ```
 
