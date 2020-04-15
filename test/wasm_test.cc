@@ -28,3 +28,12 @@ TEST_F(WasmTest, engine) {
   i_isolate->set_wasm_module_callback(module_callback);
   //TODO: Compile and call module function
 }
+
+TEST_F(WasmTest, ValueType) {
+  Isolate::Scope isolate_scope(isolate_);
+  const v8::HandleScope handle_scope(isolate_);
+  i::Isolate* i_isolate = asInternal(isolate_);
+
+  i::wasm::ValueType anyref(i::wasm::ValueType::Kind::kAnyRef);
+  EXPECT_EQ(i::wasm::kWasmAnyRef, anyref);
+}

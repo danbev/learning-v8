@@ -8538,6 +8538,136 @@ bool NoExtension(const v8::FunctionCallbackInfo<v8::Value>&) { return false; }
 ```
 And is set as the default function for module/instance callbacks.
 
+Looking a little further we can see checks for WASM Threads support (TODO: take
+a look at this).
+And then we have:
+```c++
+  module_obj = i_isolate->wasm_engine()->SyncCompile(                             
+        i_isolate, enabled_features, &thrower, bytes);
+```
+`SyncCompile` can be found in `src/wasm/wasm-engine.cc` and will call
+`DecodeWasmModule` which can be found in `src/wasm/module-decoder.cc`.
+```c++
+ModuleResult result = DecodeWasmModule(enabled, bytes.start(), bytes.end(),
+                                       false, kWasmOrigin, 
+                                       isolate->counters(), allocator()); 
+```
+```c++
+ModuleResult DecodeWasmModule(const WasmFeatures& enabled,                      
+                              const byte* module_start, const byte* module_end, 
+                              bool verify_functions, ModuleOrigin origin,       
+                              Counters* counters,                               
+                              AccountingAllocator* allocator) {
+  ...
+  ModuleDecoderImpl decoder(enabled, module_start, module_end, origin);
+  return decoder.DecodeModule(counters, allocator, verify_functions);
+```
+DecodeModuleHeader:
+```c++
+  uint32_t magic_word = consume_u32("wasm magic");
+```
+This will land in `src/wasm/decoder.h` consume_little_endian(name):
+```c++
+
+```
+A wasm module has the following preamble:
+```
+magic nr: 0x6d736100 
+version: 0x1
+```
+These can be found as a constant in `src/wasm/wasm-constants.h`:
+```c++
+constexpr uint32_t kWasmMagic = 0x6d736100; 
+constexpr uint32_t kWasmVersion = 0x01;
+```
+After the DecodeModuleHeader the code will iterate of the sections (type,
+import, function, table, memory, global, export, start, element, code, data,
+custom).
+For each section `DecodeSection` will be called:
+```c++
+DecodeSection(section_iter.section_code(), section_iter.payload(),
+              offset, verify_functions);
+```
+There is an enum named `SectionCode` in `src/wasm/wasm-constants.h` which
+contains the various sections which is used in switch statement in DecodeSection
+. Depending on the `section_code` there are Decode<Type>Section methods that
+will be called. In our case section_code is:
+```console
+(lldb) expr section_code
+(v8::internal::wasm::SectionCode) $5 = kTypeSectionCode
+```
+And this will match the `kTypeSectionCode` and `DecodeTypeSection` will be
+called.
+
+ValueType can be found in `src/wasm/value-type.h` and there are types for
+each of the currently supported types:
+```c++
+constexpr ValueType kWasmI32 = ValueType(ValueType::kI32);                      
+constexpr ValueType kWasmI64 = ValueType(ValueType::kI64);                      
+constexpr ValueType kWasmF32 = ValueType(ValueType::kF32);                      
+constexpr ValueType kWasmF64 = ValueType(ValueType::kF64);                      
+constexpr ValueType kWasmAnyRef = ValueType(ValueType::kAnyRef);                
+constexpr ValueType kWasmExnRef = ValueType(ValueType::kExnRef);                
+constexpr ValueType kWasmFuncRef = ValueType(ValueType::kFuncRef);              
+constexpr ValueType kWasmNullRef = ValueType(ValueType::kNullRef);              
+constexpr ValueType kWasmS128 = ValueType(ValueType::kS128);                    
+constexpr ValueType kWasmStmt = ValueType(ValueType::kStmt);                    
+constexpr ValueType kWasmBottom = ValueType(ValueType::kBottom);
+```
+
+`FunctionSig` is declared with a `using` statement in value-type.h:
+```c++
+using FunctionSig = Signature<ValueType>;
+```
+We can find `Signature` in src/codegen/signature.h:
+```c++
+template <typename T>
+class Signature : public ZoneObject {
+ public:
+  constexpr Signature(size_t return_count, size_t parameter_count,
+                      const T* reps)
+      : return_count_(return_count),
+        parameter_count_(parameter_count),
+        reps_(reps) {}
+```
+The return count can be zero, one (or greater if multi-value return types are
+enabled). The parameter count also makes sense, but reps is not clear to me what
+that represents.
+```console
+(lldb) fr v
+(v8::internal::Signature<v8::internal::wasm::ValueType> *) this = 0x0000555555583950
+(size_t) return_count = 1
+(size_t) parameter_count = 2
+(const v8::internal::wasm::ValueType *) reps = 0x0000555555583948
+```
+Before the call to `Signature`s construtor we have:
+```c++
+    // FunctionSig stores the return types first.                               
+    ValueType* buffer = zone->NewArray<ValueType>(param_count + return_count);  
+    uint32_t b = 0;                                                             
+    for (uint32_t i = 0; i < return_count; ++i) buffer[b++] = returns[i];           
+    for (uint32_t i = 0; i < param_count; ++i) buffer[b++] = params[i];         
+                                                                                
+    return new (zone) FunctionSig(return_count, param_count, buffer);
+```
+So `reps_` contains the return (re?) and the params (ps?).
+
+
+After the DecodeWasmModule has returned in SyncCompile we will have a
+ModuleResult. This will be compiled to NativeModule:
+```c++
+ModuleResult result =                                                         
+      DecodeWasmModule(enabled, bytes.start(), bytes.end(), false, kWasmOrigin, 
+                       isolate->counters(), allocator());
+Handle<FixedArray> export_wrappers;                                           
+  std::shared_ptr<NativeModule> native_module =                                 
+      CompileToNativeModule(isolate, enabled, thrower,                          
+                            std::move(result).value(), bytes, &export_wrappers);
+```
+`CompileToNativeModule` can be found in `module-compiler.cc`
+
+TODO: CompileNativeModule...
+
 There is an example in [wasm_test.cc](./test/wasm_test.cc).
 
 ### ExtensionCallback
