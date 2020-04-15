@@ -862,7 +862,7 @@ See [handlescope_test.cc](./test/handlescope_test.cc) for an example.
 TODO:
 
 ### Local
-Has a single mem
+Has a single member `val_` which is of type pointer to `T`:
 ```c++
 template <class T> class Local { 
 ...
@@ -875,7 +875,7 @@ Notice that this is a pointer to T. We could create a local using:
   v8::Local<v8::Value> empty_value;
 ```
 
-
+See [local_test.cc](./test/local_test.cc) for an example.
 
 
 ### PrintObject
