@@ -881,7 +881,7 @@ Notice that this is a pointer to T. We could create a local using:
 ### PrintObject
 Using _v8_internal_Print_Object from c++:
 ```console
-$ nm libv8_monolith.a | grep Print_Object | c++filt
+$ nm -C libv8_monolith.a | grep Print_Object
 0000000000000000 T _v8_internal_Print_Object(void*)
 ```
 Notice that this function does not have a namespace.
@@ -907,7 +907,7 @@ be of type pointer-to-pointer to Object.
 An instance of v8::internal::Object only has a single data member which is a
 field named `ptr_` of type `Address`:
 
-`src/objects/objects.h:
+`src/objects/objects.h`:
 ```c++
 class Object : public TaggedImpl<HeapObjectReferenceType::STRONG, Address> {
  public:
