@@ -605,9 +605,13 @@ a data pointer. It is an unsigned integer type that any valid pointer to void
 can be converted to this type (and back).
 
 ### TaggedImpl
-Has a single private member which is declared as:
+This class is declared in `src/objects/tagged-impl.h and has a single private
+member which is declared as:
 ```c++
-StorageType ptr_;
+ public
+  constexpr StorageType ptr() const { return ptr_; }
+ private:
+  StorageType ptr_;
 ```
 An instance can be created using:
 ```c++
@@ -638,7 +642,7 @@ an object:
 |ptr_  |---->
 +------+
 ```
-Now, `ptr_` is a TaggedImpl so it could be a Smi in which case it would just
+Now, `ptr_` is a StorageType so it could be a Smi in which case it would just
 contains the value directly, for example a small integer:
 ```
 +------+
