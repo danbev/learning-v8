@@ -8308,7 +8308,7 @@ static Local<Context> New(
 ```
 The implementation for this function can be found in `src/api/api.cc`
 How does a Local become a MaybeLocal in this above case?  
-This is because MaybeLocal has a constructor that takes a Local<S> and this will
+This is because MaybeLocal has a constructor that takes a `Local<S>` and this will
 be casted into the `val_` member of the MaybeLocal instance.
 
 
