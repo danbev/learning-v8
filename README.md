@@ -8313,9 +8313,7 @@ be casted into the `val_` member of the MaybeLocal instance.
 
 
 ### Genesis
-if (context_snapshot_index == 0) {                                              
-  Handle<JSGlobalObject> global_object = CreateNewGlobals(global_proxy_template, global_proxy);
-  HookUpGlobalObject(global_object);
+TODO
 
 
 ### What is the difference between a Local and a Handle?
