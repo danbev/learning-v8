@@ -875,6 +875,19 @@ Notice that this is a pointer to T. We could create a local using:
   v8::Local<v8::Value> empty_value;
 ```
 
+So a Local contains a pointer to type T. We can access this pointer using
+`operator->` and `operator*`.
+
+We can cast from a subtype to a supertype using Local::Cast:
+```c++
+v8::Local<v8::Number> nr = v8::Local<v8::Number>(v8::Number::New(isolate_, 12));
+v8::Local<v8::Value> val = v8::Local<v8::Value>::Cast(nr);
+```
+And there is also the 
+```c++
+v8::Local<v8::Value> val2 = nr.As<v8::Value>();
+```
+
 See [local_test.cc](./test/local_test.cc) for an example.
 
 

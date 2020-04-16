@@ -1,8 +1,12 @@
 #include <iostream>
 #include "gtest/gtest.h"
 #include "v8.h"
+#include "v8_test_fixture.h"
 
-TEST(Local, local) {
+class LocalTest : public V8TestFixture {
+};
+
+TEST_F(LocalTest, local) {
   v8::Local<v8::Value> v;
   EXPECT_EQ(true, v.IsEmpty()) << "Default constructed Local should be empty";
 
@@ -22,5 +26,13 @@ TEST(Local, local) {
 
   // Calling ToLocalChecked will crash the process if called on an empty
   // MaybeLocal<T>
-  ASSERT_DEATH(maybe.ToLocalChecked(), "Fatal error");
+  //ASSERT_DEATH(maybe.ToLocalChecked(), "Fatal error");
+
+  const v8::HandleScope handle_scope(isolate_);
+  // Example of using Local::Cast:
+  v8::Local<v8::Number> nr = v8::Local<v8::Number>(v8::Number::New(isolate_, 12));
+  v8::Local<v8::Value> val = v8::Local<v8::Value>::Cast(nr);
+  // Example of using As:
+  v8::Local<v8::Value> val2 = nr.As<v8::Value>();
+  
 }
