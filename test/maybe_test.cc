@@ -8,7 +8,7 @@ using namespace v8;
 class MaybeTest : public V8TestFixture {
 };
 
-TEST_F(MaybeTest, maybeLocal) {
+TEST_F(MaybeTest, MaybeLocal) {
   Isolate::Scope isolate_scope(isolate_);
   const HandleScope handle_scope(isolate_);
   Handle<Context> context = Context::New(isolate_);
@@ -28,4 +28,17 @@ TEST_F(MaybeTest, maybeLocal) {
   EXPECT_TRUE(maybe_nr.ToLocal<Number>(&nr2));
   EXPECT_TRUE(maybe_nr.ToLocal(&nr2));
   EXPECT_EQ(nr2->Value(), 18);
+}
+
+TEST_F(MaybeTest, Maybe) {
+  Maybe<int> maybe = Just<int>(10);
+  EXPECT_TRUE(maybe.IsJust());
+  EXPECT_FALSE(maybe.IsNothing());
+  maybe.Check();
+  int nr = maybe.ToChecked();
+  EXPECT_EQ(nr, 10);
+  EXPECT_EQ(maybe.FromJust(), 10);
+  Maybe<int> nothing = Nothing<int>();
+  int value = nothing.FromMaybe(22);
+  EXPECT_EQ(value, 22);
 }
