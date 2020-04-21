@@ -668,6 +668,58 @@ See [object_test.cc](./test/object_test.cc) for an example.
 ```
 See [objectslot_test.cc](./test/objectslot_test.cc) for an example.
 
+### Maybe
+A Maybe is like an optional which can either hold a value or nothing.
+```c++
+template <class T>                                                              
+class Maybe {
+ public:
+  V8_INLINE bool IsNothing() const { return !has_value_; }                      
+  V8_INLINE bool IsJust() const { return has_value_; }
+  ...
+
+ private:
+  bool has_value_;                                                              
+  T value_; 
+}
+```
+I first thought that name `Just` was a little confusing but if you read this
+like:
+```c++
+  bool cond = true;
+  Maybe<int> maybe = cond ? Just<int>(10) : Nothing<int>();
+```
+I think it makes more sense. There are functions that check if the Maybe is
+nothing and crash the process if so. You can also check and return the value
+by using `FromJust`. 
+
+The usage of Maybe is where api calls can fail and returning Nothing is a way
+of signaling this.
+
+See [maybe_test.cc](./test/maybe_test.cc) for an example.
+
+### MaybeLocal
+```c++
+template <class T>                                                              
+class MaybeLocal {
+ public:                                                                        
+  V8_INLINE MaybeLocal() : val_(nullptr) {} 
+  V8_INLINE Local<T> ToLocalChecked();
+  V8_INLINE bool IsEmpty() const { return val_ == nullptr; }
+  template <class S>                                                            
+  V8_WARN_UNUSED_RESULT V8_INLINE bool ToLocal(Local<S>* out) const {           
+    out->val_ = IsEmpty() ? nullptr : this->val_;                               
+    return !IsEmpty();                                                          
+  }    
+
+ private:
+  T* val_;
+```
+`ToLocalChecked` will crash the process if `val_` is a nullptr. If you want to
+avoid a crash one can use `ToLocal`.
+
+See [maybelocal_test.cc](./test/maybelocal_test.cc) for an example.
+
 ### Data
 Is the super class of all objects that can exist the V8 heap:
 ```c++
@@ -889,6 +941,8 @@ v8::Local<v8::Value> val2 = nr.As<v8::Value>();
 ```
 
 See [local_test.cc](./test/local_test.cc) for an example.
+
+### MaybeLocal
 
 
 ### PrintObject

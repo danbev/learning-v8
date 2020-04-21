@@ -9,6 +9,7 @@ snapshot_blob.bin
 hello-world.dSYM
 test/local_test
 test/maybe_test
+test/maybelocal_test
 test/persistent-object_test
 test/smi_test
 instances

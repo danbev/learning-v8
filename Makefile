@@ -113,6 +113,9 @@ test/persistent-object_test: test/persistent-object_test.cc
 test/maybe_test: test/maybe_test.cc
 	$(clang_test_cmd)
 
+test/maybelocal_test: test/maybelocal_test.cc
+	$(clang_test_cmd)
+
 test/smi_test: test/smi_test.cc
 	$(clang_test_cmd)
 
