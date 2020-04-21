@@ -38,3 +38,4 @@ test/builtins_test
 test/arrays_test
 test/roots_test
 test/wasm_test
+test/promise_test

@@ -185,6 +185,9 @@ test/wasm_test: test/wasm_test.cc
 test/functioncallbackargs_test: test/functioncallbackargs_test.cc
 	$(clang_test_cmd)
 
+test/promise_test: test/promise_test.cc
+	$(clang_test_cmd)
+
 V8_TORQUE_BUILTINS_FILES=$(addprefix src/builtins/,$(notdir $(wildcard $(V8_HOME)/src/builtins/*.tq)))
 V8_TORQUE_OBJECTS_FILES=$(addprefix src/objects/,$(notdir $(wildcard $(V8_HOME)/src/objects/*.tq)))
 V8_TORQUE_WASM_FILES=$(addprefix src/wasm/,$(notdir $(wildcard $(V8_HOME)/src/wasm/*.tq)))

@@ -18,6 +18,7 @@ The sole purpose of this project is to aid me in leaning Google's V8 JavaScript 
 1. [CodeStubAssembler](#codestubassembler)
 1. [Torque](#torque)
 1. [WebAssembly](#webassembly)
+1. [Promises](#promises)
 1. [V8 Build artifacts](#v8-build-artifacts)
 1. [V8 Startup walkthrough](#startup-walk-through)
 1. [Building V8](#building-v8)
@@ -8830,4 +8831,30 @@ to get them:
   inline Handle<JSFunction> target() const;                                     
   inline Handle<HeapObject> new_target() const;
 ```
+
+### Promises
+A Promise is an object which has a state. For example, we can create a promise
+using the following call:
+
+```c++
+  i::Handle<i::JSPromise> promise = factory->NewJSPromise();
+  print_handle(promise);
+```
+This will output:
+```console
+0x3e46080c1cb9: [JSPromise]
+ - map: 0x3e46081c0fa9 <Map(HOLEY_ELEMENTS)> [FastProperties]
+ - prototype: 0x3e46082063ed <Object map = 0x3e46081c0fd1>
+ - elements: 0x3e46080406e9 <FixedArray[0]> [HOLEY_ELEMENTS]
+ - status: pending
+ - reactions: 0
+ - has_handler: 0
+ - handled_hint: 0
+ - properties: 0x3e46080406e9 <FixedArray[0]> {}
+```
+The implementation for `JSPromise` can be found in `src/objects/js-promise.h`.
+
+TODO: continue exploration...
+
+There is an example in [promise_test.cc](./test/promise_test.cc)
 
