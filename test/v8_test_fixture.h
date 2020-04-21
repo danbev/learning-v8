@@ -17,6 +17,10 @@ class V8TestFixture : public ::testing::Test {
   static void print_local(v8::Local<T> obj) {
     _v8_internal_Print_Object(*((v8::internal::Object**)*obj));
   }
+  template<typename T>
+  static void print_handle(i::Handle<T> h) {
+    _v8_internal_Print_Object(*((v8::internal::Object**)h.location()));
+  }
  protected:
   static std::unique_ptr<v8::Platform> platform_;
   static std::unique_ptr<v8::ArrayBuffer::Allocator> allocator_;
