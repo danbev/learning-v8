@@ -8854,7 +8854,81 @@ This will output:
 ```
 The implementation for `JSPromise` can be found in `src/objects/js-promise.h`.
 
+Now, `factory->NewJSPromise` looks like this:
+```c++
+Handle<JSPromise> Factory::NewJSPromise() {
+  Handle<JSPromise> promise = NewJSPromiseWithoutHook();
+  isolate()->RunPromiseHook(PromiseHookType::kInit, promise, undefined_value());
+  return promise;
+}
+Handle<JSPromise> Factory::NewJSPromiseWithoutHook() {
+  Handle<JSPromise> promise =
+      Handle<JSPromise>::cast(NewJSObject(isolate()->promise_function()));
+  promise->set_reactions_or_result(Smi::zero());
+  promise->set_flags(0);
+  ZeroEmbedderFields(promise);
+  DCHECK_EQ(promise->GetEmbedderFieldCount(), v8::Promise::kEmbedderFieldCount);
+  return promise;
+}
+```
+```console
+$ gdb ./test/promise_test
+(gdb) b Factory::NewJSPromise
+
+```
+
+We can find the torque source file in `src/builtins/promise-constructor.tq` which
+has comments that refer to the emcascript spec. In our case this is
+[promise-executor](https://tc39.es/ecma262/#sec-promise-executor)
+```c++
+  transitioning javascript builtin                                                 
+  PromiseConstructor(                                                              
+      js-implicit context: NativeContext, receiver: JSAny,                         
+      newTarget: JSAny)(executor: JSAny): JSAny {
+   // 1. If NewTarget is undefined, throw a TypeError exception.                  
+   if (newTarget == Undefined) {
+     ThrowTypeError(MessageTemplate::kNotAPromise, newTarget);
+   }
+```
+And for the generated c++ code we can look in `out/x64.release_gcc/gen/torque-generated/src/builtins/promise-constructor-tq-csa.cc'.
+
+Now, if we look at the spec and the torque source we can find the first step 
+in the spec is:
+```
+1. If NewTarget is undefined, throw a TypeError exception.
+```
+And in the torque source file:
+```
+  if (newTarget == Undefined) {
+      ThrowTypeError(MessageTemplate::kNotAPromise, newTarget);
+  }
+```
+And in the generated CodeStubAssembler c++ source for this:
+```c++
+  TNode<Object> parameter2 = UncheckedCast<Object>(Parameter(Descriptor::kJSNewTarget));
+  ...
+
+  TNode<Oddball> tmp0;
+  TNode<BoolT> tmp1;
+  if (block0.is_used()) {
+    ca_.Bind(&block0);
+    ca_.SetSourcePosition("../../src/builtins/promise-constructor.tq", 51);
+    tmp0 = Undefined_0(state_);
+    tmp1 = CodeStubAssembler(state_).TaggedEqual(TNode<Object>{parameter2}, TNode<HeapObject>{tmp0});
+    ca_.Branch(tmp1, &block1, std::vector<Node*>{}, &block2, std::vector<Node*>{});
+  }             
+
+  if (block1.is_used()) {
+    ca_.Bind(&block1);
+    ca_.SetSourcePosition("../../src/builtins/promise-constructor.tq", 52);
+    CodeStubAssembler(state_).ThrowTypeError(TNode<Context>{parameter0}, MessageTemplate::kNotAPromise, TNode<Object>{parameter2});
+  }
+```
+
 TODO: continue exploration...
 
+[Promise Objects](https://tc39.es/ecma262/#sec-promise-objects).
+
 There is an example in [promise_test.cc](./test/promise_test.cc)
+
 
