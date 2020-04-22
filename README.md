@@ -6870,11 +6870,11 @@ It is called from `SetupIsolateDelegat::SetupBuiltins` which is called from Isol
 Just to recap before I loose track of what is going on...We have math.tq, which
 is the torque source file. This is parsed by the torque compiler/parser and it
 will generate c++ headers and source files, one of which will be a
-CodeStubAssembler class for out MathI42 function. It will also generate the 
+CodeStubAssembler class for our MathI42 function. It will also generate the 
 "torque-generated/builtin-definitions-tq.h. 
-After this has happend the sources need to be compiled into object files. After
+After this has happened the sources need to be compiled into object files. After
 that if a snapshot is configured to be created, mksnapshot will create a new
-Isolate and in that process the MathIs42 builin will get added. Then a context will
+Isolate and in that process the MathIs42 builtin will get added. Then a context will
 be created and saved. The snapshot can then be deserialized into an Isoalte as
 some later point.
 
@@ -8048,6 +8048,8 @@ In the following line in api.cc, where does `i::OBJECT_TEMPLATE_INFO_TYPE` come 
   i::Handle<i::Struct> struct_obj = isolate->factory()->NewStruct(
       i::OBJECT_TEMPLATE_INFO_TYPE, i::AllocationType::kOld);
 ```
+
+### InstanceType
 The enum `InstanceType` is defined in `src/objects/instance-type.h`:
 ```c++
 #include "torque-generated/instance-types-tq.h" 
