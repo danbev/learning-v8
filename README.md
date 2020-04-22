@@ -8932,3 +8932,78 @@ TODO: continue exploration...
 There is an example in [promise_test.cc](./test/promise_test.cc)
 
 
+### EcmaScript Spec
+To further my understanding of the V8 code base I've found it helpful to
+read the [spec](https://tc39.es/ecma262/). This can make it clear why functions
+and fields are named in certain ways and also why they do certain things.
+
+#### Record
+A Record in the spec is like a struct in c where each member is called a field.
+
+#### Completion Record
+Is a Record which is used as a return value and can have one of three possible
+states:
+```
+[[Type]] (normal, return, throw, break, or continue)
+```
+If the type is normal, return, or throw then the CompletionRecord can have a
+[[Value]] which is what is returned/thrown.
+If the type is break or continue it can optionally have a [[Target]].
+
+```js
+function something() {
+  if (bla) {
+    return CompletionRecord({type: "normal", value: "something"});
+  } else {
+    return CompletionRecord({type: "throw", value: "error"});
+  }
+}
+const result = something();
+```
+So a function is the spec would return a CompletionRecord and the spec has to
+describe what is done in each case. If it was an abrupt (throw) in the example
+above it return the value. Instead of writing that as text the spec writers
+can use:
+```
+ReturnIfAbrupt(result)
+or
+Let result ? be something()
+```
+
+```js
+function something() {
+  return CompletionRecord({type: "normal", value: "something"});
+}
+const result = something();
+```
+```
+Let result be !something()
+```
+This means that something() will never return an abrupt completion.
+
+#### Builtin Objects
+In the spec one can see object referred to as `%Array%` which referrs to builtin
+objects. These are listed in [well-known-intrinsic-objects](https://tc39.es/ecma262/#sec-well-known-intrinsic-objects).
+
+#### Realms
+All js must be associated with a realm which consists of the builtin/intrinsic
+objects, a global environment.
+
+`src/parsing/parser.h` we can find:
+```c++
+class V8_EXPORT_PRIVATE Parser : public NON_EXPORTED_BASE(ParserBase<Parser>) { 
+  ...
+  enum CompletionKind {                                                             
+    kNormalCompletion,                                                              
+    kThrowCompletion,                                                               
+    kAbruptCompletion                                                               
+  };
+```
+But I can't find any usages of this enum? 
+
+#### Internal fields/methods
+When you see something like [[Notation]] you can think of this as a field in
+an object that is not exposed to JavaScript user code but internal to the JavaScript
+engine. These can also be used for internal methods.
+
+
