@@ -8824,7 +8824,7 @@ enum class ArgumentsType {
 An instance of Arguments only has a length which is the number of arguments,
 and an Address pointer which points to the first argument. The functions it
 provides allows for getting/setting specific arguments and handling various
-types (like Handle<S>, smi, etc). It also overloads the operator[] allowing
+types (like `Handle<S>`, smi, etc). It also overloads the operator[] allowing
 to specify an index and getting back an Object to that argument.
 In `BuiltinArguments` the constants specify the index's and provides functions
 to get them:
@@ -8907,6 +8907,9 @@ And in the torque source file:
 ```
 And in the generated CodeStubAssembler c++ source for this:
 ```c++
+TF_BUILTIN(PromiseConstructor, CodeStubAssembler) {                             
+  compiler::CodeAssemblerState* state_ = state();
+  compiler::CodeAssembler ca_(state());
   TNode<Object> parameter2 = UncheckedCast<Object>(Parameter(Descriptor::kJSNewTarget));
   ...
 
@@ -8926,6 +8929,153 @@ And in the generated CodeStubAssembler c++ source for this:
     CodeStubAssembler(state_).ThrowTypeError(TNode<Context>{parameter0}, MessageTemplate::kNotAPromise, TNode<Object>{parameter2});
   }
 ```
+Now, `TF_BUILTIN` is a macro on `src/builtins/builtins-utils-gen.h`. 
+```c++
+#define TF_BUILTIN(Name, AssemblerBase)                                 \
+  class Name##Assembler : public AssemblerBase {                        \
+   public:                                                              \
+    using Descriptor = Builtin_##Name##_InterfaceDescriptor;            \
+                                                                        \
+    explicit Name##Assembler(compiler::CodeAssemblerState* state)       \
+        : AssemblerBase(state) {}                                       \
+    void Generate##Name##Impl();                                        \
+                                                                        \
+    Node* Parameter(Descriptor::ParameterIndices index) {               \
+      return CodeAssembler::Parameter(static_cast<int>(index));         \
+    }                                                                   \
+  };                                                                    \
+  void Builtins::Generate_##Name(compiler::CodeAssemblerState* state) { \
+    Name##Assembler assembler(state);                                   \
+    state->SetInitialDebugInformation(#Name, __FILE__, __LINE__);       \
+    if (Builtins::KindOf(Builtins::k##Name) == Builtins::TFJ) {         \
+      assembler.PerformStackCheck(assembler.GetJSContextParameter());   \
+    }                                                                   \
+    assembler.Generate##Name##Impl();                                   \
+  }                                                                     \
+  void Name##Assembler::Generate##Name##Impl()
+```
+
+So the above
+will be expanded by the preprocessor into:
+```c++
+TF_BUILTIN(PromiseConstructor, CodeStubAssembler) {                             
+class PromiseConstructorAssembler : public CodeStubAssembler {
+ public:
+  using Descriptor = Builtin_PromiseConstructor_InterfaceDescriptor;
+
+  explicit PromiseConstructorAssembler(compiler::CodeAssemblerState* state) :
+      CodeStubAssembler(state) {}
+  void GeneratePromiseConstructorImpl;
+
+  Node* Parameter(Descriptor::ParameterIndices index) {
+    return CodeAssembler::Parameter(static_cast<int>(index));
+  }
+};
+
+void Builtins::Generate_PromiseConstructor(compiler::CodeAssemblerState* state) {
+  PromiseConstructorAssembler assembler(state);
+  state->SetInitialDebugInformation(PromiseConstructor, __FILE__, __LINE__);
+  if (Builtins::KindOf(Builtins::kPromiseConstructor) == Builtins::TFJ) {
+    assembler.PerformStackCheck(assembler.GetJSContextParameter());
+  }
+  assembler.GeneratePromiseConstructorImpl();
+}
+
+void PromiseConstructorAssembler::GeneratePromiseConstructorImpl()
+  compiler::CodeAssemblerState* state_ = state();
+  compiler::CodeAssembler ca_(state());
+  TNode<Object> parameter2 = UncheckedCast<Object>(Parameter(Descriptor::kJSNewTarget));
+  ... rest of the content that we already showed above.
+}
+```
+And this is hooked by by `src/init/boostraper.cc` in:
+```c++
+void Genesis::InitializeGlobal(Handle<JSGlobalObject> global_object,
+                               Handle<JSFunction> empty_function) {
+  ...
+  {  // -- P r o m i s e                                                        
+    Handle<JSFunction> promise_fun = InstallFunction(
+        isolate_, global, "Promise", JS_PROMISE_TYPE,
+        JSPromise::kSizeWithEmbedderFields, 0, factory->the_hole_value(),
+        Builtins::kPromiseConstructor);
+    InstallWithIntrinsicDefaultProto(isolate_, promise_fun, Context::PROMISE_FUNCTION_INDEX); 
+```
+Install function takes the following parameters:
+```c++
+V8_NOINLINE Handle<JSFunction> InstallFunction(
+    Isolate* isolate, Handle<JSObject> target, const char* name,
+    InstanceType type, int instance_size, int inobject_properties,
+    Handle<HeapObject> prototype, Builtins::Name call) {
+  return InstallFunction(isolate, target,
+                         isolate->factory()->InternalizeUtf8String(name), type, 
+                         instance_size, inobject_properties, prototype, call);
+}
+```
+The above function will be called when creating the snapshot (if snapshots
+are configured) so one way to explore this is to debug `mksnapshot`:
+```console
+$ cd out/x64_release_gcc/
+$ gdb mksnapshot
+$ Breakpoint 1 at 0x1da5cc7: file ../../src/init/bootstrapper.cc, line 1409.
+(gdb) br bootstrapper.cc:2347
+(gdb) r
+(gdb) continue
+(gdb) p JS_PROMISE_TYPE
+$1 = v8::internal::JS_PROMISE_TYPE
+```
+Details about [InstanceType](#instancetype).
+
+And we can see that we passing in `Builtins::kPromiseConstructor`. This is declared 
+in `out/x64.release_gcc/gen/torque-generated/builtin-definitions-tq.h`:
+```c++
+#define BUILTIN_LIST_FROM_TORQUE(CPP, TFJ, TFC, TFS, TFH, ASM) \
+...
+TFJ(PromiseConstructor, 1, kReceiver, kExecutor) \ 
+```
+For full details see the [Torque](#torque) section. We will get the following
+in `builtins.h` (after being preprocessed):
+```c++
+class Builtins {
+  enum Name : int32_t {
+    ...
+    kPromiseConstructor,
+  };
+
+  static void Generate_PromiseConstructor(compiler::CodeAssemblerState* state); 
+
+};
+``` 
+And and in builtins.cc (also after being preprocessed):
+```c++
+struct Builtin_PromiseConstructor_InterfaceDescriptor {
+  enum ParameterIndices {
+    kJSTarget = compiler::CodeAssembler::kTargetParameterIndex,
+    kReceiver,
+    kExecutor,
+    kJSNewTarget,
+    kJSActualArgumentsCount,
+    kContext,
+    kParameterCount,
+  };
+};
+const BuiltinMetadata builtin_metadata[] = {
+  ...
+  {"PromiseConstructor", Builtins::TFJ, {1, 0}},
+  ...
+};
+```
+`Generate_PromiseConstructor` is declared as as a static function in Builtins and
+recall that we showed that is defined in `out/x64.release_gcc/gen/torque-generated/src/builtins/promise-constructor-tq-csa.cc'.
+So to recap a little, when we do:
+```js
+const p1 = new Promise(function(resolve, reject) {
+  console.log('Running p1 executor function...');
+  resolve("success!");
+});
+```
+This will invoke the builtin function Builtins::kPromiseConstructor that was
+installed on the Promise object, which was either done upon startup if snapshots
+are disabled, or by mksnapshot if they are enabled. 
 
 TODO: continue exploration...
 
