@@ -6905,6 +6905,14 @@ So we see that the function is added as a property to the Math object.
 Notice that we also have to add `kMathIs42` to the Builtins class which is now
 part of the builtins_table_ array which we went through above.
 
+#### Transitioning/Transient
+In torgue source files we can sometimes see types declared as `transient`, and
+functions that have a `transitioning` specifier. In V8 HeapObjects can change
+at runtime (I think an example of this would be deleting an element in an array
+which would transition it to a different type of array HoleyElementArray or
+something like that. TODO: verify and explain this). And a function that calls
+JavaScript which cause such a transition is marked with transitioning.
+
 
 ### Troubleshooting
 Compilation error when including `src/objects/objects-inl.h:
