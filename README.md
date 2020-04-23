@@ -8904,12 +8904,37 @@ included by isolate.h (which isolate-inl.h includes). In contexts.h we find:
 ```
 So the preprocessor will generate the following functions for promise_function:
 ```c++
+inline Handle<JSFunction> promise_function();
+inline bool is_promise_function(JSFunction value);
+
+Handle<JSFunction> Isolate::promise_function() {
+  return Handle<JSFunction>(raw_native_context().promise_function(), this);
+}
+bool Isolate::is_promise_function(JSFunction value) {
+  return raw_native_context().is_promise_function(value);
+}
+```
+And the functions that are called from the above (in src/objects/contexts.h):
+```c++
 inline void set_promise_function(JSFunction value);
 inline bool is_promise_function(JSFunction value) const;
 inline JSFunction promise_function() const;
+
+void Context::set_promise_function(JSFunction value) {
+  ((void) 0);
+  set(PROMISE_FUNCTION_INDEX, value);
+}
+bool Context::is_promise_function(JSFunction value) const {
+  ((void) 0);
+  return JSFunction::cast(get(PROMISE_FUNCTION_INDEX)) == value;
+}
+JSFunction Context::promise_function() const {
+  ((void) 0);
+  return JSFunction::cast(get(PROMISE_FUNCTION_INDEX));
+}
 ```
-So that answers where the function is declared and what it returns (`JSFunction`)
-but where is it defined?
+So that answers where the function is declared and defined and what it returns.
+
 
 We can find the torque source file in `src/builtins/promise-constructor.tq` which
 has comments that refer to the emcascript spec. In our case this is
