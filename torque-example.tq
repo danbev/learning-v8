@@ -1,4 +1,18 @@
+extern class BajjaHashMap extends HashTable;
+
+@export
+macro HelloWorld1(msg: JSAny) {
+  Print(msg);
+}
+
+@export
+macro HelloWorld2(implicit msg: JSAny)() {
+  Print(msg);
+}
+
 @export
 macro HelloWorld() {
-  Print('Hello world');
+  HelloWorld1('Hello World');
+  const msg = 'Hello implicit'; 
+  HelloWorld2();
 }

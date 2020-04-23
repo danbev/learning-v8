@@ -6914,6 +6914,56 @@ something like that. TODO: verify and explain this). And a function that calls
 JavaScript which cause such a transition is marked with transitioning.
 
 
+#### Callables
+Are like functions is js/c++ but have some additional capabilities and there
+are several different types of callables:
+
+##### macro callables
+These correspond to generated CodeStubAssebler C++ that will be inlined at
+the callsite.
+
+##### builtin callables
+These will become V8 builtins with info added to builtin-definitions.h (via
+the include of torque-generated/builtin-definitions-tq.h). There is only one
+copy of this and this will be a call instead of being inlined as is the case
+with macros.
+
+##### runtime callables
+
+##### intrinsic callables
+
+#### Explicit parameters
+macros and builtins can have parameters. For example:
+```
+@export
+macro HelloWorld1(msg: JSAny) {
+  Print(msg);
+}
+```
+And we can call this from another macro like this:
+```
+@export
+macro HelloWorld() {
+  HelloWorld1('Hello World');
+}
+```
+
+#### Implicit parameters
+In the previous section we showed explicit parameters but we can also have
+implicit parameters:
+```
+@export
+macro HelloWorld2(implicit msg: JSAny)() {
+  Print(msg);
+}
+@export
+macro HelloWorld() {
+  const msg = 'Hello implicit';
+  HelloWorld2();
+}
+```
+
+
 ### Troubleshooting
 Compilation error when including `src/objects/objects-inl.h:
 ```console
