@@ -8873,11 +8873,43 @@ Handle<JSPromise> Factory::NewJSPromiseWithoutHook() {
   return promise;
 }
 ```
+Notice `isolate->promise_function()` what does it return and where is it
+defined:
 ```console
 $ gdb ./test/promise_test
 (gdb) b Factory::NewJSPromise
-
+(gdb) r
+(gdb) p isolate()->promise_function()
+$1 = {<v8::internal::HandleBase> = {location_ = 0x20a7c68}, <No data fields>}
 ```
+That did tell me much. But if we look at `src/execution/isolate-inl.h` we can
+find:
+```c++
+#define NATIVE_CONTEXT_FIELD_ACCESSOR(index, type, name)    \
+  Handle<type> Isolate::name() {                            \
+    return Handle<type>(raw_native_context().name(), this); \
+  }                                                         \
+  bool Isolate::is_##name(type value) {                     \
+    return raw_native_context().is_##name(value);           \
+  }
+NATIVE_CONTEXT_FIELDS(NATIVE_CONTEXT_FIELD_ACCESSOR)
+#undef NATIVE_CONTEXT_FIELD_ACCESSOR
+```
+And `NATIVE_CONTEXT_FIELDS` can be found in "src/objects/contexts.h" which is
+included by isolate.h (which isolate-inl.h includes). In contexts.h we find:
+```c++
+#define NATIVE_CONTEXT_FIELDS(V)
+  ...
+  V(PROMISE_FUNCTION_INDEX, JSFunction, promise_function)
+```
+So the preprocessor will generate the following functions for promise_function:
+```c++
+inline void set_promise_function(JSFunction value);
+inline bool is_promise_function(JSFunction value) const;
+inline JSFunction promise_function() const;
+```
+So that answers where the function is declared and what it returns (`JSFunction`)
+but where is it defined?
 
 We can find the torque source file in `src/builtins/promise-constructor.tq` which
 has comments that refer to the emcascript spec. In our case this is
@@ -8955,8 +8987,7 @@ Now, `TF_BUILTIN` is a macro on `src/builtins/builtins-utils-gen.h`.
   void Name##Assembler::Generate##Name##Impl()
 ```
 
-So the above
-will be expanded by the preprocessor into:
+So the above will be expanded by the preprocessor into:
 ```c++
 TF_BUILTIN(PromiseConstructor, CodeStubAssembler) {                             
 class PromiseConstructorAssembler : public CodeStubAssembler {
@@ -8988,7 +9019,13 @@ void PromiseConstructorAssembler::GeneratePromiseConstructorImpl()
   ... rest of the content that we already showed above.
 }
 ```
-And this is hooked by by `src/init/boostraper.cc` in:
+And if we are want to inspect the generated assembler code we can find it
+in
+```console
+$ objdump -d ../v8_src/v8/out/x64.release_gcc/obj/torque_generated_initializers/promise-constructor-tq-csa.o | c++filt
+```
+
+And this builtin is hooked up by `src/init/boostraper.cc` in:
 ```c++
 void Genesis::InitializeGlobal(Handle<JSGlobalObject> global_object,
                                Handle<JSFunction> empty_function) {
@@ -9064,8 +9101,10 @@ const BuiltinMetadata builtin_metadata[] = {
   ...
 };
 ```
-`Generate_PromiseConstructor` is declared as as a static function in Builtins and
-recall that we showed that is defined in `out/x64.release_gcc/gen/torque-generated/src/builtins/promise-constructor-tq-csa.cc'.
+`Generate_PromiseConstructor` is declared as as a static function in Builtins
+and recall that we showed above that is defined in
+`out/x64.release_gcc/gen/torque-generated/src/builtins/promise-constructor-tq-csa.cc'.
+
 So to recap a little, when we do:
 ```js
 const p1 = new Promise(function(resolve, reject) {
