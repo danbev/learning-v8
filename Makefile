@@ -15,6 +15,7 @@ clang = "$(V8_HOME)/third_party/llvm-build/Release+Asserts/bin/clang"
 
 clang_cmd=g++ -Wall -g -O0 $@.cc -o $@ -std=c++14 -Wcast-function-type \
 	  -fno-exceptions -fno-rtti \
+	  -DV8_COMPRESS_POINTERS \
           -I$(v8_include_dir) \
           -I$(V8_HOME) \
           -I$(v8_build_dir)/gen \

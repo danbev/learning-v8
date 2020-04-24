@@ -70,7 +70,7 @@ int main(int argc, char* argv[]) {
         // Inside an instance of V8 (an Isolate) you can have multiple unrelated JavaScript applications
         // running. JavaScript has global level stuff, and one application should not mess things up for
         // another running application. Context allow for each application not step on each others toes.
-        Local<Context> context = Context::New(isolate, NULL, global);
+        Local<Context> context = Context::New(isolate, nullptr, global);
         // a Local<SomeType> is held on the stack, and accociated with a handle scope. When the handle
         // scope is deleted the GC can deallocate the objects.
 
