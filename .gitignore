@@ -39,3 +39,4 @@ test/arrays_test
 test/roots_test
 test/wasm_test
 test/promise_test
+test/property_descriptor_test
