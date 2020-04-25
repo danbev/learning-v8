@@ -105,91 +105,91 @@ snapshot_blob.bin:
 
 check: test/local_test test/persistent-object_test test/maybe_test test/smi_test test/string_test test/context_test
 
-test/local_test: test/local_test.cc
+test/local_test:
 	$(clang_test_cmd)
 
-test/persistent-object_test: test/persistent-object_test.cc
+test/persistent-object_test:
 	$(clang_test_cmd)
 
-test/maybe_test: test/maybe_test.cc
+test/maybe_test:
 	$(clang_test_cmd)
 
-test/maybelocal_test: test/maybelocal_test.cc
+test/maybelocal_test:
 	$(clang_test_cmd)
 
-test/smi_test: test/smi_test.cc
+test/smi_test:
 	$(clang_test_cmd)
 
-test/string_test: test/string_test.cc
+test/string_test:
 	$(clang_test_cmd)
 
-test/jsobject_test: test/jsobject_test.cc
+test/jsobject_test:
 	$(clang_test_cmd)
 
 test/ast_test: test/ast_test.cc
 	$(COMPILE_TEST) -Wno-everything test/main.cc $< -o $@
 
-test/context_test: test/context_test.cc
+test/context_test:
 	$(clang_test_cmd)
 
-test/heap_test: test/heap_test.cc
+test/heap_test:
 	$(clang_test_cmd)
 
 test/map_test: test/map_test.cc
 	$(call run_compile, "${v8_build_dir}/obj/v8_base_without_compiler/map.o")
 
-test/isolate_test: test/isolate_test.cc
+test/isolate_test:
 	$(clang_test_cmd)
 
-test/roots_test: test/roots_test.cc
+test/roots_test:
 	$(clang_test_cmd)
 
 test/builtins_test: test/builtins_test.cc
 	$(call run_compile, "${v8_build_dir}/obj/v8_base_without_compiler/builtins.o ${v8_build_dir}/obj/v8_base_without_compiler/code.o ")
 
-test/tagged_test: test/tagged_test.cc
+test/tagged_test:
 	$(clang_test_cmd)
 
-test/object_test: test/object_test.cc
+test/object_test:
 	$(clang_test_cmd)
 
-test/heapobject_test: test/heapobject_test.cc
+test/heapobject_test:
 	$(clang_test_cmd)
 
-test/objectslot_test: test/objectslot_test.cc
+test/objectslot_test:
 	$(clang_test_cmd)
 
-test/handle_test: test/handle_test.cc
+test/handle_test:
 	$(clang_test_cmd)
 
-test/handlescope_test: test/handlescope_test.cc
+test/handlescope_test:
 	$(clang_test_cmd)
 
-test/csa_test: test/csa_test.cc
+test/csa_test:
 	$(clang_test_cmd)
 
-test/objecttemplate_test: test/objecttemplate_test.cc
+test/objecttemplate_test:
 	$(clang_test_cmd)
 
-test/functiontemplate_test: test/functiontemplate_test.cc
+test/functiontemplate_test:
 	$(clang_test_cmd)
 
-test/exceptions_test: test/exceptions_test.cc
+test/exceptions_test:
 	$(clang_test_cmd)
 
-test/arrays_test: test/arrays_test.cc
+test/arrays_test:
 	$(clang_test_cmd)
 
-test/wasm_test: test/wasm_test.cc
+test/wasm_test:
 	$(clang_test_cmd)
 
-test/functioncallbackargs_test: test/functioncallbackargs_test.cc
+test/functioncallbackargs_test:
 	$(clang_test_cmd)
 
-test/promise_test: test/promise_test.cc
+test/promise_test:
 	$(clang_test_cmd)
 
-test/property_descriptor_test: test/property_descriptor_test.cc
+test/property_descriptor_test:
 	$(clang_test_cmd)
 
 V8_TORQUE_BUILTINS_FILES=$(addprefix src/builtins/,$(notdir $(wildcard $(V8_HOME)/src/builtins/*.tq)))
