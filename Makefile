@@ -49,6 +49,7 @@ g++ -Wall -g -O0 test/main.cc $(subst ", ,$1) $@.cc -o $@  ./lib/gtest/libgtest-
 	  -fno-exceptions -fno-rtti -Wcast-function-type -Wno-unused-variable \
 	  -Wno-class-memaccess -Wno-comment -Wno-unused-but-set-variable \
 	  -DV8_INTL_SUPPORT \
+	  -DV8_COMPRESS_POINTERS \
           -I$(v8_include_dir) \
           -I$(V8_HOME) \
           -I$(V8_HOME)/third_party/icu/source/common/ \
@@ -109,10 +110,10 @@ check: test/local_test test/persistent-object_test test/maybe_test test/smi_test
 $(objs): 
 	$(cxx_test_comp_cmd)
 
-test/map_test: test/map_test.cc
+test/map_test:
 	$(call run_compile, "${v8_build_dir}/obj/v8_base_without_compiler/map.o")
 
-test/builtins_test: test/builtins_test.cc
+test/builtins_test:
 	$(call run_compile, "${v8_build_dir}/obj/v8_base_without_compiler/builtins.o ${v8_build_dir}/obj/v8_base_without_compiler/code.o ")
 
 V8_TORQUE_BUILTINS_FILES=$(addprefix src/builtins/,$(notdir $(wildcard $(V8_HOME)/src/builtins/*.tq)))
