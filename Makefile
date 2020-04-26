@@ -134,7 +134,7 @@ torque-example: torque-example.tq
 		$<
 	@rm $(V8_HOME)/$<
 
-.PHONY: clean list-gtest
+.PHONY: clean
 
 clean: 
 	@rm -f $(objs)
