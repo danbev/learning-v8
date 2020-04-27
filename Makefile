@@ -107,7 +107,7 @@ snapshot_blob.bin:
 
 check: test/local_test test/persistent-object_test test/maybe_test test/smi_test test/string_test test/context_test
 
-$(objs): 
+test/%: test/%.cc
 	$(cxx_test_comp_cmd)
 
 test/map_test:
@@ -138,4 +138,4 @@ torque-example: torque-example.tq
 .PHONY: clean
 
 clean: 
-	@rm -f $(objs)
+	@rm -f $(objs) hello-world
