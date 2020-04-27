@@ -3425,6 +3425,45 @@ only the syntax of the function declaration (parenthesis, arguments, brackets et
 ### Function methods
 The declaration of Function can be found in `include/v8.h` (just noting this as I've looked for it several times)
 
+### Symbol
+The declarations for the Symbol class can be found in `v8.h` and the internal
+implementation in `src/api/api.cc`.
+
+The well known Symbols are generated using macros so you won't find the just
+by searching using the static function names like 'GetToPrimitive`.
+```c++
+#define WELL_KNOWN_SYMBOLS(V)                 \
+  V(AsyncIterator, async_iterator)            \
+  V(HasInstance, has_instance)                \
+  V(IsConcatSpreadable, is_concat_spreadable) \
+  V(Iterator, iterator)                       \
+  V(Match, match)                             \
+  V(Replace, replace)                         \
+  V(Search, search)                           \
+  V(Split, split)                             \
+  V(ToPrimitive, to_primitive)                \
+  V(ToStringTag, to_string_tag)               \
+  V(Unscopables, unscopables)
+
+#define SYMBOL_GETTER(Name, name)                                   \
+  Local<Symbol> v8::Symbol::Get##Name(Isolate* isolate) {           \
+    i::Isolate* i_isolate = reinterpret_cast<i::Isolate*>(isolate); \
+    return Utils::ToLocal(i_isolate->factory()->name##_symbol());   \
+  }
+```
+So GetToPrimitive would become:
+```c++
+Local<Symbol> v8::Symbol::GeToPrimitive(Isolate* isolate) {
+  i::Isolate* i_isolate = reinterpret_cast<i::Isolate*>(isolate);
+  return Utils::ToLocal(i_isolate->factory()->to_primitive_symbol());
+}
+
+```
+
+
+
+There is an example in [symbol-test.cc](./test/symbol-test.cc).
+
 ### String types
 There are a number of different String types in V8 which are optimized for various situations.
 If we look in src/objects/objects.h we can see the object hierarchy:
