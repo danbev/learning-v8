@@ -89,10 +89,6 @@ gdb-hello:
 contexts: snapshot_blob.bin contexts.cc
 	clang++ -O0 -g -I$(v8_include_dir) $(v8_dylibs) -L$(v8_build_dir) $@.cc -o $@ -pthread -std=c++0x -rpath $(v8_build_dir)
 
-ns: snapshot_blob.bin ns.cc
-	@echo "Using v8_home = $(v8_include_dir)"
-	clang++ -O0 -g -I$(v8_include_dir) $(v8_dylibs) -L$(v8_build_dir) $@.cc -o $@ -pthread -std=c++0x -rpath $(v8_build_dir)
-
 instances: snapshot_blob.bin instances.cc
 	clang++ -O0 -g -fno-rtti -I$(v8_include_dir) $(v8_dylibs) -L$(v8_build_dir) $@.cc -o $@ -pthread -std=c++0x -rpath $(v8_build_dir)
 
