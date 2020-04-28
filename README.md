@@ -26,6 +26,7 @@ The sole purpose of this project is to aid me in leaning Google's V8 JavaScript 
 1. [Debugging](#debugging)
 1. [Building chromium](#building-chromium)
 1. [Goma chromium](#goma)
+1. [EcmaScript notes](./notes/ecmaspec.md)
 
 ## Introduction
 V8 is bascially consists of the memory management of the heap and the execution stack (very simplified but helps
