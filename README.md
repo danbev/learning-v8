@@ -4819,8 +4819,9 @@ Handle<WeakFixedArray> WeakFixedArray::Add(Handle<Object> maybe_array,
 Notice the name of the first parameter `maybe_array` but it is not of type maybe?
 
 ### Context
-JavaScript provides a set of builtin functions and objects. These functions and objects can be changed by user code. Each context
-is separate collection of these objects and functions.
+JavaScript provides a set of builtin functions and objects. These functions and
+objects can be changed by user code. Each context is separate collection of
+these objects and functions.
 
 And internal::Context is declared in `deps/v8/src/contexts.h` and extends FixedArray
 ```console
@@ -7002,7 +7003,6 @@ macro HelloWorld() {
 }
 ```
 
-
 ### Troubleshooting
 Compilation error when including `src/objects/objects-inl.h:
 ```console
@@ -8256,8 +8256,6 @@ object_template_info_map type: 79
 
 ### IsolateData
 
-
-
 ### Context creation
 When we create a new context using:
 ```c++
@@ -9250,6 +9248,30 @@ To further my understanding of the V8 code base I've found it helpful to
 read the [spec](https://tc39.es/ecma262/). This can make it clear why functions
 and fields are named in certain ways and also why they do certain things.
 
+#### [[something]]
+Most often denotes an internal property named `something`.
+
+#### @@
+Within the specification a well-known symbol is referred to by using a notation
+of the form `@@name`, where `name` is one of the values:
+```
+Spec Name               [[Description]]
+* @@asyncIterator       Symbol.asyncIterator
+* @@hasInstance         Symbol.hasInstance
+* @@isConcatSpreadable  Symbol.isConcatSpreadable
+* @@iterator            Symbol.iterator
+* @@match               Symbol.match
+* @@matchAll            Symbol.matchAll
+* @@replace             Symbol.replace
+* @@search              Symbol.search
+* @@speices             Symbol.species
+* @@split		Symbol.split
+* @@toPrimitive		Symbol.toPrimitive
+* @@toStringTag         Symbol.toStringTag
+```
+So you might see something like [@@toPrimitive] anobject would have a function
+keyed with Symbol.toPrimitive which can be used access that function.
+
 #### Record
 A Record in the spec is like a struct in c where each member is called a field.
 
@@ -9299,8 +9321,31 @@ In the spec one can see object referred to as `%Array%` which referrs to builtin
 objects. These are listed in [well-known-intrinsic-objects](https://tc39.es/ecma262/#sec-well-known-intrinsic-objects).
 
 #### Realms
-All js must be associated with a realm which consists of the builtin/intrinsic
-objects, a global environment.
+All js code must be associated with a realm before it is evaluated which consists
+of the builtin/intrinsic objects, a global environment ([link](https://tc39.es/ecma262/#sec-code-realms).
+This could be a window/frame/tab in a browser, another example could be a web
+worker or a service worker. Code in one realm might not be able to interact with
+code in another. Like a symbol might only be available in one for example.
+TODO: add more examples and clarify this.
+
+### NativeContext
+Can be found in `src/objects/contexts.h` and has the following definition:
+```c++
+class NativeContext : public Context {
+ public:
+
+  DECL_PRIMITIVE_ACCESSORS(microtask_queue, MicrotaskQueue*)
+
+  V8_EXPORT_PRIVATE void AddOptimizedCode(Code code);
+  void SetOptimizedCodeListHead(Object head);
+  Object OptimizedCodeListHead();
+  void SetDeoptimizedCodeListHead(Object head);
+  Object DeoptimizedCodeListHead();
+  inline OSROptimizedCodeCache GetOSROptimizedCodeCache();
+  void ResetErrorsThrown();
+  void IncrementErrorsThrown();
+  int GetErrorsThrown();
+```
 
 `src/parsing/parser.h` we can find:
 ```c++
