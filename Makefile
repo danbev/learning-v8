@@ -101,8 +101,6 @@ exceptions: snapshot_blob.bin exceptions.cc
 snapshot_blob.bin:
 	@cp $(v8_build_dir)/$@ .
 
-check: test/local_test test/persistent-object_test test/maybe_test test/smi_test test/string_test test/context_test
-
 test/%: test/%.cc
 	$(cxx_test_comp_cmd)
 
