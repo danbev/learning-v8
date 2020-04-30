@@ -1,8 +1,8 @@
-### Learning Google V8
+## Learning Google V8
 The sole purpose of this project is to aid me in leaning Google's V8 JavaScript engine.
 
 
-## Contents
+### Contents
 1. [Introduction](./notes/intro.md)
 1. [Address](#address)
 1. [TaggedImpl](#taggedimpl)
