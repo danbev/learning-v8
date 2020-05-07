@@ -9,6 +9,8 @@ Platform:
 ```c++
   std::unique_ptr<Platform> platform = platform::NewDefaultPlatform();
 ```
+`NewDefaultPlatform` is declared in `include/libplatform/libplatform.h` and
+creates a new [DefaultPlatform](#defaultplatform).
 
 ### Platform
 `Platform` is declared in `include/v8-platform.h`. The indended user of this 
@@ -105,8 +107,7 @@ One example is when compiling wasm:
 ```c++
   V8::GetCurrentPlatform()->CallOnWorkerThread(std::move(task));
 ```
-Also there are may calls from the heap namespace with handles garbage collection.
-
+Also there are many calls from the heap namespace with handles garbage collection.
 
 
 ### TaskRunner
