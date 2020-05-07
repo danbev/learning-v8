@@ -18,7 +18,7 @@ void function_callback(const FunctionCallbackInfo<Value>& info) {
   std::cout << "function_callback args= " << info.Length() << '\n';
 }
 
-TEST_F(MicrotaskTest, EnqueueMicrotask) {
+TEST_F(MicrotaskTest, EnqueueMicrotaskFunction) {
   Isolate::Scope isolate_scope(isolate_);
   const v8::HandleScope handle_scope(isolate_);
 
@@ -31,5 +31,20 @@ TEST_F(MicrotaskTest, EnqueueMicrotask) {
   Local<String> func_name = String::NewFromUtf8(isolate_, "SomeFunc", NewStringType::kNormal).ToLocalChecked();
   function->SetName(func_name);
   isolate_->EnqueueMicrotask(function);
+  isolate_->PerformMicrotaskCheckpoint();
+}
+
+void callback(void* data) {
+  std::cout << "callback..." << '\n';
+}
+
+TEST_F(MicrotaskTest, EnqueueMicrotaskCallback) {
+  Isolate::Scope isolate_scope(isolate_);
+  const v8::HandleScope handle_scope(isolate_);
+
+  Handle<v8::Context> context = Context::New(isolate_);
+  Context::Scope context_scope(context);
+
+  isolate_->EnqueueMicrotask(callback, nullptr);
   isolate_->PerformMicrotaskCheckpoint();
 }
