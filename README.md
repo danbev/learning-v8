@@ -7080,6 +7080,13 @@ So the only two options are the v8_monolith or is_component_build where it
 might be an advantage of being able to build a single component and not have
 to rebuild the whole monolith at times.
 
+### wee8
+`libwee8` can be produced which is a library which only supports WebAssembly
+and does not support JavaScript.
+```console
+$ ninja -C out/wee8 wee8
+```
+
 
 ### V8 Internal Isolate
 `src/execution/isolate.h` is where you can find the v8::internal::Isolate.
