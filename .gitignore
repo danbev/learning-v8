@@ -41,4 +41,5 @@ test/wasm_test
 test/promise_test
 test/property_descriptor_test
 test/symbol_test
+test/arraybuffer_test
 gen
