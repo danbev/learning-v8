@@ -34,5 +34,19 @@ TEST_F(ArrayBufferTest, Uint16Array) {
   EXPECT_EQ(static_cast<int>(array->Length()), 2);
   array->Set(context, 0, Number::New(isolate_, 220)).Check();
   array->Set(context, 1, Number::New(isolate_, 221)).Check();
+}
+
+TEST_F(ArrayBufferTest, Float64Array) {
+  Isolate::Scope isolate_scope(isolate_);
+  const v8::HandleScope handle_scope(isolate_);
+
+  Handle<v8::Context> context = Context::New(isolate_);
+  Context::Scope context_scope(context);
+
+  int count = 32;
+  int bytes_size = sizeof(double) * count;
+  Local<ArrayBuffer> ab = ArrayBuffer::New(isolate_, bytes_size);
+  Local<Float64Array> array = Float64Array::New(ab, 0, count);
+  EXPECT_EQ(static_cast<int>(array->Length()), count);
   print_local(array);
 }
