@@ -28,4 +28,11 @@ TEST_F(MaybeLocalTest, MaybeLocal) {
   EXPECT_TRUE(maybe_nr.ToLocal<Number>(&nr2));
   EXPECT_TRUE(maybe_nr.ToLocal(&nr2));
   EXPECT_EQ(nr2->Value(), 18);
+
+  // the {} will use the types, MaybeLocal default constructor so this would
+  // be the same as writing MaybeLocal<Value> something = MaybeLocal<Value>();
+  MaybeLocal<Value> something = {};
+  std::cout << something.IsEmpty() << '\n';
+  MaybeLocal<Value> something2 = MaybeLocal<Value>();
+  std::cout << something2.IsEmpty() << '\n';
 }
