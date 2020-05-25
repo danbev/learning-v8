@@ -3507,6 +3507,85 @@ This would be represented as:
 ```
 So we can see that one and two in str are pointers to existing strings. 
 
+### NewFromUt8Literal
+This function was introduced in b097a8e5de7.
+
+The normal way of creating a Local<String> would be to use:
+```c++
+  Local<String> str = String::NewFromUtf8(isolate_, "åäö").ToLocalChecked();    
+```
+Now, String::NewFromUtf8 looks like this:
+```c++
+MaybeLocal<String> String::NewFromUtf8(Isolate* isolate, const char* data,           
+                                       NewStringType type, int length) {        
+  NEW_STRING(isolate, String, NewFromUtf8, char, data, type, length);           
+  return result;                                                                
+}
+```
+The macro `NEW_STRING` (which can be found in src/api/api.cc) 
+We can take a look at the expanded macro using:
+```console
+$ g++ -I./out/x64.release_gcc/gen -I./include -I. -E src/api/api.cc > output
+```
+```c++
+MaybeLocal<String> String::NewFromUtf8(Isolate* isolate, const char* data,      
+                                       NewStringType type, int length) {        
+  MaybeLocal<String> result;
+  if (length == 0) {
+    result = String::Empty(isolate);
+  } else if (length > i::String::kMaxLength) {
+    result = MaybeLocal<String>();
+  } else {
+    i::Isolate* i_isolate = reinterpret_cast<internal::Isolate*>(isolate);
+    i::VMState<v8::OTHER> __state__((i_isolate));;
+    i::RuntimeCallTimerScope _runtime_timer( i_isolate, i::RuntimeCallCounterId::kAPI_String_NewFromUtf8);
+    do {
+      auto&& logger = (i_isolate)->logger();
+      if (logger->is_logging())
+        logger->ApiEntryCall("v8::" "String" "::" "NewFromUtf8");
+    } while (false);
+    if (length < 0)
+      length = StringLength(data);
+     i::Handle<i::String> handle_result = NewString(i_isolate->factory(), type, i::Vector<const char>(data, length)) .ToHandleChecked();
+     result = Utils::ToLocal(handle_result);
+  };
+  return result;                                                                
+}
+```
+There are a number of checks that are not required when we have a string literal,
+and some that can be checked at compile time, like the max length. 
+```c++
+  template <int N>                                                              
+  static V8_WARN_UNUSED_RESULT Local<String> NewFromUtf8Literal(                
+      Isolate* isolate, const char (&literal)[N],                                    
+      NewStringType type = NewStringType::kNormal) {                                 
+    static_assert(N <= kMaxLength, "String is too long");                       
+    return NewFromUtf8Literal(isolate, literal, type, N - 1);                        
+  }                                                                                  
+```
+Notice the `static_assert` which is performed at compile time.
+          
+
+Local<String> String::NewFromUtf8Literal(Isolate* isolate, const char* literal, 
+                                         NewStringType type, int length) {           
+  DCHECK_LE(length, i::String::kMaxLength);
+  i::Isolate* i_isolate = reinterpret_cast<internal::Isolate*>(isolate);
+  ENTER_V8_NO_SCRIPT_NO_EXCEPTION(i_isolate);
+  LOG_API(i_isolate, String, NewFromUtf8Literal);
+  i::Handle<i::String> handle_result =
+      NewString(i_isolate->factory(), type,
+                i::Vector<const char>(literal, length))
+          .ToHandleChecked();
+  return Utils::ToLocal(handle_result);
+}
+```
+We can see that the compiler instantiates this template as:
+```console
+$ nm -C test/string_test | grep NewFromUtf8Literal
+                 U v8::String::NewFromUtf8Literal(v8::Isolate*, char const*, v8::NewStringType, int)
+000000000041551c W v8::Local<v8::String> v8::String::NewFromUtf8Literal<10>(v8::Isolate*, char const (&) [10], v8::NewStringType)
+```
+
 
 #### ExternalString
 These strings are located on the native heap. The ExternalString structure has a

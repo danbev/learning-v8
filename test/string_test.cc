@@ -25,12 +25,21 @@ TEST_F(StringTest, create) {
   EXPECT_EQ(str->IsExternalOneByte(), false);
 }
 
+TEST_F(StringTest, NewFromUtf8) {
+  const v8::HandleScope handle_scope(isolate_);
+  Isolate::Scope isolate_scope(isolate_);
+  Local<String> str = String::NewFromUtf8(isolate_, "åäö").ToLocalChecked();
+  EXPECT_EQ(str->Length(), 3);
+  EXPECT_EQ(str->Utf8Length(isolate_), 6);
+  EXPECT_EQ(str->IsOneByte(), true);
+}
+
 TEST_F(StringTest, fromStringLiteral) {
   const v8::HandleScope handle_scope(isolate_);
   Isolate::Scope isolate_scope(isolate_);
-  Local<String> str = String::NewFromUtf8Literal(isolate_, "åäö");
-  EXPECT_EQ(str->Length(), 3);
-  EXPECT_EQ(str->Utf8Length(isolate_), 6);
+  Local<String> str = String::NewFromUtf8Literal(isolate_, "something");
+  EXPECT_EQ(str->Length(), 9);
+  EXPECT_EQ(str->Utf8Length(isolate_), 9);
   EXPECT_EQ(str->IsOneByte(), true);
 }
 
