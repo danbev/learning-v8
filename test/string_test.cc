@@ -51,6 +51,8 @@ TEST_F(StringTest, empty) {
   EXPECT_EQ(str->Utf8Length(isolate_), 0);
   EXPECT_EQ(str->IsOneByte(), true);
   EXPECT_EQ(str->ContainsOnlyOneByte(), true);
+  v8::String::Utf8Value empty(isolate_, str);
+  EXPECT_STREQ(*empty, "");
 }
 
 TEST_F(StringTest, concat) {
