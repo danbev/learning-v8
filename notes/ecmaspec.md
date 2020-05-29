@@ -32,14 +32,20 @@ A Record in the spec is like a struct in c where each member is called a field.
 
 ### Completion Record
 Is a Record which is used as a return value and can have one of three possible
-states:
+fields:
 ```
 [[Type]] (normal, return, throw, break, or continue)
 ```
 If the type is normal, return, or throw then the CompletionRecord can have a
-[[Value]] which is what is returned/thrown.
-If the type is break or continue it can optionally have a [[Target]].
 
+```
+[[Value]] which is what is returned/thrown.
+```
+```
+[[Target]] If the type is break or continue it can optionally have a [[Target]].
+```
+
+For example:
 ```js
 function something() {
   if (bla) {
@@ -70,6 +76,8 @@ const result = something();
 Let result be !something()
 ```
 This means that something() will never return an abrupt completion.
+
+Every abstract operation in the spec implicitely returns a completion record.
 
 ### Builtin Objects
 In the spec one can see object referred to as `%Array%` which referrs to builtin
