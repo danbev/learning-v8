@@ -56,14 +56,16 @@ function something() {
 }
 const result = something();
 ```
-So a function is the spec would return a CompletionRecord and the spec has to
+So a function in the spec would return a CompletionRecord and the spec has to
 describe what is done in each case. If it was an abrupt (throw) in the example
 above it return the value. Instead of writing that as text the spec writers
 can use:
 ```
-ReturnIfAbrupt(result)
-or
-Let result ? be something()
+ReturnIfAbrupt(someting())
+```
+can be written as:
+```
+? something()
 ```
 
 ```js
@@ -75,9 +77,13 @@ const result = something();
 ```
 Let result be !something()
 ```
-This means that something() will never return an abrupt completion.
+This means that something() will `never` return an abrupt completion.
 
 Every abstract operation in the spec implicitely returns a completion record.
+
+### Sets
+You can find sets uses in the spec in places where you have something like
+`<< one, two >>` which denotes a set with two elements.
 
 ### Builtin Objects
 In the spec one can see object referred to as `%Array%` which referrs to builtin
