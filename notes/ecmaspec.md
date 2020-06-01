@@ -57,16 +57,21 @@ function something() {
 const result = something();
 ```
 So a function in the spec would return a CompletionRecord and the spec has to
-describe what is done in each case. If it was an abrupt (throw) in the example
-above it return the value. Instead of writing that as text the spec writers
-can use:
+describe what is done in each case.
+
+### ReturnIfAbrupt
+If it was an abrupt (throw) in the example above it return the value. Instead
+of writing that as text the spec writers can use:
 ```
-ReturnIfAbrupt(someting())
+ReturnIfAbrupt(something())
 ```
 can be written as:
 ```
 ? something()
 ```
+ReturnIfAbrupt means if the value passed in is an abrupt completion then
+that value is returned, else if the value is a Completion Record then set the
+value to value.[[Value]].
 
 ```js
 function something() {
