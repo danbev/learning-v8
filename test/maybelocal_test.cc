@@ -61,3 +61,22 @@ TEST_F(MaybeLocalTest, FromMaybe) {
   from_local = maybe_str.FromMaybe<Value>(Local<Value>());
   EXPECT_TRUE(from_local.IsEmpty());
 }
+
+MaybeLocal<Value> something() {
+  MaybeLocal<Object> empty; // call some function that returns
+  Local<Object> obj;
+  if (!empty.ToLocal(&obj)) {
+    // do some error handling
+  }
+  return obj; // just return the value or empty.
+}
+
+TEST_F(MaybeLocalTest, ReturnEmpty) {
+  Isolate::Scope isolate_scope(isolate_);
+  const HandleScope handle_scope(isolate_);
+  Handle<Context> context = Context::New(isolate_);
+  Context::Scope context_scope(context);
+
+  MaybeLocal<Value> maybe = something();
+  EXPECT_TRUE(maybe.IsEmpty());
+}
