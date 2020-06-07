@@ -22,7 +22,7 @@ cxx_comp_cmd=g++ -Wall -g -O0 $@.cc -o $@ -std=c++14 -Wcast-function-type \
           -I$(v8_build_dir)/gen \
           -L$(v8_build_dir) \
           $(v8_dylibs) \
-          -Wl,-L$(v8_build_dir) -Wl,-lpthread
+          -Wl,-L$(v8_build_dir) -Wl,-rpath=$(v8_build_dir) -Wl,-lpthread
 
 cxx_test_comp_cmd=g++ -Wall -g -O0 test/main.cc $@.cc -o $@  ./lib/gtest/libgtest-linux.a -std=c++14 \
 	  -fno-exceptions -fno-rtti -Wcast-function-type -Wno-unused-variable \
@@ -36,7 +36,7 @@ cxx_test_comp_cmd=g++ -Wall -g -O0 test/main.cc $@.cc -o $@  ./lib/gtest/libgtes
           -L$(v8_build_dir) \
           -I./deps/googletest/googletest/include \
           $(v8_dylibs) \
-          -Wl,-L$(v8_build_dir) -Wl,-L/usr/lib64 -Wl,-lstdc++ -Wl,-lpthread
+          -Wl,-L$(v8_build_dir) -Wl,-rpath=$(v8_build_dir) -Wl,-L/usr/lib64 -Wl,-lstdc++ -Wl,-lpthread
 
 cxx_gtest_comp_cmd=g++ --verbose -Wall -O0 -g -c $(gtest_home)/src/gtest-all.cc \
           -o $(gtest_home)/gtest-all.o	-std=c++14 \
