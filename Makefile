@@ -24,7 +24,7 @@ cxx_comp_cmd=g++ -Wall -g -O0 $@.cc -o $@ -std=c++14 -Wcast-function-type \
           $(v8_dylibs) \
           -Wl,-L$(v8_build_dir) -Wl,-rpath,$(v8_build_dir) -Wl,-lpthread
 
-cxx_test_comp_cmd=g++ -Wall -g -O0 test/main.cc $@.cc -o $@  ./lib/gtest/libgtest-linux.a -std=c++14 \
+cxx_test_comp_cmd=g++ -Wall -g -O0 test/main.cc $@.cc -o $@  ./lib/gtest/libgtest.a -std=c++14 \
 	  -fno-exceptions -fno-rtti -Wcast-function-type -Wno-unused-variable \
 	  -Wno-class-memaccess -Wno-comment -Wno-unused-but-set-variable \
 	  -DV8_COMPRESS_POINTERS \
@@ -45,7 +45,7 @@ cxx_gtest_comp_cmd=g++ --verbose -Wall -O0 -g -c $(gtest_home)/src/gtest-all.cc 
           -I$(gtest_home)/include
 
 define run_compile
-g++ -Wall -g -O0 test/main.cc $(subst ", ,$1) $@.cc -o $@  ./lib/gtest/libgtest-linux.a -std=c++14 \
+g++ -Wall -g -O0 test/main.cc $(subst ", ,$1) $@.cc -o $@  ./lib/gtest/libgtest.a -std=c++14 \
 	  -fno-exceptions -fno-rtti -Wcast-function-type -Wno-unused-variable \
 	  -Wno-class-memaccess -Wno-comment -Wno-unused-but-set-variable \
 	  -DV8_INTL_SUPPORT \
@@ -74,7 +74,8 @@ persistent-obj: persistent-obj.cc
 gtest-compile: 
 	@echo "Building gtest library"
 	$(cxx_gtest_comp_cmd)
-	ar -rv $(current_dir)/lib/gtest/libgtest-linux.a $(gtest_home)/gtest-all.o
+	@mkdir $(current_dir)/lib/gtest
+	ar -rv $(current_dir)/lib/gtest/libgtest.a $(gtest_home)/gtest-all.o
 
 
 .PHONY: run-hello

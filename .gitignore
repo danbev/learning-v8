@@ -3,6 +3,7 @@
 *.dSYM/
 deps
 tags
+lib/gtest/libgtest.a
 hello-world
 natives_blob.bin
 snapshot_blob.bin
