@@ -61,8 +61,6 @@ g++ -Wall -g -O0 test/main.cc $(subst ", ,$1) $@.cc -o $@  ./lib/gtest/libgtest.
 endef
 
 
-COMPILE_TEST = g++ -v -std=c++11 -O0 -g -I$(V8_HOME)/third_party/googletest/src/googletest/include -I$(v8_include_dir) -I$(v8_gen_dir) -I$(V8_HOME) $(v8_dylibs) -L$(v8_build_dir) -pthread  lib/gtest/libgtest.a
-
 hello-world: hello-world.cc
 	@echo "Using v8_home = $(V8_HOME)"
 	$(cxx_comp_cmd)
