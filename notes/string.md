@@ -78,7 +78,6 @@ Code points from BPM are transformed/encoded into single code unit of 16-bits
 Code points from the other planes are transformed/encoded into two code units
 each of size 16-bits.
 
-
 ```
 Abstract Character        Code point       Code unit
 LATIN SMALL LETTER A      U+0061           0x0061
@@ -126,7 +125,7 @@ implementations that we've seen above. There are used for various cases, for
 example for indexing, concatenation, and slicing).
 
 #### SeqString
-Represents a sequence of charaters which (the characters) are either one or two
+Represents a sequence of characters which (the characters) are either one or two
 bytes in length.
 
 #### ConsString
