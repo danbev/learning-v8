@@ -1,47 +1,22 @@
 V8_HOME ?= /home/danielbevenius/work/google/v8_src/v8
 
 v8_build_dir := $(V8_HOME)/out/x64.release_gcc
-### The following is a build using clang which seems to work better with lldb
-#v8_build_dir = $(V8_HOME)/out/x64.debug
-
-gtest_home := $(CURDIR)/deps/googletest/googletest
-
 v8_include_dir := $(V8_HOME)/include
 v8_src_dir := $(V8_HOME)/src
 v8_gen_dir := $(v8_build_dir)/gen
-v8_dylibs :=-lv8 -lv8_libplatform -lv8_libbase
-
+v8_dylibs := -lv8 -lv8_libplatform -lv8_libbase
 objs := $(patsubst %.cc, %,  $(wildcard test/*.cc))
+gtest_home := $(CURDIR)/deps/googletest/googletest
 
-cxx_comp_cmd=${CXX} -Wall -g -O0 $@.cc -o $@ -std=c++14 -Wcast-function-type \
-	  -fno-exceptions -fno-rtti \
-	  -DV8_COMPRESS_POINTERS \
-          -I$(v8_include_dir) \
-          -I$(V8_HOME) \
-          -I$(v8_build_dir)/gen \
-          -L$(v8_build_dir) \
-          $(v8_dylibs) \
-          -Wl,-L$(v8_build_dir) -Wl,-rpath,$(v8_build_dir) -Wl,-lpthread
-
-cxx_test_comp_cmd=${CXX} -Wall -g -O0 test/main.cc $@.cc -o $@  ./lib/gtest/libgtest.a -std=c++14 \
-	  -fno-exceptions -fno-rtti -Wcast-function-type -Wno-unused-variable \
-	  -Wno-class-memaccess -Wno-comment -Wno-unused-but-set-variable \
-	  -DV8_COMPRESS_POINTERS \
-	  -DV8_INTL_SUPPORT \
-          -I$(v8_include_dir) \
-          -I$(V8_HOME) \
-          -I$(V8_HOME)/third_party/icu/source/common/ \
-          -I$(v8_build_dir)/gen \
-          -L$(v8_build_dir) \
-          -I./deps/googletest/googletest/include \
-          $(v8_dylibs) \
-          -Wl,-L$(v8_build_dir) -Wl,-rpath,$(v8_build_dir) -Wl,-lstdc++ -Wl,-lpthread
-
-cxx_gtest_comp_cmd=${CXX} --verbose -Wall -O0 -g -c $(gtest_home)/src/gtest-all.cc \
-          -o $(gtest_home)/gtest-all.o	-std=c++14 \
-	  -fno-exceptions -fno-rtti \
-          -I$(gtest_home) \
-          -I$(gtest_home)/include
+CXXFLAGS = -Wall -g -O0 $@.cc -o $@ -std=c++14 -Wcast-function-type \
+	    -fno-exceptions -fno-rtti \
+	    -DV8_COMPRESS_POINTERS \
+            -I$(v8_include_dir) \
+            -I$(V8_HOME) \
+            -I$(v8_build_dir)/gen \
+            -L$(v8_build_dir) \
+            $(v8_dylibs) \
+            -Wl,-L$(v8_build_dir) -Wl,-rpath,$(v8_build_dir) -Wl,-lpthread
 
 define run_compile
 ${CXX} -Wall -g -O0 test/main.cc $(subst ", ,$1) $@.cc -o $@  ./lib/gtest/libgtest.a -std=c++14 \
@@ -59,39 +34,33 @@ ${CXX} -Wall -g -O0 test/main.cc $(subst ", ,$1) $@.cc -o $@  ./lib/gtest/libgte
           -Wl,-L$(v8_build_dir) -Wl,-L/usr/lib64 -Wl,-lstdc++ -Wl,-lpthread
 endef
 
-
 hello-world: hello-world.cc
-	@echo "Using v8_home = $(V8_HOME)"
-	$(cxx_comp_cmd)
-
-persistent-obj: persistent-obj.cc
-	$(cxx_comp_cmd)
+	$(CXX) ${CXXFLAGS}
 
 .PHONY: gtest-compile
+gtest-compile: CXXFLAGS = --verbose -Wall -O0 -g -c $(gtest_home)/src/gtest-all.cc \
+          -o $(gtest_home)/gtest-all.o	-std=c++14 \
+	  -fno-exceptions -fno-rtti \
+          -I$(gtest_home) \
+          -I$(gtest_home)/include
 gtest-compile: 
 	@echo "Building gtest library"
-	$(cxx_gtest_comp_cmd)
-	@mkdir $(CURDIR)/lib/gtest
-	ar -rv $(CURDIR)/lib/gtest/libgtest.a $(gtest_home)/gtest-all.o
+	${CXX} ${CXXFLAGS}
+	@mkdir -p $(CURDIR)/lib/gtest
+	${AR} -rv $(CURDIR)/lib/gtest/libgtest.a $(gtest_home)/gtest-all.o
 
-
-.PHONY: run-hello
-run-hello:
-	@LD_LIBRARY_PATH=$(v8_build_dir)/ ./hello-world
 
 .PHONY: gdb-hello
 gdb-hello:
 	@LD_LIBRARY_PATH=$(v8_build_dir)/ gdb --cd=$(v8_build_dir) --args $(CURDIR)/hello-world
 	
-
-contexts: snapshot_blob.bin contexts.cc
-	clang++ -O0 -g -I$(v8_include_dir) $(v8_dylibs) -L$(v8_build_dir) $@.cc -o $@ -pthread -std=c++0x -rpath $(v8_build_dir)
-
 instances: snapshot_blob.bin instances.cc
-	clang++ -O0 -g -fno-rtti -I$(v8_include_dir) $(v8_dylibs) -L$(v8_build_dir) $@.cc -o $@ -pthread -std=c++0x -rpath $(v8_build_dir)
-
+	${CXX} -O0 -g -fno-rtti -I$(v8_include_dir) $(v8_dylibs) \
+	       -L$(v8_build_dir) $@.cc -o $@ -pthread -std=c++0x \
+	       -Wl,-rpath,$(v8_build_dir)
+          
 run-script: run-script.cc
-	$(cxx_comp_cmd) 
+	$(CXX) ${CXXFLAGS}
 
 exceptions: snapshot_blob.bin exceptions.cc
 	clang++ -O0 -g -fno-rtti -I$(v8_include_dir) -I$(V8_HOME) $(v8_dylibs) -L$(v8_build_dir) $@.cc $(v8_src_dir)/objects-printer.cc -o $@ -pthread -std=c++0x -rpath $(v8_build_dir)
@@ -99,8 +68,22 @@ exceptions: snapshot_blob.bin exceptions.cc
 snapshot_blob.bin:
 	@cp $(v8_build_dir)/$@ .
 
+test/%: CXXFLAGS = -Wall -g -O0 test/main.cc $@.cc -o $@  ./lib/gtest/libgtest.a -std=c++14 \
+	  -fno-exceptions -fno-rtti -Wcast-function-type -Wno-unused-variable \
+	  -Wno-class-memaccess -Wno-comment -Wno-unused-but-set-variable \
+	  -DV8_COMPRESS_POINTERS \
+	  -DV8_INTL_SUPPORT \
+          -I$(v8_include_dir) \
+          -I$(V8_HOME) \
+          -I$(V8_HOME)/third_party/icu/source/common/ \
+          -I$(v8_build_dir)/gen \
+          -L$(v8_build_dir) \
+          -I./deps/googletest/googletest/include \
+          $(v8_dylibs) \
+          -Wl,-L$(v8_build_dir) -Wl,-rpath,$(v8_build_dir) -Wl,-lstdc++ -Wl,-lpthread
+
 test/%: test/%.cc
-	$(cxx_test_comp_cmd)
+	${CXX} ${CXXFLAGS}
 
 test/map_test:
 	$(call run_compile, "${v8_build_dir}/obj/v8_base_without_compiler/map.o")
