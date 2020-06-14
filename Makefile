@@ -1,18 +1,17 @@
 V8_HOME ?= /home/danielbevenius/work/google/v8_src/v8
 
-v8_build_dir = $(V8_HOME)/out/x64.release_gcc
+v8_build_dir := $(V8_HOME)/out/x64.release_gcc
 ### The following is a build using clang which seems to work better with lldb
 #v8_build_dir = $(V8_HOME)/out/x64.debug
 
-current_dir=$(shell pwd)
-gtest_home = $(current_dir)/deps/googletest/googletest
+gtest_home := $(CURDIR)/deps/googletest/googletest
 
-v8_include_dir = $(V8_HOME)/include
-v8_src_dir = $(V8_HOME)/src
-v8_gen_dir = $(v8_build_dir)/gen
-v8_dylibs=-lv8 -lv8_libplatform -lv8_libbase
+v8_include_dir := $(V8_HOME)/include
+v8_src_dir := $(V8_HOME)/src
+v8_gen_dir := $(v8_build_dir)/gen
+v8_dylibs :=-lv8 -lv8_libplatform -lv8_libbase
 
-objs = $(patsubst %.cc, %,  $(wildcard test/*.cc))
+objs := $(patsubst %.cc, %,  $(wildcard test/*.cc))
 
 cxx_comp_cmd=g++ -Wall -g -O0 $@.cc -o $@ -std=c++14 -Wcast-function-type \
 	  -fno-exceptions -fno-rtti \
@@ -72,8 +71,8 @@ persistent-obj: persistent-obj.cc
 gtest-compile: 
 	@echo "Building gtest library"
 	$(cxx_gtest_comp_cmd)
-	@mkdir $(current_dir)/lib/gtest
-	ar -rv $(current_dir)/lib/gtest/libgtest.a $(gtest_home)/gtest-all.o
+	@mkdir $(CURDIR)/lib/gtest
+	ar -rv $(CURDIR)/lib/gtest/libgtest.a $(gtest_home)/gtest-all.o
 
 
 .PHONY: run-hello
@@ -82,7 +81,7 @@ run-hello:
 
 .PHONY: gdb-hello
 gdb-hello:
-	@LD_LIBRARY_PATH=$(v8_build_dir)/ gdb --cd=$(v8_build_dir) --args $(current_dir)/hello-world
+	@LD_LIBRARY_PATH=$(v8_build_dir)/ gdb --cd=$(v8_build_dir) --args $(CURDIR)/hello-world
 	
 
 contexts: snapshot_blob.bin contexts.cc
@@ -109,11 +108,11 @@ test/map_test:
 test/builtins_test:
 	$(call run_compile, "${v8_build_dir}/obj/v8_base_without_compiler/builtins.o ${v8_build_dir}/obj/v8_base_without_compiler/code.o ")
 
-V8_TORQUE_BUILTINS_FILES=$(addprefix src/builtins/,$(notdir $(wildcard $(V8_HOME)/src/builtins/*.tq)))
-V8_TORQUE_OBJECTS_FILES=$(addprefix src/objects/,$(notdir $(wildcard $(V8_HOME)/src/objects/*.tq)))
-V8_TORQUE_WASM_FILES=$(addprefix src/wasm/,$(notdir $(wildcard $(V8_HOME)/src/wasm/*.tq)))
-V8_TORQUE_TP_FILES=$(addprefix src/third_party/,$(notdir $(wildcard $(V8_HOME)/src/third_party/*.tq)))
-V8_TORQUE_TEST_FILES=$(addprefix test/torque/,$(notdir $(wildcard $(V8_HOME)/test/torque/*.tq)))
+V8_TORQUE_BUILTINS_FILES:=$(addprefix src/builtins/,$(notdir $(wildcard $(V8_HOME)/src/builtins/*.tq)))
+V8_TORQUE_OBJECTS_FILES:=$(addprefix src/objects/,$(notdir $(wildcard $(V8_HOME)/src/objects/*.tq)))
+V8_TORQUE_WASM_FILES:=$(addprefix src/wasm/,$(notdir $(wildcard $(V8_HOME)/src/wasm/*.tq)))
+V8_TORQUE_TP_FILES:=$(addprefix src/third_party/,$(notdir $(wildcard $(V8_HOME)/src/third_party/*.tq)))
+V8_TORQUE_TEST_FILES:=$(addprefix test/torque/,$(notdir $(wildcard $(V8_HOME)/test/torque/*.tq)))
 
 torque-example: torque-example.tq
 	@mkdir -p gen/torque-generated
@@ -131,4 +130,4 @@ torque-example: torque-example.tq
 .PHONY: clean
 
 clean: 
-	@rm -f $(objs) hello-world
+	@${RM} $(objs) hello-world
