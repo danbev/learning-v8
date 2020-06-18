@@ -18,22 +18,6 @@ CXXFLAGS = -Wall -g -O0 $@.cc -o $@ -std=c++14 -Wcast-function-type \
             $(v8_dylibs) \
             -Wl,-L$(v8_build_dir) -Wl,-rpath,$(v8_build_dir) -Wl,-lpthread
 
-define run_compile
-${CXX} -Wall -g -O0 test/main.cc $(subst ", ,$1) $@.cc -o $@  ./lib/gtest/libgtest.a -std=c++14 \
-	  -fno-exceptions -fno-rtti -Wcast-function-type -Wno-unused-variable \
-	  -Wno-class-memaccess -Wno-comment -Wno-unused-but-set-variable \
-	  -DV8_INTL_SUPPORT \
-	  -DV8_COMPRESS_POINTERS \
-          -I$(v8_include_dir) \
-          -I$(V8_HOME) \
-          -I$(V8_HOME)/third_party/icu/source/common/ \
-          -I$(v8_build_dir)/gen \
-          -L$(v8_build_dir) \
-          -I./deps/googletest/googletest/include \
-          $(v8_dylibs) \
-          -Wl,-L$(v8_build_dir) -Wl,-L/usr/lib64 -Wl,-lstdc++ -Wl,-lpthread
-endef
-
 hello-world: hello-world.cc
 	$(CXX) ${CXXFLAGS}
 
@@ -85,11 +69,24 @@ test/%: CXXFLAGS = -Wall -g -O0 test/main.cc $@.cc -o $@  ./lib/gtest/libgtest.a
 test/%: test/%.cc
 	${CXX} ${CXXFLAGS}
 
-test/map_test:
-	$(call run_compile, "${v8_build_dir}/obj/v8_base_without_compiler/map.o")
+test/map_test: obj_files:="${v8_build_dir}/obj/v8_base_without_compiler/map.o"
+test/builtins_test: obj_files:="${v8_build_dir}/obj/v8_base_without_compiler/builtins.o ${v8_build_dir}/obj/v8_base_without_compiler/code.o"
+test/map_test test/builtins_test:
+	${CXX} -Wall -g -O0 test/main.cc $(subst ", ,${obj_files}) $@.cc -o $@ \
+	./lib/gtest/libgtest.a -std=c++14 \
+	-fno-exceptions -fno-rtti -Wcast-function-type -Wno-unused-variable \
+	-Wno-class-memaccess -Wno-comment -Wno-unused-but-set-variable \
+	-DV8_INTL_SUPPORT \
+	-DV8_COMPRESS_POINTERS \
+	-I$(v8_include_dir) \
+	-I$(V8_HOME) \
+	-I$(V8_HOME)/third_party/icu/source/common/ \
+	-I$(v8_build_dir)/gen \
+	-L$(v8_build_dir) \
+	-I./deps/googletest/googletest/include \
+	$(v8_dylibs) \
+	-Wl,-L$(v8_build_dir) -Wl,-rpath,$(v8_build_dir) -Wl,-L/usr/lib64 -Wl,-lstdc++ -Wl,-lpthread
 
-test/builtins_test:
-	$(call run_compile, "${v8_build_dir}/obj/v8_base_without_compiler/builtins.o ${v8_build_dir}/obj/v8_base_without_compiler/code.o ")
 
 V8_TORQUE_BUILTINS_FILES:=$(addprefix src/builtins/,$(notdir $(wildcard $(V8_HOME)/src/builtins/*.tq)))
 V8_TORQUE_OBJECTS_FILES:=$(addprefix src/objects/,$(notdir $(wildcard $(V8_HOME)/src/objects/*.tq)))
