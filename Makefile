@@ -105,7 +105,7 @@ torque-example: torque-example.tq
 		$(V8_TORQUE_TP_FILES) \
 		$(V8_TORQUE_TEST_FILES) \
 		$<
-	@rm $(V8_HOME)/$<
+	@${RM} $(V8_HOME)/$<
 
 .PHONY: clean
 
