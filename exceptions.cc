@@ -14,7 +14,7 @@ Isolate* isolate;
 int age = 41;
 
 void doit(const FunctionCallbackInfo<Value>& args) {
-    String::Utf8Value str(args[0]);
+    String::Utf8Value str(args.GetIsolate(), args[0]);
     printf("doit argument = %s...\n", *str);
     args.GetReturnValue().Set(String::NewFromUtf8(args.GetIsolate(), "done", NewStringType::kNormal).ToLocalChecked());
 }
@@ -24,27 +24,26 @@ void ageGetter(Local<String> property, const PropertyCallbackInfo<Value>& info) 
 }
 
 void ageSetter(Local<String> property, Local<Value> value, const PropertyCallbackInfo<void>& info) {
-    age = value->Int32Value();
+    age = value->Int32Value(info.GetIsolate()->GetCurrentContext()).FromJust();
 }
 
 void propertyListener(Local<String> name, const PropertyCallbackInfo<Value>& info) {
-    String::Utf8Value utf8_value(name);
+    String::Utf8Value utf8_value(info.GetIsolate(), name);
     std::string key = std::string(*utf8_value);
     printf("ageListener called for nam %s.\n", key.c_str());
 }
 
 static void OnMessage(Local<Message> message, Local<Value> error) {
   printf("OnMessage message: \n");
-  printf("LineNumber: %d\n", message->GetLineNumber());
+  printf("LineNumber: %d\n",
+      message->GetLineNumber(isolate->GetCurrentContext()).FromJust());
   printf("StartPosistion: %d\n", message->GetStartPosition());
   printf("ErrorLevel: %d\n", message->ErrorLevel());
   message->PrintCurrentStackTrace(isolate, stdout);
-  Local<Value> scriptName = message->GetScriptResourceName();
-  auto name = *scriptName;
   
   printf("\nOnMessage error: ");
   _v8_internal_Print_Object(*error);
-  printf("Length: %s\n", *String::Utf8Value(error));
+  printf("Length: %s\n", *String::Utf8Value(isolate, error));
   printf("\n");
 }
 
@@ -56,8 +55,8 @@ static void OnFatalError(const char* location, const char* message) {
 
 int main(int argc, char* argv[]) {
   V8::InitializeExternalStartupData(argv[0]);
-  Platform* platform = platform::CreateDefaultPlatform();
-  V8::InitializePlatform(platform);
+  std::unique_ptr<Platform> platform = platform::NewDefaultPlatform();
+  V8::InitializePlatform(platform.get());
   V8::Initialize();
 
   Isolate::CreateParams create_params;
@@ -81,8 +80,8 @@ int main(int argc, char* argv[]) {
     MaybeLocal<Value> result = script->Run(context);
 
     if (try_catch.HasCaught()) {
-      printf("Caught: %s\n", *String::Utf8Value(try_catch.Exception()));
-      Local<Value> stack = try_catch.StackTrace(context).ToLocalChecked();
+      printf("Caught: %s\n", *String::Utf8Value(isolate, try_catch.Exception()));
+      //Local<Value> stack = try_catch.StackTrace(context).ToLocalChecked();
       //printf("StackFrames: %d\n", *(stack)->GetFrameCount());
     }
     
@@ -94,6 +93,5 @@ int main(int argc, char* argv[]) {
   isolate->Dispose();
   V8::Dispose();
   V8::ShutdownPlatform();
-  delete platform;
   return 0;
 }

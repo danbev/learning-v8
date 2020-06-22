@@ -47,7 +47,7 @@ run-script: run-script.cc
 	$(CXX) ${CXXFLAGS}
 
 exceptions: snapshot_blob.bin exceptions.cc
-	clang++ -O0 -g -fno-rtti -I$(v8_include_dir) -I$(V8_HOME) $(v8_dylibs) -L$(v8_build_dir) $@.cc $(v8_src_dir)/objects-printer.cc -o $@ -pthread -std=c++0x -rpath $(v8_build_dir)
+	${CXX} ${CXXFLAGS}
 
 snapshot_blob.bin:
 	@cp $(v8_build_dir)/$@ .
