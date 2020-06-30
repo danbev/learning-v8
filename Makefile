@@ -39,9 +39,7 @@ gdb-hello:
 	@LD_LIBRARY_PATH=$(v8_build_dir)/ gdb --cd=$(v8_build_dir) --args $(CURDIR)/hello-world
 	
 instances: snapshot_blob.bin instances.cc
-	${CXX} -O0 -g -fno-rtti -I$(v8_include_dir) $(v8_dylibs) \
-	       -L$(v8_build_dir) $@.cc -o $@ -pthread -std=c++0x \
-	       -Wl,-rpath,$(v8_build_dir)
+	${CXX} ${CXXFLAGS}
           
 run-script: run-script.cc
 	$(CXX) ${CXXFLAGS}

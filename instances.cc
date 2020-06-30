@@ -24,7 +24,7 @@ class Person {
 };
 
 void NewPerson(const FunctionCallbackInfo<Value>& args) {
-    String::Utf8Value str(args[0]);
+    String::Utf8Value str(args.GetIsolate(), args[0]);
     Person *p = new Person(*str);
     std::cout << "Created new Person(" << p->name() << ")" << std::endl;
     Local<Object> self = args.Holder();
@@ -40,10 +40,8 @@ void GetName(Local<String> property, const PropertyCallbackInfo<Value>& info) {
 }
 
 int main(int argc, char* argv[]) {
-    V8::InitializeExternalStartupData(argv[0]);
-
-    Platform* platform = platform::CreateDefaultPlatform();
-    V8::InitializePlatform(platform);
+    std::unique_ptr<Platform> platform = platform::NewDefaultPlatform();
+    V8::InitializePlatform(platform.get());
     V8::Initialize();
 
     Isolate::CreateParams create_params;
@@ -56,9 +54,10 @@ int main(int argc, char* argv[]) {
         Local<ObjectTemplate> global = ObjectTemplate::New(isolate);
 
         Local<FunctionTemplate> function_template = FunctionTemplate::New(isolate, NewPerson);
-        function_template->SetClassName(String::NewFromUtf8(isolate, "Person"));
+        function_template->SetClassName(String::NewFromUtf8(isolate, "Person").ToLocalChecked());
         function_template->InstanceTemplate()->SetInternalFieldCount(1);
-        function_template->InstanceTemplate()->SetAccessor(String::NewFromUtf8(isolate, "name"), GetName, nullptr);
+        function_template->InstanceTemplate()->SetAccessor(
+            String::NewFromUtf8(isolate, "name").ToLocalChecked(),GetName, nullptr);
 
         Local<ObjectTemplate> person_template = ObjectTemplate::New(isolate, function_template);
         person_template->SetInternalFieldCount(1);
@@ -73,7 +72,7 @@ int main(int argc, char* argv[]) {
 
         Local<Script> script = Script::Compile(context, source).ToLocalChecked();
         Local<Value> result = script->Run(context).ToLocalChecked();
-        String::Utf8Value utf8(result);
+        String::Utf8Value utf8(isolate, result);
         printf("Script return value: %s\n", *utf8);
     }
 
@@ -81,6 +80,5 @@ int main(int argc, char* argv[]) {
     isolate->Dispose();
     V8::Dispose();
     V8::ShutdownPlatform();
-    delete platform;
     return 0;
 }
