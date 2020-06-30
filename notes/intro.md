@@ -68,6 +68,8 @@ In Node.js `setTimeout` and `setInterval`...
 Is a function that is executed after current function has run after all the
 other functions that are currently on the call stack.
 
+An example can be found in [microtask_test](./test/microtask_test.cc).
+
 
 #### Microtask queue
 When a promise is created it will execute right away and if it has been resovled
