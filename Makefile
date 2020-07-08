@@ -67,9 +67,10 @@ test/%: CXXFLAGS = -Wall -g -O0 test/main.cc $@.cc -o $@  ./lib/gtest/libgtest.a
 test/%: test/%.cc test/v8_test_fixture.h
 	${CXX} ${CXXFLAGS}
 
+test/isolate_test: obj_files:="${v8_build_dir}/obj/v8_base_without_compiler/snapshot.o"
 test/map_test: obj_files:="${v8_build_dir}/obj/v8_base_without_compiler/map.o"
 test/builtins_test: obj_files:="${v8_build_dir}/obj/v8_base_without_compiler/builtins.o ${v8_build_dir}/obj/v8_base_without_compiler/code.o"
-test/map_test test/builtins_test:
+test/map_test test/builtins_test test/isolate_test: test/map_test.cc test/builtins_test.cc test/isolate_test.cc
 	${CXX} -Wall -g -O0 test/main.cc $(subst ", ,${obj_files}) $@.cc -o $@ \
 	./lib/gtest/libgtest.a -std=c++14 \
 	-fno-exceptions -fno-rtti -Wcast-function-type -Wno-unused-variable \

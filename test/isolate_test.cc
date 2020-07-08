@@ -1,19 +1,23 @@
 #include <iostream>
+#include <cstdio>
 #include "gtest/gtest.h"
 #include "v8.h"
 #include "libplatform/libplatform.h"
 #include "v8_test_fixture.h"
 #include "src/execution/isolate.h"
 #include "src/execution/isolate-inl.h"
+#include "src/api/api-inl.h"
 
 using namespace v8;
 namespace i = v8::internal;
 
-class IsolateTest : public V8TestFixture {};
+class IsolateTest : public V8TestFixture {
+
+};
 
 TEST_F(IsolateTest, Members) {
-  const v8::HandleScope handle_scope(isolate_);
   Isolate::Scope isolate_scope(isolate_);
+  const v8::HandleScope handle_scope(isolate_);
   i::Isolate* i_isolate = asInternal(isolate_);
 
   i::RootsTable& roots_table = i_isolate->roots_table();
@@ -62,4 +66,25 @@ TEST_F(IsolateTest, Members) {
   i::Map free_space_map = ro_roots.free_space_map();
   std::cout << "free_space_map instance size: " << free_space_map.instance_size() << '\n';
   i::Handle<i::Map> free_space_map_handle = ro_roots.free_space_map_handle();
+
+  Local<ObjectTemplate> global = ObjectTemplate::New(isolate_);
+  Local<Context> context = Context::New(isolate_, NULL, global);
+  Context::Scope context_scope(context);
+
+  // HandleScope
+  i::HandleScopeData* h_data = i_isolate->handle_scope_data();
+
+  i::Map m = ro_roots.object_template_info_map();
+  i::InstanceType type = m.instance_type();
+  std::cout << "m type " << type << '\n';
+
+  // Map
+  i::Address object_ptr = reinterpret_cast<i::Address>(*global);
+  i::HeapObject heap_obj = i::HeapObject::FromAddress(object_ptr);
+  //i::Map heap_map = heap_obj.map();
+  //std::cout << "heap_map type " << heap_map.instance_type() << '\n';
+
+  //i::ObjectSlot map_slot = heap_map.map_slot();
+  //i::MapWord map_word = heap_map.map_word();
+
 }
