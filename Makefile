@@ -64,7 +64,7 @@ test/%: CXXFLAGS = -Wall -g -O0 test/main.cc $@.cc -o $@  ./lib/gtest/libgtest.a
           $(v8_dylibs) \
           -Wl,-L$(v8_build_dir) -Wl,-rpath,$(v8_build_dir) -Wl,-lstdc++ -Wl,-lpthread
 
-test/%: test/%.cc
+test/%: test/%.cc test/v8_test_fixture.h
 	${CXX} ${CXXFLAGS}
 
 test/map_test: obj_files:="${v8_build_dir}/obj/v8_base_without_compiler/map.o"
