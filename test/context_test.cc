@@ -3,18 +3,18 @@
 #include "v8.h"
 #include "libplatform/libplatform.h"
 #include "v8_test_fixture.h"
-#include "src/objects.h"
-#include "src/objects-inl.h"
-#include "src/api.h"
+#include "src/objects/objects.h"
+#include "src/objects/objects-inl.h"
+#include "src/api/api.h"
 
 class ContextTest : public V8TestFixture {
 };
 
 TEST_F(ContextTest, Scopes) {
   const v8::Local<v8::ObjectTemplate> obt = v8::Local<v8::ObjectTemplate>();
-  const v8::HandleScope handle_scope(V8TestFixture::isolate_);
+  const v8::HandleScope handle_scope(isolate_);
   {
-    v8::Handle<v8::Context> context1 = v8::Context::New(V8TestFixture::isolate_, nullptr, obt);
+    v8::Handle<v8::Context> context1 = v8::Context::New(isolate_, nullptr, obt);
     v8::Context::Scope contextScope1(context1);
     // entered_contexts_ [context1], saved_contexts_[isolateContext]
     EXPECT_EQ(context1, V8TestFixture::isolate_->GetEnteredContext());
@@ -39,8 +39,8 @@ TEST_F(ContextTest, ExtensionConfiguration) {
   const char* name = "mock";
   const char* names[] = {name};
 
-  std::unique_ptr<MockExtension> mock_extension {new MockExtension{name}};
-  v8::RegisterExtension(mock_extension.get());
+  std::unique_ptr<v8::Extension> mock_extension {new MockExtension{name}};
+  v8::RegisterExtension(std::move(mock_extension));
   std::unique_ptr<v8::ExtensionConfiguration> ext{new v8::ExtensionConfiguration(1, names)};
   bool found = false;
   v8::Handle<v8::Context> context = v8::Context::New(isolate_,
@@ -62,10 +62,7 @@ TEST_F(ContextTest, EmbedderData) {
                                          nullptr,
                                          v8::Local<v8::ObjectTemplate>());
   
-  v8::Local<v8::String> str = v8::String::NewFromOneByte(isolate_, 
-      reinterpret_cast<const uint8_t*>("embdata"),
-      v8::NewStringType::kNormal,
-      7).ToLocalChecked();
+  v8::Local<v8::String> str = v8::String::NewFromUtf8Literal(isolate_, "embdata");
   context->SetEmbedderData(0, str);
   EXPECT_EQ(context->GetEmbedderData(0), str);
 
@@ -73,7 +70,7 @@ TEST_F(ContextTest, EmbedderData) {
                                           nullptr,
                                           v8::Local<v8::ObjectTemplate>());
   // Note that the embedder data FixedArray is of length 3 initially and
-  // and not zeroed out, wo we can't just check for null which I was my 
+  // and not zeroed out, so we can't just check for null which was my
   // first thought. This is mainly to verify that context are indeed separate.
   EXPECT_NE(context2->GetEmbedderData(0), str);
 }
