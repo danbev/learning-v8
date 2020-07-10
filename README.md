@@ -19,6 +19,7 @@ The sole purpose of this project is to aid me in leaning Google's V8 JavaScript 
 1. [Torque](#torque)
 1. [WebAssembly](#webassembly)
 1. [Promises](./notes/promises.md)
+1. [Snapshots](./notes/snapshots.md)
 1. [V8 Build artifacts](#v8-build-artifacts)
 1. [V8 Startup walkthrough](#startup-walk-through)
 1. [Building V8](#building-v8)
@@ -1202,27 +1203,6 @@ default. [i18n-support](https://github.com/v8/v8/wiki/i18n-support) says that ev
 not use ICU you still need to call InitializeICU :
 
     V8::InitializeICU();
-
-### Snapshot
-JavaScript specifies a lot of built-in functionality which every V8 context must provide.
-For example, you can run Math.PI and that will work in a JavaScript console/repl.
-The global object and all the built-in functionality must be setup and initialized
-into the V8 heap. This can be time consuming and affect runtime performance if
-this has to be done every time. 
-
-Now this is where the file `snapshot_blob.bin` comes into play. 
-But what are this bin file?  
-The blobs above are prepared snapshots that get directly deserialized into the
-heap to provide an initilized context.
-
-There is an executable named `mksnapshot` which is defined in 
-`src/snapshot/mksnapshot.c`. 
-
-When V8 is built with `v8_use_external_startup_data` the build process will
-create a snapshot_blob.bin file using a template in BUILD.gn named `run_mksnapshot`
-, but if false it will generate a file named snapshot.cc. 
-
-
 
 ### Local
 
