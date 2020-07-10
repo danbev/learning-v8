@@ -47,4 +47,8 @@ int FlagList::SetFlagsFromCommandLine(int* argc, char** argv, bool remove_flags)
 So even if we specify `--help`` the usage string for snapshot will not be
 printed. As a suggetion I've created
 https://chromium-review.googlesource.com/c/v8/v8/+/2290852 to fix this.
-
+With this change `--help`will print the usage message:
+```console
+$ ./out/x64.release_gcc/mksnapshot --help | head -n 1
+Usage: ./out/x64.release_gcc/mksnapshot --startup_src=... --startup_blob=... [extras]
+```
