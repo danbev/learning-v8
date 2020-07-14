@@ -44,3 +44,4 @@ test/property_descriptor_test
 test/symbol_test
 test/arraybuffer_test
 gen
+snapshot_test

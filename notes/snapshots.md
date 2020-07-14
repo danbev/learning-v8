@@ -20,6 +20,7 @@ There is an executable named `mksnapshot` which is defined in
 `src/snapshot/mksnapshot.cc`. This can be executed on the command line:
 ```console
 $ mksnapshot --help
+Usage: ./out/x64.release_gcc/mksnapshot [--startup-src=file] [--startup-blob=file] [--embedded-src=file] [--embedded-variant=label] [--target-arch=arch] [--target-os=os] [extras]
 ```
 But the strange things is that the usage is never printed, instead the normal
 V8/D8 options. If we look in `src/snapshot/snapshot.cc` we can see:
@@ -46,9 +47,174 @@ int FlagList::SetFlagsFromCommandLine(int* argc, char** argv, bool remove_flags)
 ```
 So even if we specify `--help`` the usage string for snapshot will not be
 printed. As a suggetion I've created
-https://chromium-review.googlesource.com/c/v8/v8/+/2290852 to fix this.
+https://chromium-review.googlesource.com/c/v8/v8/+/2290852 to address this.
+
 With this change `--help`will print the usage message:
 ```console
 $ ./out/x64.release_gcc/mksnapshot --help | head -n 1
 Usage: ./out/x64.release_gcc/mksnapshot --startup_src=... --startup_blob=... [extras]
 ```
+
+What mksnapshot does is much the same start up of a normal V8 application, it
+has to initialize V8 itself (`src/snapshot/snapshot.cc`):
+```c++
+  v8::V8::InitializeICUDefaultLocation(argv[0]);
+  std::unique_ptr<v8::Platform> platform = v8::platform::NewDefaultPlatform();
+  v8::V8::InitializePlatform(platform.get());
+  v8::V8::Initialize();
+```
+Notice that this is just was we have in [hello-world](../hello-world.cc) or
+in [v8_test_fixture.h](../test/v8_test_fixture.h).
+
+Next, we have:
+```c++
+  SnapshotFileWriter snapshot_writer;
+  snapshot_writer.SetSnapshotFile(i::FLAG_startup_src);
+  snapshot_writer.SetStartupBlobFile(i::FLAG_startup_blob);
+```
+`i::FLAG_startup_src` is defined in `src/flags/flag-definitions.h`:
+```c++
+DEFINE_STRING(startup_src, nullptr,
+              "Write V8 startup as C++ src. (mksnapshot only)")
+
+#define DEFINE_STRING(nam, def, cmt) FLAG(STRING, const char*, nam, def, cmt)
+
+#undef FLAG
+#ifdef ENABLE_GDB_JIT_INTERFACE
+#define FLAG FLAG_FULL
+#else
+#define FLAG FLAG_READONLY
+#endif
+
+#define FLAG_FULL(ftype, ctype, nam, def, cmt) \
+  V8_EXPORT_PRIVATE extern ctype FLAG_##nam;
+
+#define FLAG_READONLY(ftype, ctype, nam, def, cmt) \
+  static constexpr ctype FLAG_##nam = def;
+```
+So the above macro would be expanded by the preprocessor into:
+```c
+  V8_EXPORT_PRIVATE extern const char* FLAG_startup_src;
+```
+
+### How V8 creates a snapshot
+The mksnapshot executable takes a number of arguments on of which is the target
+os which can be differnt from the host os. Examples of targets can be found
+in `BUILD.gn` and are `android`, `fuchsia`, `ios`, `linux`, `mac`, and `win`.
+
+
+There is a template named `run_mksnapshot` in `BUILD.gn` that shows how
+mksnapshot is called.
+
+If `v8_use_external_startup_data` is set in args.gn, the option `--startup_blob`
+will be passed to mksnapshot:
+```console
+  if (v8_use_external_startup_data) {
+      outputs += [ "$root_out_dir/snapshot_blob${suffix}.bin" ]
+      data += [ "$root_out_dir/snapshot_blob${suffix}.bin" ]
+      args += [
+        "--startup_blob",
+        rebase_path("$root_out_dir/snapshot_blob${suffix}.bin", root_build_dir),
+      ]
+```
+And this binary file can then be deserialized. If `v8_use_external_startup_data`
+if not set the `--startup_src` will be passed instread:
+```
+  } else {
+      outputs += [ "$target_gen_dir/snapshot${suffix}.cc" ]
+      args += [
+        "--startup_src",
+        rebase_path("$target_gen_dir/snapshot${suffix}.cc", root_build_dir),
+      ]
+    }
+```
+To see what is actually getting used on when building one can look at the file
+`out/x64.release_gcc/toolchain.ninja`:
+```console
+rule ___run_mksnapshot_default___build_toolchain_linux_x64__rule
+  command = python ../../tools/run.py ./mksnapshot --turbo_instruction_scheduling 
+    --target_os=linux 
+    --target_arch=x64 
+    --embedded_src gen/embedded.S 
+    --embedded_variant Default 
+    --random-seed 314159265 
+    --startup_src gen/snapshot.cc 
+    --native-code-counters 
+    --verify-heap
+  description = ACTION //:run_mksnapshot_default(//build/toolchain/linux:x64)
+  restat = 1
+  pool = build_toolchain_action_pool
+```
+
+### startup-src
+This option will specifies a path to a c++ source file that will be generated
+by mksnapshot, for example:
+```console
+$ ../v8_src/v8/out/x64.release_gcc/mksnapshot --startup_src=gen/example_snapshot.cc
+```
+After this we can inspect `gen/example_snapshot.cc` which will contain the
+serialized snapshot in a byte array named `blob_data`.
+```c++
+#include "src/snapshot/snapshot.h"
+
+namespace v8 {
+namespace internal {
+
+alignas(kPointerAlignment) static const byte blob_data[] = {
+  ...
+};
+static const int blob_size = 133115;
+static const v8::StartupData blob = { (const char*) blob_data, blob_size };
+const v8::StartupData* Snapshot::DefaultSnapshotBlob() {
+  return &blob;
+}
+```
+This file is generated by `MaybeWriteSnapshotFile`.
+
+### startup-blob
+This is also a command line options that can be passed to `mksnapshot` which 
+will generate a binary file in the path specified. Note that this can be specified
+in addition to `startup-src` which I was not aware of:
+```
+$ ../v8_src/v8/out/x64.release_gcc/mksnapshot --startup_src=gen/example-snapshot.cc --startup-blob=gen/example-blob.bin
+$ ls -l -h gen/example-blob.bin
+-rw-rw-r--. 1 danielbevenius danielbevenius 130K Jul 14 09:52 gen/example-blob.bin
+```
+This binary can then be specified using:
+```c++
+  V8::InitializeExternalStartupDataFromFile("../gen/example-blob.bin");
+```
+
+`src/init/startup-data-util.cc` contains the implementation for this and notice
+that it is guarded by a macro:
+```c++
+void InitializeExternalStartupDataFromFile(const char* snapshot_blob) {
+#ifdef V8_USE_EXTERNAL_STARTUP_DATA
+  LoadFromFile(snapshot_blob);
+#endif  // V8_USE_EXTERNAL_STARTUP_DATA
+}
+```
+So we need to make sure that we have set `v8_use_external_startup_data` to true
+in `args.gn` and rebuild v8.
+
+There is an example, [snapshot_test](./test/snapshot_test.cc) that explores
+using the binary blob.
+
+### embedded-src
+This is also a command line options that can be passed to `mksnapshot`.
+```console
+$ ../v8_src/v8/out/x64.release_gcc/mksnapshot --startup_src=gen/example-snapshot.cc --startup-blob=gen/example-blob.bin --embedded-src=gen/example-embedded.S
+```
+`src/snapshot/embedded/embedded-file-writer.h` declares the class responsible
+for generating this file.
+How is this file used?  
+
+### embed-script
+Not to be confused with `embedded-src` this is any extra javascript that can
+be passed as the `extra` option argument on the command line to mksnapshot.
+```console
+$ ../v8_src/v8/out/x64.release_gcc/mksnapshot --startup_src=gen/example-snapshot.cc --startup-blob=gen/example-blob.bin --embedded-src=gen/example-embedded.S lib/embed-script.js
+Loading script for embedding: lib/embed-script.js
+```
+
+
