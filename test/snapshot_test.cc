@@ -67,7 +67,7 @@ TEST(SnapshotTest, CreateSnapshot) {
   isolate = Isolate::New(create_params);
   {
     HandleScope scope(isolate);
-    Local<Context> context = Context::New(isolate);
+    Local<Context> context = Context::FromSnapshot(isolate, 0).ToLocalChecked();
     Context::Scope context_scope(context);
     TryCatch try_catch(isolate);
     const char* js = "test_snapshot();";
