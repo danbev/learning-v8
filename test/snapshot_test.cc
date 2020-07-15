@@ -5,8 +5,6 @@
 
 using namespace v8;
 
-extern void _v8_internal_Print_Object(void* object);
-
 TEST(SnapshotTest, CreateSnapshot) {
   v8::V8::SetFlagsFromString("--random_seed=42");
   std::unique_ptr<Platform> platform = platform::NewDefaultPlatform();
@@ -32,7 +30,7 @@ TEST(SnapshotTest, CreateSnapshot) {
           return 'from test_snapshot function';
         })";
         Local<v8::String> src = String::NewFromUtf8(isolate, js).ToLocalChecked();
-        ScriptOrigin origin(String::NewFromUtf8Literal(isolate, "test_snapshot"));
+        ScriptOrigin origin(String::NewFromUtf8Literal(isolate, "function"));
         ScriptCompiler::Source source(src, origin);                     
         Local<v8::Script> script;
         EXPECT_TRUE(ScriptCompiler::Compile(context, &source).ToLocal(&script));
@@ -72,7 +70,7 @@ TEST(SnapshotTest, CreateSnapshot) {
     // Add JavaScript code that calls the function we added previously.
     const char* js = "test_snapshot();";
     Local<v8::String> src = String::NewFromUtf8(isolate, js).ToLocalChecked();
-    ScriptOrigin origin(String::NewFromUtf8Literal(isolate, "test_snapshot"));
+    ScriptOrigin origin(String::NewFromUtf8Literal(isolate, "usage"));
     ScriptCompiler::Source source(src, origin);                     
     Local<v8::Script> script;
     EXPECT_TRUE(ScriptCompiler::Compile(context, &source).ToLocal(&script));
