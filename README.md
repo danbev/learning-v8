@@ -59,13 +59,13 @@ class V8_EXPORT Data {
   Data();                                                                       
 };
 ```
-Template does not have any members/fields, it only declared functions.
+Template does not have any members/fields, it only declares functions.
 
 We create an instance of ObjectTemplate and we can add properties to it that
 all instance created using this ObjectTemplate instance will have. This is done
-by calling Set which is member of the Template class. You specify a Local<Name>
-for the property. Name is a superclass for Symbols and Strings which can be both
-be used as names for a property.
+by calling `Set` which is member of the `Template` class. You specify a
+Local<Name> for the property. `Name` is a superclass for `Symbol` and `String`
+which can be both be used as names for a property.
 
 The implementation for `Set` can be found in `src/api/api.cc`:
 ```c++
@@ -104,7 +104,7 @@ Function::Call can be found in `src/api/api.cc`:
   has_pending_exception = !ToLocal<Value>(                                           
       i::Execution::Call(isolate, self, recv_obj, argc, args), &result);
 ```
-Notice that the result of `Call` which is a `MaybeHandle<Object>` will be
+Notice that the return value of `Call` which is a `MaybeHandle<Object>` will be
 passed to ToLocal<Value> which is defined in `api.h`:
 ```c++
 template <class T>                                                              
@@ -122,7 +122,8 @@ and it calls:
 ```c++
 return Invoke(isolate, InvokeParams::SetUpForCall(isolate, callable, receiver, argc, argv));
 ```
-`SetUpForCall` will return an `InvokeParams`. TODO: Take a closer look at InvokeParams.
+`SetUpForCall` will return an `InvokeParams`.
+TODO: Take a closer look at InvokeParams.
 ```c++
 V8_WARN_UNUSED_RESULT MaybeHandle<Object> Invoke(Isolate* isolate,              
                                                  const InvokeParams& params) {
@@ -146,7 +147,7 @@ result = HandleApiCallHelper<false>(isolate, function, new_target,
                                     fun_data, receiver, arguments);
 ```
 
-api-arguments-inl.h has 
+`api-arguments-inl.h` has:
 ```c++
 FunctionCallbackArguments::Call(CallHandlerInfo handler) {
   ...
@@ -178,7 +179,7 @@ do {
 } while (false);
 ```
 Notice that if there was an exception an empty object is returned.
-Later in `Invoke` execution.cc 
+Later in `Invoke` in `execution.cc`a:
 ```c++
   auto value = Builtins::InvokeApiFunction(                                 
           isolate, params.is_construct, function, receiver, params.argc,        
@@ -234,7 +235,7 @@ and it calls:
 ```c++
 return Invoke(isolate, InvokeParams::SetUpForCall(isolate, callable, receiver, argc, argv));
 ```
-`InvokeParams` is a struct in execution.cc which has a few static functions
+`InvokeParams` is a struct in `execution.cc` which has a few static functions
 (one being `SetupForCall`) and also the following fields:
 ```
 Handle<Object> target;                                                        
@@ -255,7 +256,7 @@ Related to exception handling is:
 ```c++
 params.message_handling = Execution::MessageHandling::kReport;
 ```
-So with that out of the way lets focos on the `Invoke` function in execution.cc
+So with that out of the way lets focus on the `Invoke` function in `execution.cc`
 around line 240 at the time of this writing.
 Now, if the target which is our case is the `Function` is a JSFunction there is
 a path which will be true in our case:
@@ -384,7 +385,7 @@ if (result.is_null()) {
 ```
 So, we returned an empty/null value from our function and the leads to the
 undefined value to be returned. Just noting this as I'm not sure if it is
-important of not but CustomArguments has a destructor that will be called
+important or not but CustomArguments has a destructor that will be called
 when the `FunctionCallbackArguments` instance goes out of scope:
 ```
 template <typename T>                                                           
@@ -409,7 +410,7 @@ Now, even though are callback returned nothing/null, that was checked for and
 instead undefined was returned. 
 
 After this we will return to `Execution::Call` which will just return to
-v8::ToLocal which will turn the Handle into a MaybeHandle.
+`v8::ToLocal` which will turn the Handle into a MaybeHandle.
 This will then return us to Function::Call:
 ```c++
 RETURN_ON_FAILED_EXECUTION(Value);
@@ -434,14 +435,12 @@ Finally we will be back in our test
   MaybeLocal<Value> ret = function->Call(context, recv, 0, nullptr);
 ```
 
-
-
 ```console
 (gdb) p result.is_null()
 $15 = true
 ```
 
-### Exception
+### Throwing an Exception
 When calling a Function one can throw an exception using:
 ```c++
   isolate->ThrowException(String::NewFromUtf8(isolate, "some error").ToLocalChecked());
@@ -485,7 +484,8 @@ The code for this part looks like this:
   handler->message_obj_ = reinterpret_cast<void*>(thread_local_top()->pending_message_obj_.ptr());
 ```  
 When a TryCatch is created its constructor will call `RegisterTryCatchHandler`
-which will set the thread_local_top try_catch_handler which is retrieved above.
+which will set the thread_local_top try_catch_handler which is retrieved above
+with the call to `try_catch_handler()`.
 
 Prior to this there will be a call to `IsJavaScriptHandlerOnTop`:
 ```c++
@@ -496,8 +496,9 @@ if (!is_catchable_by_javascript(exception)) return false;
   return exception != ReadOnlyRoots(heap()).termination_exception();               
 }
 ```
-I really need to understand this better and the various ways to catch/handle
-exceptions (from C++ and JavaScript). 
+TODO: I really need to understand this better and the various ways to
+catch/handle exceptions (from C++ and JavaScript).
+
 Next (in PropagatePendingExceptionToExternalTryCatch) we have:
 ```c++
   // Get the top-most JS_ENTRY handler, cannot be on top if it doesn't exist.   
@@ -561,7 +562,7 @@ if (params.execution_target == Execution::Target::kCallable) {
 ```c++
 typedef uintptr_t Address;
 ```
-`uintptr_t` is an optional type specified in cstdint and is capable of storing
+`uintptr_t` is an optional type specified in `cstdint` and is capable of storing
 a data pointer. It is an unsigned integer type that any valid pointer to void
 can be converted to this type (and back).
 
@@ -603,7 +604,7 @@ an object:
 |ptr_  |---->
 +------+
 ```
-Now, `ptr_` is a StorageType so it could be a Smi in which case it would just
+Now, `ptr_` is a StorageType so it could be a `Smi` in which case it would just
 contains the value directly, for example a small integer:
 ```
 +------+
@@ -691,7 +692,7 @@ class V8_EXPORT Data {
 ```
 
 ### Value
-Value extends Data and adds a number of methods that check if a Value
+Value extends `Data` and adds a number of methods that check if a Value
 is of a certain type, like `IsUndefined()`, `IsNull`, `IsNumber` etc.
 It also has useful methods to convert to a Local<T>, for example:
 ```c++
@@ -767,8 +768,8 @@ Lets take a closer look at what happens when we construct a HandleScope:
 ```c++
   v8::HandleScope handle_scope{isolate_};
 ```
-The constructor call will end up in `src/api/api.cc` and the constructor simply delegates to
-`Initialize`:
+The constructor call will end up in `src/api/api.cc` and the constructor simply
+delegates to `Initialize`:
 ```c++
 HandleScope::HandleScope(Isolate* isolate) { Initialize(isolate); }
 
@@ -782,7 +783,7 @@ void HandleScope::Initialize(Isolate* isolate) {
   current->level++;
 }
 ```
-Every v8::internal::Isolate has member of type HandleScopeData:
+Every `v8::internal::Isolate` has member of type HandleScopeData:
 ```c++
 HandleScopeData handle_scope_data_;
 HandleScopeData* handle_scope_data() { return &handle_scope_data_; }
@@ -850,7 +851,7 @@ Address* HandleScope::GetHandle(Isolate* isolate, Address value) {
   return canonical ? canonical->Lookup(value) : CreateHandle(isolate, value);   
 }
 ```
-Which will call CreateHandle in this case and this function will retrieve the
+Which will call `CreateHandle` in this case and this function will retrieve the
 current isolate's handle_scope_data:
 ```c++
   HandleScopeData* data = isolate->handle_scope_data();                         
@@ -902,9 +903,6 @@ v8::Local<v8::Value> val2 = nr.As<v8::Value>();
 ```
 
 See [local_test.cc](./test/local_test.cc) for an example.
-
-### MaybeLocal
-
 
 ### PrintObject
 Using _v8_internal_Print_Object from c++:
@@ -2557,22 +2555,27 @@ But in all other cases `V8_EXPORT` is empty and the preprocessor does not insert
 anything (nothing will be there come compile time). 
 But what about the `__attribute__ ((visibility("default"))` what is this?  
 
-In the GNU compiler collection (GCC) environment, the term that is used for exporting is visibility. As it 
-applies to functions and variables in a shared object, visibility refers to the ability of other shared objects 
-to call a C/C++ function. Functions with default visibility have a global scope and can be called from other 
-shared objects. Functions with hidden visibility have a local scope and cannot be called from other shared objects.
+In the GNU compiler collection (GCC) environment, the term that is used for
+exporting is visibility. As it applies to functions and variables in a shared
+object, visibility refers to the ability of other shared objects to call a
+C/C++ function. Functions with default visibility have a global scope and can
+be called from other shared objects. Functions with hidden visibility have a
+local scope and cannot be called from other shared objects.
 
 Visibility can be controlled by using either compiler options or visibility attributes.
-In your header files, wherever you want an interface or API made public outside the current Dynamic Shared Object (DSO)
-, place `__attribute__ ((visibility ("default")))` in struct, class and function declarations you wish to make public.
- With `-fvisibility=hidden`, you are telling GCC that every declaration not explicitly marked with a visibility attribute 
-has a hidden visibility. There is such a flag in build/common.gypi
+In your header files, wherever you want an interface or API made public outside
+the current Dynamic Shared Object (DSO) , place
+`__attribute__ ((visibility ("default")))` in struct, class and function
+declarations you wish to make public.  With `-fvisibility=hidden`, you are
+telling GCC that every declaration not explicitly marked with a visibility
+attribute has a hidden visibility. There is such a flag in build/common.gypi
 
 
 ### ToLocalChecked()
 You'll see a few of these calls in the hello_world example:
-
-     Local<String> source = String::NewFromUtf8(isolate, js, NewStringType::kNormal).ToLocalChecked();
+```c++
+  Local<String> source = String::NewFromUtf8(isolate, js, NewStringType::kNormal).ToLocalChecked();
+```
 
 NewFromUtf8 actually returns a Local<String> wrapped in a MaybeLocal which forces a check to see if 
 the Local<> is empty before using it. 
@@ -2611,7 +2614,8 @@ I was wondering where the Utils::ToLocal was defined but could not find it until
       return Convert<v8::internal::From, v8::To>(obj);                          \
     }
 
-The above can be found in src/api.h. The same goes for `Local<Object>, Local<String>` etc.
+The above can be found in `src/api.h`. The same goes for `Local<Object>,
+Local<String>` etc.
 
 
 ### Small Integers
