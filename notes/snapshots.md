@@ -16,6 +16,9 @@ create a snapshot_blob.bin file using a template in BUILD.gn named `run_mksnapsh
 , but if false it will generate a file named snapshot.cc. 
 
 #### mksnapshot
+This executable is used to create snapshot and does so starting a V8 Isolate
+and then serializing runtime data into binary format. 
+
 There is an executable named `mksnapshot` which is defined in 
 `src/snapshot/mksnapshot.cc`. This can be executed on the command line:
 ```console
@@ -208,6 +211,7 @@ $ ../v8_src/v8/out/x64.release_gcc/mksnapshot --startup_src=gen/example-snapshot
 `src/snapshot/embedded/embedded-file-writer.h` declares the class responsible
 for generating this file.
 How is this file used?  
+TODO: explain how this is used.
 
 ### embed-script
 Not to be confused with `embedded-src` this is any extra javascript that can
@@ -217,4 +221,60 @@ $ ../v8_src/v8/out/x64.release_gcc/mksnapshot --startup_src=gen/example-snapshot
 Loading script for embedding: lib/embed-script.js
 ```
 
+### Snapshot usage
+Do understand what is actually happening 
+[snapshot_test](./test/snapshot_test.cc) has a test named `CreateSnapshot`
+which creates a creates a V8 environment (initializes the Platform, creates
+an Isolate, and a Context), adds a function named `test_snapshot` to the 
+Context and then creates a snapshot using SnapshotCreator.
 
+SnapshotCreator creates the binary in a class named `StartupData `which can be
+found in `v8.h`:
+```c++
+class V8_EXPORT StartupData {
+  bool CanBeRehashed() const;
+  bool IsValid() const;
+  const char* data;
+  int raw_size;
+};
+```
+After creating the StartupData (which is called a blob (Binary Large Object)
+the V8 environment is disposed of. 
+Next, a new V8 environmentis created but this time the Context is created using
+```c++
+  Isolate::CreateParams create_params;
+  // Specify the startup_data blob created earlier.
+  create_params.snapshot_blob = &startup_data;
+  isolate = Isolate::New(create_params);
+
+  Local<Context> context = Context::FromSnapshot(isolate, index).ToLocalChecked();
+```
+After this we are going to call the function that we serialized previously and
+verify that that works.
+
+So that was a javascript function that was serialized into a snapshot blob and
+then deserialized. 
+
+Note, that the tests in snapshot_test will contain a bit of duplicated code
+which is intentional as I think it makes it easer to see what is required to
+perform these tasks and this is only for learning.
+
+
+### Snapshot binary format
+The layout of the binary snapshot can be found in `src/snapshot/snapshot.cc`:
+```c++
+  // Snapshot blob layout:
+  // [0] number of contexts N
+  // [1] rehashability
+  // [2] checksum
+  // [3] (128 bytes) version string
+  // [4] offset to readonly
+  // [5] offset to context 0
+  // [6] offset to context 1
+  // ...
+  // ... offset to context N - 1
+  // ... startup snapshot data
+  // ... read-only snapshot data
+  // ... context 0 snapshot data
+  // ... context 1 snapshot data
+```

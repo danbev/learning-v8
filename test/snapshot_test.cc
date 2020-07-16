@@ -5,6 +5,14 @@
 
 using namespace v8;
 
+void print_data(StartupData* startup_data) {
+  size_t size = static_cast<size_t>(startup_data->raw_size);
+  for (size_t i = 0; i < size; i++) {
+    char endchar = i != size - 1 ? ',' : '\n';
+    std::cout << std::to_string(startup_data->data[i]) << endchar;
+  }
+}
+
 TEST(SnapshotTest, CreateSnapshot) {
   v8::V8::SetFlagsFromString("--random_seed=42");
   std::unique_ptr<Platform> platform = platform::NewDefaultPlatform();
@@ -43,14 +51,6 @@ TEST(SnapshotTest, CreateSnapshot) {
     }
     startup_data = snapshot_creator.CreateBlob(SnapshotCreator::FunctionCodeHandling::kKeep);
     std::cout << "size of blob: " << startup_data.raw_size << '\n';
-
-    /* Example of printing the blob:
-    size_t size = static_cast<size_t>(startup_data.raw_size);
-    for (size_t i = 0; i < size; i++) {
-      char endchar = i != size - 1 ? ',' : '\n';
-      std::cout << std::to_string(startup_data.data[i]) << endchar;
-    }
-    */
   }
   v8::V8::ShutdownPlatform();
 
