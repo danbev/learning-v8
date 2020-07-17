@@ -16,19 +16,19 @@ void print_data(StartupData* startup_data) {
 class SnapshotTest : public ::testing::Test {
  public:
  protected:
-  static std::unique_ptr<v8::Platform> platform_;
+  static std::unique_ptr<Platform> platform_;
   static void SetUpTestCase() {
-    platform_ = v8::platform::NewDefaultPlatform();
-    v8::V8::SetFlagsFromString("--random_seed=42");
-    v8::V8::InitializePlatform(platform_.get());
-    v8::V8::Initialize();
+    platform_ = platform::NewDefaultPlatform();
+    V8::SetFlagsFromString("--random_seed=42");
+    V8::InitializePlatform(platform_.get());
+    V8::Initialize();
   }
   static void TearDownTestCase() {
-    v8::V8::ShutdownPlatform();
+    V8::ShutdownPlatform();
   }
 };
 
-std::unique_ptr<v8::Platform> SnapshotTest::platform_;
+std::unique_ptr<Platform> SnapshotTest::platform_;
 
 TEST_F(SnapshotTest, CreateSnapshot) {
   StartupData startup_data;
@@ -37,7 +37,7 @@ TEST_F(SnapshotTest, CreateSnapshot) {
   std::vector<intptr_t> external_references = { reinterpret_cast<intptr_t>(nullptr)};
   {
     Isolate* isolate = Isolate::Allocate();
-    v8::SnapshotCreator snapshot_creator(isolate, external_references.data());
+    SnapshotCreator snapshot_creator(isolate, external_references.data());
     {
       HandleScope scope(isolate);
       snapshot_creator.SetDefaultContext(Context::New(isolate));
@@ -50,10 +50,10 @@ TEST_F(SnapshotTest, CreateSnapshot) {
         const char* js = R"(function test_snapshot() { 
           return 'from test_snapshot function';
         })";
-        Local<v8::String> src = String::NewFromUtf8(isolate, js).ToLocalChecked();
+        Local<String> src = String::NewFromUtf8(isolate, js).ToLocalChecked();
         ScriptOrigin origin(String::NewFromUtf8Literal(isolate, "function"));
         ScriptCompiler::Source source(src, origin);                     
-        Local<v8::Script> script;
+        Local<Script> script;
         EXPECT_TRUE(ScriptCompiler::Compile(context, &source).ToLocal(&script));
         EXPECT_FALSE(script->Run(context).ToLocalChecked().IsEmpty());
         EXPECT_FALSE(try_catch.HasCaught());
@@ -70,7 +70,7 @@ TEST_F(SnapshotTest, CreateSnapshot) {
   Isolate::CreateParams create_params;
   // Specify the startup_data blob created earlier.
   create_params.snapshot_blob = &startup_data;
-  create_params.array_buffer_allocator = v8::ArrayBuffer::Allocator::NewDefaultAllocator();
+  create_params.array_buffer_allocator = ArrayBuffer::Allocator::NewDefaultAllocator();
   Isolate* isolate = Isolate::New(create_params);
   {
     HandleScope scope(isolate);
@@ -80,10 +80,10 @@ TEST_F(SnapshotTest, CreateSnapshot) {
     TryCatch try_catch(isolate);
     // Add JavaScript code that calls the function we added previously.
     const char* js = "test_snapshot();";
-    Local<v8::String> src = String::NewFromUtf8(isolate, js).ToLocalChecked();
+    Local<String> src = String::NewFromUtf8(isolate, js).ToLocalChecked();
     ScriptOrigin origin(String::NewFromUtf8Literal(isolate, "usage"));
     ScriptCompiler::Source source(src, origin);                     
-    Local<v8::Script> script;
+    Local<Script> script;
     EXPECT_TRUE(ScriptCompiler::Compile(context, &source).ToLocal(&script));
     MaybeLocal<Value> maybe_result = script->Run(context);
     EXPECT_FALSE(maybe_result.IsEmpty());
@@ -113,7 +113,7 @@ TEST_F(SnapshotTest, CreateSnapshotWithData) {
   {
     Isolate* isolate = nullptr;
     isolate = Isolate::Allocate();
-    v8::SnapshotCreator snapshot_creator(isolate, external_references.data());
+    SnapshotCreator snapshot_creator(isolate, external_references.data());
     {
       HandleScope scope(isolate);
       snapshot_creator.SetDefaultContext(Context::New(isolate));
@@ -131,7 +131,7 @@ TEST_F(SnapshotTest, CreateSnapshotWithData) {
   Isolate::CreateParams create_params;
   // Specify the startup_data blob created earlier.
   create_params.snapshot_blob = &startup_data;
-  create_params.array_buffer_allocator = v8::ArrayBuffer::Allocator::NewDefaultAllocator();
+  create_params.array_buffer_allocator = ArrayBuffer::Allocator::NewDefaultAllocator();
   Isolate* isolate = Isolate::New(create_params);
   {
     HandleScope scope(isolate);
@@ -206,7 +206,7 @@ TEST_F(SnapshotTest, ExternalReference) {
   create_params.snapshot_blob = &startup_data;
   // Add the external references to functions 
   create_params.external_references = external_refs.data();
-  create_params.array_buffer_allocator = v8::ArrayBuffer::Allocator::NewDefaultAllocator();
+  create_params.array_buffer_allocator = ArrayBuffer::Allocator::NewDefaultAllocator();
   Isolate* isolate = Isolate::New(create_params);
   {
     HandleScope scope(isolate);
@@ -214,10 +214,10 @@ TEST_F(SnapshotTest, ExternalReference) {
     {
       Context::Scope context_scope(context);
       TryCatch try_catch(isolate);
-        Local<v8::String> src = String::NewFromUtf8Literal(isolate, "doit('some arg');");
+        Local<String> src = String::NewFromUtf8Literal(isolate, "doit('some arg');");
         ScriptOrigin origin(String::NewFromUtf8Literal(isolate, "function"));
         ScriptCompiler::Source source(src, origin);                     
-        Local<v8::Script> script;
+        Local<Script> script;
         EXPECT_TRUE(ScriptCompiler::Compile(context, &source).ToLocal(&script));
         MaybeLocal<Value> maybe_result = script->Run(context);
         EXPECT_FALSE(maybe_result.IsEmpty());
