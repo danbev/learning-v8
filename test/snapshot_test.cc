@@ -96,12 +96,6 @@ TEST_F(SnapshotTest, CreateSnapshot) {
   isolate->Dispose();
 }
 
-
-void InternalFieldsCallback(Local<Object> holder, int index,
-                            StartupData payload, void* data) {
-  std::cout << "InternalFieldsCallback..." << '\n';
-}
-
 class ExternalData {
  public:
   ExternalData(int x) : x_(x) {}
@@ -141,21 +135,97 @@ TEST_F(SnapshotTest, CreateSnapshotWithData) {
   Isolate* isolate = Isolate::New(create_params);
   {
     HandleScope scope(isolate);
-    const void* data = "some data";
-    DeserializeInternalFieldsCallback int_fields_cb(InternalFieldsCallback,
-                                                    const_cast<void*>(data));
     // Create the Context from the snapshot index.
-    Local<Context> context = Context::FromSnapshot(isolate,
-      index,
-      int_fields_cb).ToLocalChecked();
+    Local<Context> context = Context::FromSnapshot(isolate, index).ToLocalChecked();
     Context::Scope context_scope(context);
     MaybeLocal<Object> obj = context->GetDataFromSnapshotOnce<Object>(data_index);
     EXPECT_FALSE(obj.IsEmpty());
     Local<Object> o = obj.ToLocalChecked();
     Local<Number> nr = o.As<Number>();
-    std::cout << "data: " << nr->Value() << '\n';
     EXPECT_EQ(18, nr->Value());
   }
   isolate->Dispose();
 }
 
+void InternalFieldsCallback(Local<Object> holder, int index,
+                            StartupData payload, void* data) {
+  std::cout << "InternalFieldsCallback..." << '\n';
+}
+
+void ExternalRefFunction(const FunctionCallbackInfo<Value>& args) {
+    String::Utf8Value str(args.GetIsolate(), args[0]);
+    printf("ExternalRefFunction argument = %s\n", *str);
+    args.GetReturnValue().Set(
+        String::NewFromUtf8Literal(args.GetIsolate(),
+          "ExternalRefFunction done."));
+}
+
+TEST_F(SnapshotTest, ExternalReference) {
+  StartupData startup_data;
+  size_t index;
+
+  std::vector<intptr_t> external_refs;
+  std::cout << "address of ExternalRefFunction function: " << 
+    reinterpret_cast<void*>(ExternalRefFunction) << '\n';
+  external_refs.push_back(reinterpret_cast<intptr_t>(ExternalRefFunction));
+
+  std::cout << "external_refs: ";
+  for (std::vector<intptr_t>::const_iterator i = external_refs.begin(); i != external_refs.end(); ++i) {
+    std::cout << *i << ' ';
+  }
+  std::cout << '\n';
+
+  {
+    Isolate* isolate = nullptr;
+    isolate = Isolate::Allocate();
+    SnapshotCreator snapshot_creator(isolate, external_refs.data());
+    {
+      HandleScope scope(isolate);
+      snapshot_creator.SetDefaultContext(Context::New(isolate));
+      Local<Context> context = Context::New(isolate);
+      {
+        Context::Scope context_scope(context);
+        TryCatch try_catch(isolate);
+
+        Local<Function> function = FunctionTemplate::New(isolate,
+            ExternalRefFunction, Local<Value>(), Local<Signature>(), 0, 
+            ConstructorBehavior::kThrow,
+            SideEffectType::kHasSideEffect)->GetFunction(context).ToLocalChecked();
+
+        Local<String> func_name = String::NewFromUtf8Literal(isolate, "doit");
+        context->Global()->Set(context, func_name, function).Check();
+        function->SetName(func_name);
+      }
+
+      index = snapshot_creator.AddContext(context);
+    }
+    startup_data = snapshot_creator.CreateBlob(SnapshotCreator::FunctionCodeHandling::kKeep);
+  }
+
+  Isolate::CreateParams create_params;
+  create_params.snapshot_blob = &startup_data;
+  // Add the external references to functions 
+  create_params.external_references = external_refs.data();
+  create_params.array_buffer_allocator = v8::ArrayBuffer::Allocator::NewDefaultAllocator();
+  Isolate* isolate = Isolate::New(create_params);
+  {
+    HandleScope scope(isolate);
+    Local<Context> context = Context::FromSnapshot(isolate, index).ToLocalChecked();
+    {
+      Context::Scope context_scope(context);
+      TryCatch try_catch(isolate);
+        Local<v8::String> src = String::NewFromUtf8Literal(isolate, "doit('some arg');");
+        ScriptOrigin origin(String::NewFromUtf8Literal(isolate, "function"));
+        ScriptCompiler::Source source(src, origin);                     
+        Local<v8::Script> script;
+        EXPECT_TRUE(ScriptCompiler::Compile(context, &source).ToLocal(&script));
+        MaybeLocal<Value> maybe_result = script->Run(context);
+        EXPECT_FALSE(maybe_result.IsEmpty());
+        Local<Value> result = maybe_result.ToLocalChecked();
+        String::Utf8Value utf8(isolate, result);
+        EXPECT_STREQ("ExternalRefFunction done.", *utf8);
+        EXPECT_FALSE(try_catch.HasCaught());
+    }
+  }
+  isolate->Dispose();
+}
