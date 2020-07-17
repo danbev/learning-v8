@@ -260,6 +260,58 @@ which is intentional as I think it makes it easer to see what is required to
 perform these tasks and this is only for learning.
 
 
+### Context::FromSnapshot
+This function can be used to deserialize a blob into a Context. This was used
+in the simple CreateSnapshot test:
+```c++
+    Local<Context> context = Context::FromSnapshot(isolate, index).ToLocalChecked();
+```
+We only passed in the isolate and the index above but `FromSnapshot` also takes
+other arguments that have default values when not specified:
+```c++
+static MaybeLocal<Context> FromSnapshot(
+      Isolate* isolate, size_t context_snapshot_index,
+      DeserializeInternalFieldsCallback embedder_fields_deserializer =
+          DeserializeInternalFieldsCallback(),
+      ExtensionConfiguration* extensions = nullptr,
+      MaybeLocal<Value> global_object = MaybeLocal<Value>(),
+      MicrotaskQueue* microtask_queue = nullptr);
+```
+
+
+### External references
+When we have functions that are not defined in V8 itself these functions will
+have addresses that V8 does not know about. The function will be a symbol that
+needs to be resolved when V8 deserialzes or when it tries to run the function.
+TODO: Verify that this is actually what happend!
+
+These symbols are serialized and when V8 deserializes a snapshot it will try
+to match symbols to addresses. This is done using `external_references` which
+is a null terminated vector which is populated with the addresses to functions
+and then passed into SnapshotCreator:
+```c++
+  std::vector<intptr_t> external_refs;
+  external_refs.push_back(reinterpret_cast<intptr_t>(ExternalRefFunction));
+  ...
+  isolate = Isolate::Allocate();
+  SnapshotCreator snapshot_creator(isolate, external_refs.data());
+```
+After creating the blob and perhaps storing it in a file, it can later be
+used to create a new Context:
+```c++
+  Isolate::CreateParams create_params;
+  create_params.snapshot_blob = &startup_data;
+  create_params.external_references = external_refs.data();
+
+  Isolate* isolate = Isolate::New(create_params);
+  ...
+  Local<Context> context = Context::FromSnapshot(isolate, index).ToLocalChecked();
+```
+There is a test case that explores this feature and it can be run using:
+```console
+$ ./test/snapshot_test --gtest_filter=SnapshotTest.ExternalReference
+```
+
 ### Snapshot binary format
 The layout of the binary snapshot can be found in `src/snapshot/snapshot.cc`:
 ```c++
