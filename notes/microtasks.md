@@ -25,7 +25,7 @@ In node.js `setTimeout` is implemented using `libuv`'s `uv_timer_start`
 The [introduction](./intro.md) has some background information about microtasks.
 This page is going to look into the internals. 
 
-There is an example of running a microtask in [microtask_test](../test/microtask_test.c).
+There is an example of running a microtask in [microtask_test](../test/microtask_test.cc).
 
 The Isolate class exposes a number of functions related to enqueueing and running
 microtasks:
