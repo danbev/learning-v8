@@ -312,6 +312,62 @@ There is a test case that explores this feature and it can be run using:
 $ ./test/snapshot_test --gtest_filter=SnapshotTest.ExternalReference
 ```
 
+### Internal Fields
+When adding a Context to SnapshotCreator there is a parameter named
+`callback` which is of type `SerializeInternalFieldsCallback` :
+```c++
+size_t AddContext(Local<Context> context,
+    SerializeInternalFieldsCallback callback = SerializeInternalFieldsCallback());
+
+struct SerializeInternalFieldsCallback {
+
+  typedef StartupData (*CallbackFunction)(Local<Object> holder, int index,
+                                          void* data);
+
+  SerializeInternalFieldsCallback(CallbackFunction function = nullptr,
+                                  void* data_arg = nullptr)
+      : callback(function), data(data_arg) {}
+
+  CallbackFunction callback;
+  void* data;
+};
+```
+So we can see that the default implementation is a noop (no operation).
+
+What exactly are internal fields? 
+
+When is the callback called?
+
+```console
+$ lldb -- ./test/snapshot_test --gtest_filter=SnapshotTest.InternalFields
+(lldb) br s -f snapshot_test.cc -l 244
+Breakpoint 4: where = snapshot_test`SnapshotTest_InternalFields_Test::TestBody() + 25 at snapshot_test.cc:247:25, address = 0x00000000004192e3
+(lldb) r
+-> 283 	      index = snapshot_creator.AddContext(context, si_cb);
+(lldb) s
+```
+In SnapshotCreator (api.cc) we can find the following:
+```c++
+size_t SnapshotCreator::AddContext(Local<Context> context,
+                                   SerializeInternalFieldsCallback callback) {
+  SnapshotCreatorData* data = SnapshotCreatorData::cast(data_);
+  ...
+  size_t index = data->contexts_.Size();
+  data->contexts_.Append(context);
+  data->embedder_fields_serializers_.push_back(callback)
+  return index;
+```
+So the SnapshotCreateData instance has a vector that contains these callback:
+```c++
+std::vector<SerializeInternalFieldsCallback> embedder_fields_serializers_;
+```
+So that is all `AddContext` does. Lets take a look at the call to actually
+create the blob:
+```c++
+  startup_data = snapshot_creator.CreateBlob(SnapshotCreator::FunctionCodeHandling::kKeep);
+```
+
+
 ### Snapshot binary format
 The layout of the binary snapshot can be found in `src/snapshot/snapshot.cc`:
 ```c++
