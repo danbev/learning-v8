@@ -5,7 +5,7 @@ v8_include_dir := $(V8_HOME)/include
 v8_src_dir := $(V8_HOME)/src
 v8_gen_dir := $(v8_build_dir)/gen
 v8_dylibs := -lv8 -lv8_libplatform -lv8_libbase
-objs := $(patsubst %.cc, %,  $(wildcard test/*.cc))
+objs := $(filter-out test/main,$(patsubst %.cc, %, $(wildcard test/*.cc)))
 gtest_home := $(CURDIR)/deps/googletest/googletest
 
 CXXFLAGS = -Wall -g -O0 $@.cc -o $@ -std=c++14 -Wcast-function-type \
@@ -47,7 +47,7 @@ run-script: run-script.cc
 exceptions: snapshot_blob.bin exceptions.cc
 	${CXX} ${CXXFLAGS}
 
-snapshot_blob.bin:
+snapshot_blob.bin: $(v8_build_dir)/$@
 	@cp $(v8_build_dir)/$@ .
 
 test/%: CXXFLAGS = -Wall -g -O0 test/main.cc $@.cc -o $@  ./lib/gtest/libgtest.a -std=c++14 \
@@ -105,6 +105,9 @@ torque-example: torque-example.tq
 		$(V8_TORQUE_TEST_FILES) \
 		$<
 	@${RM} $(V8_HOME)/$<
+
+.PHONY: all
+all: snapshot_blob.bin $(objs)
 
 .PHONY: clean
 
