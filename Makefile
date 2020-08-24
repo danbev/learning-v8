@@ -109,6 +109,12 @@ torque-example: torque-example.tq
 .PHONY: all
 all: snapshot_blob.bin $(objs)
 
+.PHONY: check-all
+check-all:
+	@for test in $(objs) ; do \
+		"$${test}" ; \
+	done
+
 .PHONY: clean
 
 clean: 
