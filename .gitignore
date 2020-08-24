@@ -45,3 +45,4 @@ test/symbol_test
 test/arraybuffer_test
 gen
 snapshot_test
+test/functioncallbackargs_test
