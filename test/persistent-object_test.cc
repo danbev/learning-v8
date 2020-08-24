@@ -3,6 +3,8 @@
 #include "v8.h"
 #include "v8_test_fixture.h"
 #include "src/objects/objects.h"
+#include "src/objects/slots-inl.h"
+#include "src/api/api-inl.h"
 
 extern void _v8_internal_Print_Object(void* object);
 
@@ -84,4 +86,13 @@ TEST_F(PersistentTest, PrintObject) {
   //v8::internal::Object** ppo = ((v8::internal::Object**)(*obj));
   //_v8_internal_Print_Object(*ppo);
   _v8_internal_Print_Object(*((v8::internal::Object**)*obj));
+
+  v8::internal::Handle<v8::internal::Object> h = v8::Utils::OpenHandle(*obj); 
+  _v8_internal_Print_Object((v8::internal::Address*)h->ptr());
+
+  v8::internal::Object o = *h;
+  v8::internal::ObjectSlot slot(h->ptr());
+  v8::internal::Address a = slot.address();
+
+  _v8_internal_Print_Object((v8::internal::Address*)v8::Utils::OpenHandle(*obj)->ptr());
 }
