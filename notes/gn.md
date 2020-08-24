@@ -1,5 +1,7 @@
 ### [GN](https://chromium.googlesource.com/chromium/src/+/master/tools/gn/docs/quick_start.md)
-GN stands for Generate Ninja.
+GN stands for Generate Ninja and the executable `gn` is a bash script that call
+`gn.py`.
+
 ```console
 $ tools/dev/v8gen.py --help
 ```
@@ -18,7 +20,7 @@ come before the `:`.
 This command is useful to see which files are included in an executable.
 
 When gn starts it will search for a .gn file in the current directory. The one
-in specifies the following:
+V8 in specifies the following:
 ```
 import("//build/dotfile_settings.gni")                                          
 ```
