@@ -1,12 +1,42 @@
 V8_HOME ?= /home/danielbevenius/work/google/v8_src/v8
 
-v8_build_dir := $(V8_HOME)/out/x64.release_gcc
+v8_out_dir := x64.release_gcc
+v8_build_dir := $(V8_HOME)/out/$(v8_out_dir)
 v8_include_dir := $(V8_HOME)/include
 v8_src_dir := $(V8_HOME)/src
 v8_gen_dir := $(v8_build_dir)/gen
 v8_dylibs := -lv8 -lv8_libplatform -lv8_libbase
 objs := $(filter-out test/main,$(patsubst %.cc, %, $(wildcard test/*.cc)))
 gtest_home := $(CURDIR)/deps/googletest/googletest
+
+v8_gn_args = \
+  v8_monolithic=false \
+  v8_static_library=false \
+  use_custom_libcxx=false \
+  is_component_build=true \
+  treat_warnings_as_errors=false \
+  is_debug=true \
+  is_clang=false \
+  target_cpu="x64" \
+  use_goma=false \
+  use_gold=false \
+  goma_dir="None" \
+  v8_enable_backtrace=true \
+  v8_enable_disassembler=true \
+  v8_enable_object_print=true \
+  v8_enable_verify_heap=true \
+  v8_use_external_startup_data=false \
+  v8_enable_i18n_support=true \
+  v8_expose_symbols=true \
+  v8_enable_gdbjit=true \
+  v8_optimized_debug=false \
+  v8_enable_debugging_features=true \
+  v8_enable_fast_torque=false \
+  v8_enable_fast_mksnapshot=false
+
+.PHONY: configure_v8
+configure_v8:
+	cd $(V8_HOME) && gn gen out/$(v8_out_dir) --args='$(v8_gn_args)'
 
 CXXFLAGS = -Wall -g -O0 $@.cc -o $@ -std=c++14 -Wcast-function-type \
 	    -fno-exceptions -fno-rtti \
