@@ -55,6 +55,7 @@ test/%: CXXFLAGS = -Wall -g -O0 test/main.cc $@.cc -o $@  ./lib/gtest/libgtest.a
 	  -Wno-class-memaccess -Wno-comment -Wno-unused-but-set-variable \
 	  -DV8_COMPRESS_POINTERS \
 	  -DV8_INTL_SUPPORT \
+	  -DDEBUG \
           -I$(v8_include_dir) \
           -I$(V8_HOME) \
           -I$(V8_HOME)/third_party/icu/source/common/ \

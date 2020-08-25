@@ -32,9 +32,12 @@ TEST_F(AstTest, ParseInfo) {
   //EXPECT_FALSE(parse_info.is_strict_mode());
   //EXPECT_FALSE(compile_flags.is_native());
   EXPECT_FALSE(compile_flags.is_module());
+  bool result = i::parsing::ParseProgram(&parse_info,
+      script, internal_isolate, i::parsing::ReportStatisticsMode::kYes);
+  EXPECT_TRUE(result);
   i::Scope* scope = parse_info.literal()->scope();
-  EXPECT_EQ(scope->start_position(), 0) << "start line (I think) was not 0";
-  EXPECT_EQ(scope->end_position(), 0) << "end line (I think) was not 0";
+  EXPECT_EQ(scope->start_position(), 0) << "start position was not 0";
+  EXPECT_EQ(scope->end_position(), 21) << "end position was not 21";
 }
 
 TEST_F(AstTest, Parser) {
