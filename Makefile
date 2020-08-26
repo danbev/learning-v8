@@ -1,6 +1,6 @@
 V8_HOME ?= /home/danielbevenius/work/google/v8_src/v8
 
-v8_out_dir := x64.release_gcc
+v8_out_dir := learning_v8
 v8_build_dir := $(V8_HOME)/out/$(v8_out_dir)
 v8_include_dir := $(V8_HOME)/include
 v8_src_dir := $(V8_HOME)/src
@@ -37,6 +37,10 @@ v8_gn_args = \
 .PHONY: configure_v8
 configure_v8:
 	cd $(V8_HOME) && gn gen out/$(v8_out_dir) --args='$(v8_gn_args)'
+
+.PHONY: compile_v8
+compile_v8:
+	cd $(V8_HOME) && ninja -C out/$(v8_out_dir)
 
 CXXFLAGS = -Wall -g -O0 $@.cc -o $@ -std=c++14 -Wcast-function-type \
 	    -fno-exceptions -fno-rtti \
