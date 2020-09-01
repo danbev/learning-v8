@@ -101,9 +101,33 @@ And notice `this=0x18` in the backtrace:
 ```console
 0x0000aaaaab4d07f4 in std::_Rb_tree<unsigned long, unsigned long, std::_Identity<unsigned long>, std::less<unsigned long>, std::allocator<unsigned long> >::_M_get_insert_unique_pos (__k=<synthetic pointer>: 716832768, this=0x18)
 ```
-So at least that explains the strange value. And it should also explain the
-segmentation fault. We are reinterpreting a memory location. But we still need
-to understand why this is happening.
+I found it strange when I first saw this and that the segfault was coming from
+the std::set::insert but hopefully the following example will clarify things:
+```c++
+#include <stdint.h>
+#include <set>
+#include <iostream>
+
+struct something {
+  std::set<int> xs;
+};
+
+int main(int argc, char** argv) {
+  intptr_t i = intptr_t{1} + 17;
+  struct something* s = reinterpret_cast<something*>(i);
+  std::cout << i << '\n';
+  s->xs.insert(2);
+  return 0;
+}
+```
+So that explains the strange value of `this` and how the it was possible
+that this . And it should also explain the how it was possible to call
+insert even though this was invalid:
+```
+auto result = code_object_registry_newly_allocated_.insert(code);
+```
+So we now understant the cause of the segmentation fault. But we still need to
+understand why this is happening.
 
 Lets create a break point so that we can easliy reproduce this:
 ```console
