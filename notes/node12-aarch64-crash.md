@@ -11,14 +11,11 @@ Backtrace:
     at /usr/include/c++/8/bits/stl_tree.h:2109
 #2  std::set<unsigned long, std::less<unsigned long>, std::allocator<unsigned long> >::insert (
     __x=<synthetic pointer>: <optimized out>, this=0x18) at /usr/include/c++/8/bits/stl_set.h:511
-
 #3  v8::internal::CodeObjectRegistry::RegisterNewlyAllocatedCodeObject (this=0x0, code=code@entry=1301151744)
     at ../deps/v8/src/heap/spaces.cc:620
-
 #4  0x0000aaaaab47ea90 in v8::internal::Heap::AllocateRaw (alignment=v8::internal::kWordAligned, 
     origin=v8::internal::AllocationOrigin::kRuntime, type=-80, size_in_bytes=129152, this=0xaaaaacbbaab0)
     at ../deps/v8/src/objects/heap-object.h:108
-
 #5  v8::internal::Heap::AllocateRawWithLightRetry (this=this@entry=0xaaaaacbbaab0, size=size@entry=129152, 
     allocation=allocation@entry=v8::internal::AllocationType::kCode, 
     origin=origin@entry=v8::internal::AllocationOrigin::kRuntime, alignment=alignment@entry=v8::internal::kWordAligned)
@@ -121,7 +118,7 @@ int main(int argc, char** argv) {
 }
 ```
 So that explains the strange value of `this` and how the it was possible
-that this . And it should also explain the how it was possible to call
+that this was 0x18. And it should also explain the how it was possible to call
 insert even though this was invalid:
 ```
 auto result = code_object_registry_newly_allocated_.insert(code);
