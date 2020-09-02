@@ -183,8 +183,7 @@ function will return true and the the next line that will be executed is
             ->RegisterNewlyAllocatedCodeObject(object.address());
       }
 ```
-I've attempted to reproduce this in
-https://github.com/danbev/learning-v8/blob/f3aae7a4e073f5a3183199aab89b0a8abe09680f/test/heap_test.cc#L48
+I've attempted to reproduce this in [heap_test](https://github.com/danbev/learning-v8/blob/f3aae7a4e073f5a3183199aab89b0a8abe09680f/test/heap_test.cc#L48)
 
 In newer versions of Node, which contain a newer version of V8, the above
 if statement also includes an additional check:
