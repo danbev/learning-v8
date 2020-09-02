@@ -44,3 +44,18 @@ TEST_F(HeapTest, MemoryChunk) {
   i::MemoryChunk* chunk = i::MemoryChunk::FromHeapObject(object);
   EXPECT_EQ(chunk->IsWritable(), true);
 }
+
+TEST_F(HeapTest, RegisterNewlyAllocatedCodeObject) {
+  const v8::HandleScope handle_scope(isolate_);
+  Isolate::Scope isolate_scope(isolate_);
+  i::Isolate* internal_isolate = asInternal(isolate_);
+
+  v8::internal::Heap* heap = internal_isolate->heap();
+  i::CodeLargeObjectSpace lo_space(heap);
+  i::AllocationResult result = lo_space.AllocateRaw(64);
+  i::HeapObject object = result.ToObject();
+  i::MemoryChunk* chunk = i::MemoryChunk::FromHeapObject(object);
+  i::CodeObjectRegistry* r = chunk->GetCodeObjectRegistry();
+
+  ASSERT_DEATH(r->RegisterNewlyAllocatedCodeObject(object.address()), "");
+}
