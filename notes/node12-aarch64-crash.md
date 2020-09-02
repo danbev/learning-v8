@@ -86,8 +86,9 @@ In `heap-inl.h` and `AllocateRaw` following code towards the end of the function
 242   return allocation;  
 ```
 This will call
-`MemoryChunk::FromHeapObject(object)->GetCodeObjectRegistry()->RegisterNewlyAllocatedCodeObject(object.address())`.
-MemoryChunk::FromHeapObject is only:
+`MemoryChunk::FromHeapObject(object)->GetCodeObjectRegistry()->RegisterNewlyAllocatedCodeObject(object.address())`. 
+
+MemoryChunk::FromHeapObject is only a reinterpret_cast:
 ```c++
 return reinterpret_cast<MemoryChunk*>(object.ptr() & ~kPageAlignmentMask);
 
@@ -128,7 +129,82 @@ understand why this is happening.
 
 Lets create a break point so that we can easliy reproduce this:
 ```console
+(gdb) br heap-inl.h:210 if size_in_bytes == 129152
 (gdb) br heap-inl.h:233 if size_in_bytes == 129152
 ```
+The first break point is where the `allocation` is created by calling `AllocateRaw'
+on the `code_lo_space` (which is of type `CodeLargeObjectSpace` which can be
+found in `src/heap/spaces.h`):
+```c++
+210       allocation = code_lo_space_->AllocateRaw(size_in_bytes);                  
+```
+`allocation is declared earlier as:
+```c++
+  AllocationResult allocation;
+```
+An `AllocationResult` instance has a single member which is of type Object.
+There is a function that can cast an object into a pointer of a type:
+```c++
+template <typename T>                                                             
+bool To(T* obj) {                                                                 
+  if (IsRetry()) return false;                                                
+  *obj = T::cast(object_);                                                    
+  return true;                                                                
+}
+```
+This function is called in the following `if` statement:
+```c++
+  HeapObject object; 
+  ...
+  if (allocation.To(&object)) {
+    if (AllocationType::kCode == type) {
+      ...
+}
+```
+The value of the field `object_` is:
+```console
+(gdb) p allocation.object_
+$10 = {<v8::internal::TaggedImpl<(v8::internal::HeapObjectReferenceType)1, unsigned long>> = {static kIsFull = true, 
+    static kCanBeWeak = false, ptr_ = 1332346881}, static kHeaderSize = 0}
+```
+The value of object is unfortunately optimized out:
+```console
+(gdb) p object
+$13 = <optimized out>
+```
+So this is the object that will be passed to HeapObject::cast(object_). This `To`
+function will return true and the the next line that will be executed is
+```c++
+      UnprotectAndRegisterMemoryChunk(object);
+      ZapCodeObject(object.address(), size_in_bytes);
+      if (!large_object) {
+        MemoryChunk::FromHeapObject(object)
+            ->GetCodeObjectRegistry()
+            ->RegisterNewlyAllocatedCodeObject(object.address());
+      }
+```
+I've attempted to reproduce this in
+https://github.com/danbev/learning-v8/blob/f3aae7a4e073f5a3183199aab89b0a8abe09680f/test/heap_test.cc#L48
+
+In newer versions of Node, which contain a newer version of V8, the above
+if statement also includes an additional check:
+```c++
+if (allocation.To(&object)) {
+    if (AllocationType::kCode == type && !V8_ENABLE_THIRD_PARTY_HEAP_BOOL) {       
+      // Unprotect the memory chunk of the object if it was not unprotected        
+      // already.
+      UnprotectAndRegisterMemoryChunk(object);
+      ZapCodeObject(object.address(), size_in_bytes);
+      if (!large_object) {
+        MemoryChunk::FromHeapObject(object)
+            ->GetCodeObjectRegistry()
+            ->RegisterNewlyAllocatedCodeObject(object.address());
+      }
+    }
+    OnAllocationEvent(object, size_in_bytes);
+  }
+```
+This flag was added in Commit 8e8fe4750522e6368a3c055de5b33a9089e64b5b
+("heap] Introduce third-party heap interface").
 
 Work in progress...
