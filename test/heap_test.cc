@@ -19,3 +19,15 @@ TEST_F(HeapTest, FastProperties) {
 
   v8::internal::Heap* heap = internal_isolate->heap();
 }
+
+TEST_F(HeapTest, AllocateRaw) {
+  const v8::HandleScope handle_scope(isolate_);
+  Isolate::Scope isolate_scope(isolate_);
+  i::Isolate* internal_isolate = asInternal(isolate_);
+
+  v8::internal::Heap* heap = internal_isolate->heap();
+  i::CodeLargeObjectSpace lo_space(heap);
+  i::AllocationResult result = lo_space.AllocateRaw(64);
+  EXPECT_EQ(result.IsRetry(), false);
+  i::HeapObject object = result.ToObject();
+}
