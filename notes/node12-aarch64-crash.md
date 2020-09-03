@@ -222,3 +222,60 @@ index dd8ba30101..3e8f2ec005 100644
 I've tried to verify this in the debugger but it has been difficult to do as
 there are alot of things that are optimized out.
 Now, how about we set the this in gdb to verify.
+
+```console
+(gdb) br heap-inl.h:206 if size_in_bytes == 129152
+Breakpoint 15 at 0xaaaaab44ac6c: heap-inl.h:206. (3 locations)
+(gdb) r
+```
+When it hits the above break point then set the following breakpoint:
+```console
+(gdb) br spaces.cc:758                                      
+Breakpoint 17 at 0xaaaaab4d0c9c: file ../deps/v8/src/heap/spaces.cc, line 758.
+(gdb) continue
+Thread 1 "node" hit Breakpoint 17, v8::internal::MemoryChunk::Initialize (heap=0xaaaaacbbaab0, base=<optimized out>, 
+    size=<optimized out>, area_start=798883840, area_end=799012992, executable=v8::internal::EXECUTABLE, 
+    owner=0xaaaaacb9dbb0, reservation=...) at ../deps/v8/src/heap/spaces.cc:758
+758	  return chunk;
+
+(gdb) p chunk->code_object_registry_
+$19 = (v8::internal::CodeObjectRegistry *) 0x0
+```
+So we can see that the `code_object_registry_` is null.
+
+Lets see if we can set it in gdb:
+```console
+(gdb) call ('v8::internal::CodeObjectRegistry'*) malloc(sizeof('v8::internal::CodeObjectRegistry'()))
+$37 = (v8::internal::CodeObjectRegistry *) 0xffffbe809050
+(gdb) call (('v8::internal::CodeObjectRegistry'*)0xffffbe809050)
+$38 = (v8::internal::CodeObjectRegistry *) 0xffffbe809050
+(gdb) p $38->code_object_registry_newly_allocated_
+$41 = std::set with 0 elements
+(gdb) p $38->code_object_registry_newly_allocated_.size()
+$42 = 0
+(gdb) set chunk->code_object_registry_ = 0xffffbe809050
+(gdb) p chunk->code_object_registry_->code_object_registry_newly_allocated_.size()
+$53 = 0
+```
+So we can now see that it is possible to get the size of the set which was not
+possible above. 
+Now, will this work if we let the debugger continue:
+```console
+(gdb) continue
+```
+Nope, that did not work :( 
+```
+620	  auto result = code_object_registry_newly_allocated_.insert(code);
+(gdb) p this
+$54 = (v8::internal::CodeObjectRegistry * const) 0xffffbe809050
+(gdb) p code_object_registry_newly_allocated_.size()
+$56 = 0
+```
+I'm not completly sure if the above should have worked or not as I'm seeing
+a few messages about function being inlined. For example, if I try to call
+```console
+(gdb) p code_object_registry_newly_allocated_.insert(('v8::internal::Address')10)
+Cannot evaluate function -- may be inlined
+```
+
+Work in progress...
