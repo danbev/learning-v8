@@ -185,25 +185,40 @@ function will return true and the the next line that will be executed is
 ```
 I've attempted to reproduce this in [heap_test](https://github.com/danbev/learning-v8/blob/f3aae7a4e073f5a3183199aab89b0a8abe09680f/test/heap_test.cc#L48)
 
-In newer versions of Node, which contain a newer version of V8, the above
-if statement also includes an additional check:
+I looks like the `code_object_registry_` is not gettting created in this case.
+In `MemoryChunk::Initialize` there is the following check
+(in `deps/v8/src/heap/spaces.cc`):
 ```c++
-if (allocation.To(&object)) {
-    if (AllocationType::kCode == type && !V8_ENABLE_THIRD_PARTY_HEAP_BOOL) {       
-      // Unprotect the memory chunk of the object if it was not unprotected        
-      // already.
-      UnprotectAndRegisterMemoryChunk(object);
-      ZapCodeObject(object.address(), size_in_bytes);
-      if (!large_object) {
-        MemoryChunk::FromHeapObject(object)
-            ->GetCodeObjectRegistry()
-            ->RegisterNewlyAllocatedCodeObject(object.address());
-      }
-    }
-    OnAllocationEvent(object, size_in_bytes);
+MemoryChunk* MemoryChunk::Initialize(BasicMemoryChunk* basic_chunk, Heap* heap, 
+                                     Executability executable) {   
+  ...
+
+  if (chunk->owner()->identity() == CODE_SPACE) {
+    chunk->code_object_registry_ = new CodeObjectRegistry();
+  } else {
+    chunk->code_object_registry_ = nullptr;
   }
 ```
-This flag was added in Commit 8e8fe4750522e6368a3c055de5b33a9089e64b5b
-("heap] Introduce third-party heap interface").
+For example if the owner is of type `CODE_LO_SPACE` there would not be a
+CodeObjectRegistry created. And this is the case we are seeing. 
 
-Work in progress...
+I'd like to try out the following patch:
+```console
+diff --git a/deps/v8/src/heap/spaces.cc b/deps/v8/src/heap/spaces.cc
+index dd8ba30101..3e8f2ec005 100644
+--- a/deps/v8/src/heap/spaces.cc
++++ b/deps/v8/src/heap/spaces.cc
+@@ -749,7 +749,7 @@ MemoryChunk* MemoryChunk::Initialize(Heap* heap, Address base, size_t size,
+ 
+   chunk->reservation_ = std::move(reservation);
+ 
+-  if (owner->identity() == CODE_SPACE) {
++  if (owner->identity() == CODE_SPACE || owner->identity() == CODE_LO_SPACE) {
+     chunk->code_object_registry_ = new CodeObjectRegistry();
+   } else {
+     chunk->code_object_registry_ = nullptr;
+```
+
+I've tried to verify this in the debugger but it has been difficult to do as
+there are alot of things that are optimized out.
+Now, how about we set the this in gdb to verify.
