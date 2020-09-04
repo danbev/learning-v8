@@ -7,24 +7,26 @@ A space refers to parts of the heap that are handled in different ways with
 regards to garbage collection:
 
 ```console
-+---------------------------------------------------------------------------------+
-|   Young Generation                  Old Generation          Large Object space  |
-|  +-------------+------------+  +-----------+-------------+ +------------------+ |
-|  | NEW_SPACE   |mark-sweep  |  | MAP_SPACE | OLD_SPACE   | | LO_SPACE         | |
-|  +-------------+------------+  +-----------+-------------+ +------------------+ |
-|  +-------------+               +-----------+               +------------------+ |
-|  | NEW_LO_SPACE|               | CODE_SPACE|               | CODE_LO_SPACE    | |
-|  +-------------+               +-----------+               +------------------+ |
-|                                                                                 |
-|   Read-only                                                                     |
-|  +--------------+                                                               |
-|  | RO_SPACE     |                                                               |
-|  +--------------+                                                               |
-+---------------------------------------------------------------------------------+
++----------------------- -----------------------------------------------------------+
+|   Young Generation                  Old Generation          Large Object space    |
+|  +-------------+--------------+  +-----------+-------------+ +------------------+ |
+|  |        NEW_SPACE           |  | MAP_SPACE | OLD_SPACE   | | LO_SPACE         | |
+|  +-------------+--------------+  +-----------+-------------+ +------------------+ |
+|  |to_SemiSpace |from_SemiSpace|                                                   |
+|  +-------------+--------------+  +-----------+-------------+ +------------------+ |
+|  +-------------+                +-----------+               +------------------+  |
+|  | NEW_LO_SPACE|                | CODE_SPACE|               | CODE_LO_SPACE    |  |
+|  +-------------+                +-----------+               +------------------+  |
+|                                                                                   |
+|   Read-only                                                                       |
+|  +--------------+                                                                 |
+|  | RO_SPACE     |                                                                 |
+|  +--------------+                                                                 |
++-----------------------------------------------------------------------------------+
 ```
 The `Map space` contains only map objects and they are non-movable.
 
-The base class for all spaces is BaseSpace which extends Malloced.
+The base class for all spaces is BaseSpace.
 
 #### BaseSpace
 BaseSpace is a super class of all Space classes in V8 which are spaces that are
