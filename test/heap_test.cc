@@ -20,6 +20,21 @@ TEST_F(HeapTest, FastProperties) {
   v8::internal::Heap* heap = internal_isolate->heap();
 }
 
+TEST_F(HeapTest, NewSpace) {
+  const v8::HandleScope handle_scope(isolate_);
+  Isolate::Scope isolate_scope(isolate_);
+  i::Isolate* internal_isolate = asInternal(isolate_);
+
+  v8::internal::Heap* heap = internal_isolate->heap();
+  PageAllocator* page_allocator = internal_isolate->page_allocator();
+  std::cout << "Page size (bytes): " << i::Page::kPageSize << '\n';
+  i::NewSpace new_space(heap, page_allocator, i::Page::kPageSize, i::Page::kPageSize*8);
+
+  i::AllocationResult result = new_space.AllocateRaw(64,
+      i::AllocationAlignment::kWordAligned);
+  i::HeapObject object = result.ToObject();
+}
+
 TEST_F(HeapTest, AllocateRaw) {
   const v8::HandleScope handle_scope(isolate_);
   Isolate::Scope isolate_scope(isolate_);
@@ -44,9 +59,13 @@ TEST_F(HeapTest, MemoryChunk) {
   i::HeapObject object = result.ToObject();
   i::MemoryChunk* chunk = i::MemoryChunk::FromHeapObject(object);
   EXPECT_EQ(chunk->IsWritable(), true);
+  std::cout << "Page size (bytes): " << i::MemoryChunk::kPageSize << '\n';
+  std::cout << "Buckets: " << chunk->buckets() << '\n';
+  std::cout << "owner: " << chunk->owner()->name() << '\n';
+  EXPECT_EQ(chunk->owner_identity(), i::AllocationSpace::CODE_LO_SPACE);
 }
 
-TEST_F(HeapTest, RegisterNewlyAllocatedCodeObject) {
+TEST_F(HeapTest, DISABLED_RegisterNewlyAllocatedCodeObject) {
   const v8::HandleScope handle_scope(isolate_);
   Isolate::Scope isolate_scope(isolate_);
   i::Isolate* internal_isolate = asInternal(isolate_);
@@ -68,7 +87,7 @@ TEST_F(HeapTest, RegisterNewlyAllocatedCodeObject) {
   ASSERT_DEATH(r->RegisterNewlyAllocatedCodeObject(heap_object.address()), "");
 }
 
-TEST_F(HeapTest, BasicMemoryChunk) {
+TEST_F(HeapTest, DISABLED_BasicMemoryChunk) {
   const v8::HandleScope handle_scope(isolate_);
   Isolate::Scope isolate_scope(isolate_);
   i::Isolate* internal_isolate = asInternal(isolate_);
