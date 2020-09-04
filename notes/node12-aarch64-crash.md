@@ -86,7 +86,7 @@ In `heap-inl.h` and `AllocateRaw` following code towards the end of the function
 242   return allocation;  
 ```
 This will call
-`MemoryChunk::FromHeapObject(object)->GetCodeObjectRegistry()->RegisterNewlyAllocatedCodeObject(object.address())`. 
+MemoryChunk::FromHeapObject(object)->GetCodeObjectRegistry()->RegisterNewlyAllocatedCodeObject(object.address()). 
 
 MemoryChunk::FromHeapObject is only a reinterpret_cast:
 ```c++
@@ -124,7 +124,7 @@ insert even though this was invalid:
 ```
 auto result = code_object_registry_newly_allocated_.insert(code);
 ```
-So we now understant the cause of the segmentation fault. But we still need to
+So we now understand the cause of the segmentation fault. But we still need to
 understand why this is happening.
 
 Lets create a break point so that we can easliy reproduce this:
@@ -187,7 +187,8 @@ I've attempted to reproduce this in [heap_test](https://github.com/danbev/learni
 
 I looks like the `code_object_registry_` is not gettting created in this case.
 In `MemoryChunk::Initialize` there is the following check
-(in `deps/v8/src/heap/spaces.cc`):
+(in deps/v8/src/heap/spaces.cc) which is called by
+CodeLargeObjectSpace::AllocateRaw which we showed earlier:
 ```c++
 MemoryChunk* MemoryChunk::Initialize(BasicMemoryChunk* basic_chunk, Heap* heap, 
                                      Executability executable) {   
@@ -265,7 +266,7 @@ Now, will this work if we let the debugger continue:
 ```
 Nope, that did not work :( 
 ```
-620	  auto result = code_object_registry_newly_allocated_.insert(code);
+620  auto result = code_object_registry_newly_allocated_.insert(code);
 (gdb) p this
 $54 = (v8::internal::CodeObjectRegistry * const) 0xffffbe809050
 (gdb) p code_object_registry_newly_allocated_.size()
@@ -278,4 +279,5 @@ a few messages about function being inlined. For example, if I try to call
 Cannot evaluate function -- may be inlined
 ```
 
-Work in progress...
+But applying this patch to node 12.16.1 it no longer crashes. Next step is to
+add a test to V8 and get some more eyes on this change.
