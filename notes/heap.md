@@ -62,6 +62,16 @@ void* Malloced::operator new(size_t size) {
   return result;
 }
 
+void* AllocWithRetry(size_t size) {
+  void* result = nullptr;
+  for (int i = 0; i < kAllocationTries; ++i) {
+    result = malloc(size);
+    if (result != nullptr) break;
+    if (!OnCriticalMemoryPressure(size)) break;
+  }
+  return result;
+}
+
 void Malloced::operator delete(void* p) { free(p); }
 ```
 So for all classes of type BaseSpace when those are created using the `new`
@@ -69,17 +79,25 @@ operator, the `Malloced::operator new` version will be called. This is like
 other types of operator overloading in c++. Here is a standalone example
 [new-override.cc](https://github.com/danbev/learning-cpp/blob/master/src/fundamentals/new-override.cc). 
 
-We can try this out using the debugger:
-```console
-$ lldb -- test/heap_test --gtest_filter=HeapTest.AllocateRaw
-(lldb) br s -f heap_test.cc -l 30
-(lldb) r
-(lldb) s
-```
-This will land us in v8::internal::Malloced::operator new. The function
-`AllocWithRetry' can be found in `allocation.cc` and will call `malloc`.
 
-So a space aquires chunks of memory from the operating system. 
+The spaces are create by `Heap::SetupSpaces`, which is called from
+`Isolate::Init`:
+```c++
+void Heap::SetUpSpaces() {
+  space_[NEW_SPACE] = new_space_ =
+      new NewSpace(this, memory_allocator_->data_page_allocator(),
+                   initial_semispace_size_, max_semi_space_size_);
+  space_[OLD_SPACE] = old_space_ = new OldSpace(this);
+  space_[CODE_SPACE] = code_space_ = new CodeSpace(this);
+  space_[MAP_SPACE] = map_space_ = new MapSpace(this);
+  space_[LO_SPACE] = lo_space_ = new OldLargeObjectSpace(this);
+  space_[NEW_LO_SPACE] = new_lo_space_ =
+      new NewLargeObjectSpace(this, new_space_->Capacity());
+  space_[CODE_LO_SPACE] = code_lo_space_ = new CodeLargeObjectSpace(this);
+  ...
+```
+Notice that this use the `new` operator and that they all extend Malloced so
+these instance will be allocated by Malloced.
 
 An instance of BaseSpace has a Heap associated with it, an AllocationSpace, and
 committed and uncommited counters.
@@ -107,14 +125,10 @@ enum AllocationSpace {
 ```
 There is an abstract superclass that extends BaseSpace named `Space`.
 
-### Space
-Is a concrete implementation of `BaseSpace` and the superclass of all other
-spaces.
-What are the spaces that are defined?  
-* NewSpace
-* PagedSpace
-* SemiSpace
-* LargeObjectSpace
+### NewSpace
+A NewSpace contains two SemiSpaces, one name `to_space_` and the other
+`from_space`.
+
 
 A space has a list of MemoryChunks that belong to the space.
 
