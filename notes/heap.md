@@ -28,6 +28,7 @@ The `Map space` contains only map objects and they are non-movable.
 
 The base class for all spaces is BaseSpace.
 
+
 #### BaseSpace
 BaseSpace is a super class of all Space classes in V8 which are spaces that are
 not read-only (sealed).
@@ -809,3 +810,426 @@ enum AllocationAlignment {
   kCodeAligned
 };
 ```
+### Heap::SetUp
+```c++
+  memory_allocator_.reset(                                                          
+      new MemoryAllocator(isolate_, MaxReserved(), code_range_size_));
+```
+
+### MemoryAllocator
+A memory allocator is what requires chunks of memory from the OS.
+Is defined in `src/heap/memory-allocator.h` and is created in Heap::SetUpg
+
+I want to know/understand where memory is allocated.
+
+When a MemoryAllocator is created it is passes an internal isolate, a capacity,
+and a code_range_size.
+Each instance has a PageAllocator for non-executable pages which is called
+data_page_allocator, and another that is for executable pages called
+code_page_allocator.
+
+The constructor can be found in `src/heap/memory-allocator.cc`:
+```c++
+MemoryAllocator::MemoryAllocator(Isolate* isolate, size_t capacity,
+                                 size_t code_range_size)
+    : isolate_(isolate),
+      data_page_allocator_(isolate->page_allocator()),
+      code_page_allocator_(nullptr),
+      capacity_(RoundUp(capacity, Page::kPageSize)),
+      size_(0),
+      size_executable_(0),
+      lowest_ever_allocated_(static_cast<Address>(-1ll)),
+      highest_ever_allocated_(kNullAddress),
+      unmapper_(isolate->heap(), this) {
+  InitializeCodePageAllocator(data_page_allocator_, code_range_size);
+}
+```
+We can see that the data_page_allocator_ is set to the isolates page_allocator.
+
+Notice that the above constructor calls `InitializeCodePageAllocator` which
+will set the `code_page_allocator`:
+```c++
+void MemoryAllocator::InitializeCodePageAllocator(
+    v8::PageAllocator* page_allocator, size_t requested) {
+
+  code_page_allocator_ = page_allocator;
+  ...
+  code_page_allocator_instance_ = std::make_unique<base::BoundedPageAllocator>(
+      page_allocator, aligned_base, size,
+      static_cast<size_t>(MemoryChunk::kAlignment));
+  code_page_allocator_ = code_page_allocator_instance_.get();
+```
+
+### PageAlloctor
+Is responsible for allocating pages from the underlying OS. This class is a
+abstract class (has virtual members that subclasses must implement).
+Can be found in `src/base/page-alloctor.h` and notice that it is in the
+`v8::base` namespace and it extends `v8::PageAllocator` which can be found
+in `include/v8-platform.h`.
+
+
+BoundedPageAllocator is 
+
+
+When we create a new Isolate (using Isolate::New) the default allocation mode
+will be `IsolateAllocationMode::kInV8Heap`:
+```c++
+  static Isolate* New(
+      IsolateAllocationMode mode = IsolateAllocationMode::kDefault);
+```
+```c++
+  // Allocate Isolate in C++ heap using default new/delete operators.
+  kInCppHeap,
+
+  // Allocate Isolate in a committed region inside V8 heap reservation.
+  kInV8Heap,
+
+#ifdef V8_COMPRESS_POINTERS
+  kDefault = kInV8Heap,
+#else
+  kDefault = kInCppHeap,
+#endif
+};
+```
+The first thing that happens in `New` is that an instance of IsolateAllocator
+is created.
+```c++
+// IsolateAllocator allocates the memory for the Isolate object according to
+// the given allocation mode.
+  std::unique_ptr<IsolateAllocator> isolate_allocator = std::make_unique<IsolateAllocator>(mode);
+```
+The constructor takes an AllocationMode as mentioned earlier.
+```c++
+IsolateAllocator::IsolateAllocator(IsolateAllocationMode mode) {
+#if V8_TARGET_ARCH_64_BIT
+  if (mode == IsolateAllocationMode::kInV8Heap) {
+    Address heap_reservation_address = InitReservation();
+    CommitPagesForIsolate(heap_reservation_address);
+    return;
+  }
+#endif  // V8_TARGET_ARCH_64_BIT
+```
+Lets take a closer look at InitReservation (`src/init/isolate-alloctor.cc`).
+```c++
+Address IsolateAllocator::InitReservation() {
+  v8::PageAllocator* platform_page_allocator = GetPlatformPageAllocator();
+  ...
+   VirtualMemory padded_reservation(platform_page_allocator,
+                                    reservation_size * 2,
+                                    reinterpret_cast<void*>(hint));
+```
+Notice that a VirtualMemory instance is created and the arguments passed. This
+is actually part of a retry loop but I've excluded that above.
+VirtualMemory's constructor can be found in `src/utils/allocation.cc`:
+```c++
+VirtualMemory::VirtualMemory(v8::PageAllocator* page_allocator, size_t size,
+                             void* hint, size_t alignment)
+    : page_allocator_(page_allocator) {
+  size_t page_size = page_allocator_->AllocatePageSize();
+  alignment = RoundUp(alignment, page_size);
+  Address address = reinterpret_cast<Address>(
+      AllocatePages(page_allocator_, hint, RoundUp(size, page_size), alignment,
+                    PageAllocator::kNoAccess));
+  ...
+}
+```
+And `AllocatePages` can be found in `src/base/page-allocator.cc`:
+```c++
+void* PageAllocator::AllocatePages(void* hint, size_t size, size_t alignment,
+                                   PageAllocator::Permission access) {
+  return base::OS::Allocate(hint, size, alignment,
+                            static_cast<base::OS::MemoryPermission>(access));
+}
+```
+Which will lead us to `base::OS::Allocate` which can be found in platform-posic.cc
+which can be found in `src/base/platform/platform-posix.cc`:
+```c++
+void* Allocate(void* hint, size_t size, OS::MemoryPermission access, PageType page_type) {
+  int prot = GetProtectionFromMemoryPermission(access);
+  int flags = GetFlagsForMemoryPermission(access, page_type);
+  void* result = mmap(hint, size, prot, flags, kMmapFd, kMmapFdOffset);
+  if (result == MAP_FAILED) return nullptr;
+  return result;
+}
+```
+Notice the call to `mmap` which is a system call. So this is as low as we get.
+I've written a small example of using
+[mmap](https://github.com/danbev/learning-linux-kernel/blob/master/mmap.c) and
+[notes](https://github.com/danbev/learning-linux-kernel#mmap-sysmmanh) which
+migth help to look at mmap in isolation and better understand what `Allocate`
+is doing.
+
+`prot` is the memory protection wanted for this mapping and is retrived by
+calling `GetProtectionFromMemoryPermission`:
+```c++
+int GetProtectionFromMemoryPermission(OS::MemoryPermission access) {
+  switch (access) {
+    case OS::MemoryPermission::kNoAccess:
+      return PROT_NONE;
+    case OS::MemoryPermission::kRead:
+      return PROT_READ;
+    case OS::MemoryPermission::kReadWrite:
+      return PROT_READ | PROT_WRITE;
+    case OS::MemoryPermission::kReadWriteExecute:
+      return PROT_READ | PROT_WRITE | PROT_EXEC;
+    case OS::MemoryPermission::kReadExecute:
+      return PROT_READ | PROT_EXEC;
+  }
+  UNREACHABLE();
+}
+```
+In our case this will return `PROT_NONE`.
+Next we get the flags to be used in the mmap call:
+```c++
+enum class PageType { kShared, kPrivate };
+
+int GetFlagsForMemoryPermission(OS::MemoryPermission access,
+                                PageType page_type) {
+  int flags = MAP_ANONYMOUS;
+  flags |= (page_type == PageType::kShared) ? MAP_SHARED : MAP_PRIVATE;
+  ...
+  return flags;
+```
+PageType in our case is `kPrivate` so this will add the `MAP_PRIVATE` flag to
+the flags, in addition to `MAP_ANONYMOUS`.
+
+So the following values are used in the call to mmap:
+```c++
+  void* result = mmap(hint, size, prot, flags, kMmapFd, kMmapFdOffset);
+```
+```console
+(lldb) expr hint
+(void *) $20 = 0x00001b9100000000
+(lldb) expr request_size/1073741824
+(unsigned long) $24 = 8
+(lldb) expr kMmapFd
+(const int) $17 = -1
+```
+`kMmapFdOffset` seems to be optimized out but we can see that it is `0x0` and
+passed in register `r9d` (as it is passed as the sixth argument):
+```console
+(lldb) disassemble
+->  0x7ffff39ba4ca <+53>:  mov    ecx, dword ptr [rbp - 0xc]
+    0x7ffff39ba4cd <+56>:  mov    edx, dword ptr [rbp - 0x10]
+    0x7ffff39ba4d0 <+59>:  mov    rsi, qword ptr [rbp - 0x20]
+    0x7ffff39ba4d4 <+63>:  mov    rax, qword ptr [rbp - 0x18]
+    0x7ffff39ba4d8 <+67>:  mov    r9d, 0x0
+    0x7ffff39ba4de <+73>:  mov    r8d, 0xffffffff
+    0x7ffff39ba4e4 <+79>:  mov    rdi, rax
+    0x7ffff39ba4e7 <+82>:  call   0x7ffff399f000            ; symbol stub for: mmap64
+```
+So if I've understood this correctly this is requesting a mapping of 8GB, with
+a memory protection of `PROT_NONE` which can be used to protect that mapping space
+and also allow it to be subdivied by calling mmap later with specific addresses
+in this mapping. These could then be called with other memory protections depending
+on the type of contents that should be stored there, for example for code objects
+it would be executable.
+
+So that will return the address to the new mapping, this will return us to
+```c++
+void* OS::Allocate(void* hint, size_t size, size_t alignment,
+                   MemoryPermission access) {
+  ...
+  void* result = base::Allocate(hint, request_size, access, PageType::kPrivate);
+  if (result == nullptr) return nullptr;
+
+  uint8_t* base = static_cast<uint8_t*>(result);
+  uint8_t* aligned_base = reinterpret_cast<uint8_t*>(
+      RoundUp(reinterpret_cast<uintptr_t>(base), alignment));
+  if (aligned_base != base) {
+    DCHECK_LT(base, aligned_base);
+    size_t prefix_size = static_cast<size_t>(aligned_base - base);
+    CHECK(Free(base, prefix_size));
+    request_size -= prefix_size;
+  }
+  // Unmap memory allocated after the potentially unaligned end.
+  if (size != request_size) {
+    DCHECK_LT(size, request_size);
+    size_t suffix_size = request_size - size;
+    CHECK(Free(aligned_base + size, suffix_size));
+    request_size -= suffix_size;
+  }
+
+  DCHECK_EQ(size, request_size);
+  return static_cast<void*>(aligned_base);
+}
+```
+TODO: figure out what why this unmapping is done.
+This return will return to `AllocatePages` which will just return to
+VirtualMemory's constructor where the address will be casted to an Address.
+```c++
+ Address address = reinterpret_cast<Address>(
+      AllocatePages(page_allocator_, hint, RoundUp(size, page_size), alignment,
+                    PageAllocator::kNoAccess));
+  if (address != kNullAddress) {
+    DCHECK(IsAligned(address, alignment));
+    region_ = base::AddressRegion(address, size);
+  }
+}
+```
+`AddressRegion` can be found in `src/base/address-region.h` and is a helper
+class to manage region with a start `address` and a size.
+After this call the VirtualMemory instance will look like this:
+```console
+(lldb) expr *this
+(v8::internal::VirtualMemory) $35 = {
+  page_allocator_ = 0x00000000004936b0
+  region_ = (address_ = 30309584207872, size_ = 8589934592)
+}
+```
+
+After `InitReservation` returns we will be in `IsolateAllocator::IsolateAllocator`:
+```c++
+  if (mode == IsolateAllocationMode::kInV8Heap) {
+    Address heap_reservation_address = InitReservation();
+    CommitPagesForIsolate(heap_reservation_address);
+    return;
+  }
+```
+
+In CommitPagesForIsolate we have :
+```c++
+void IsolateAllocator::CommitPagesForIsolate(Address heap_reservation_address) {
+  v8::PageAllocator* platform_page_allocator = GetPlatformPageAllocator();
+
+  Address isolate_root = heap_reservation_address + kIsolateRootBiasPageSize;
+
+
+  size_t page_size = RoundUp(size_t{1} << kPageSizeBits,
+                             platform_page_allocator->AllocatePageSize());
+
+  page_allocator_instance_ = std::make_unique<base::BoundedPageAllocator>(
+      platform_page_allocator, isolate_root, kPtrComprHeapReservationSize,
+      page_size);
+  page_allocator_ = page_allocator_instance_.get();
+```
+```
+(lldb) expr isolate_root
+(v8::internal::Address) $54 = 30309584207872
+```
+And notice that the VirtualMemory that we allocated above has the same memory
+address. 
+So we are creating a new instance of BoundedPageAllocator and setting this to
+page_allocator_instance_ (smart pointer) and also setting the pointer
+page_allocator_.
+
+```c++
+  Address isolate_address = isolate_root - Isolate::isolate_root_bias();
+  Address isolate_end = isolate_address + sizeof(Isolate);
+  {
+    Address reserved_region_address = isolate_root;
+    size_t reserved_region_size =
+        RoundUp(isolate_end, page_size) - reserved_region_address;
+
+    CHECK(page_allocator_instance_->AllocatePagesAt(
+        reserved_region_address, reserved_region_size,
+        PageAllocator::Permission::kNoAccess));
+  }
+```
+`AllocatePagesAt` will call `BoundedPageAllocator::AllocatePagesAt`:
+```c++
+bool BoundedPageAllocator::AllocatePagesAt(Address address, size_t size,
+                                           PageAllocator::Permission access) {
+  if (!region_allocator_.AllocateRegionAt(address, size)) {
+    return false;
+  }
+  CHECK(page_allocator_->SetPermissions(reinterpret_cast<void*>(address), size,
+                                        access));
+  return true;
+}
+```
+`SetPermissions` can be found in `platform-posix.cc` and looks like this:
+```c++
+bool OS::SetPermissions(void* address, size_t size, MemoryPermission access) {
+  ...
+  int prot = GetProtectionFromMemoryPermission(access);
+  int ret = mprotect(address, size, prot);
+```
+`mprotect` is a system call that can change a memory mappings protection.
+
+
+Now, lets see what goes on when we create a new Object, say of type String.
+```console
+(lldb) bt
+* thread #1, name = 'string_test', stop reason = step in
+  * frame #0: 0x00007ffff633d55a libv8.so`v8::internal::FactoryBase<v8::internal::Factory>::AllocateRawWithImmortalMap(this=0x00001d1000000000, size=20, allocation=kYoung, map=Map @ 0x00007fffffffcab8, alignment=kWordAligned) at factory-base.cc:817:3
+    frame #1: 0x00007ffff633c2f1 libv8.so`v8::internal::FactoryBase<v8::internal::Factory>::NewRawOneByteString(this=0x00001d1000000000, length=6, allocation=kYoung) at factory-base.cc:533:14
+    frame #2: 0x00007ffff634771e libv8.so`v8::internal::Factory::NewStringFromOneByte(this=0x00001d1000000000, string=0x00007fffffffcbd0, allocation=kYoung) at factory.cc:607:3
+    frame #3: 0x00007ffff5fc1c54 libv8.so`v8::(anonymous namespace)::NewString(factory=0x00001d1000000000, type=kNormal, string=(start_ = "bajja", length_ = 6)) at api.cc:6381:46
+    frame #4: 0x00007ffff5fc2284 libv8.so`v8::String::NewFromOneByte(isolate=0x00001d1000000000, data="bajja", type=kNormal, length=6) at api.cc:6439:3
+    frame #5: 0x0000000000413fa4 string_test`StringTest_create_Test::TestBody(this=0x000000000048dff0) at string_test.cc:18:8
+```
+If we look at the call `AllocateRawWithImmortalMap` we find:
+```c++
+  HeapObject result = AllocateRaw(size, allocation, alignment);
+```
+AllocateRaw will end up in FactoryBase<Impl>::AllocateRaw:
+```c++
+HeapObject FactoryBase<Impl>::AllocateRaw(int size, AllocationType allocation,
+                                          AllocationAlignment alignment) {
+  return impl()->AllocateRaw(size, allocation, alignment);
+}
+```
+Which will end up in `Factory::AllocateRaw`:
+```c++
+HeapObject Factory::AllocateRaw(int size, AllocationType allocation,
+                                AllocationAlignment alignment) {
+  return isolate()->heap()->AllocateRawWith<Heap::kRetryOrFail>(
+      size, allocation, AllocationOrigin::kRuntime, alignment);
+  
+}
+```
+
+```c++
+   case kRetryOrFail:
+-> 297 	      return AllocateRawWithRetryOrFailSlowPath(size, allocation, origin,
+   298 	                                                alignment);
+```
+```c++
+ 5165	  AllocationResult alloc;
+   5166	  HeapObject result =
+-> 5167	      AllocateRawWithLightRetrySlowPath(size, allocation, origin, alignment);
+```
+
+```c++
+-> 5143	  HeapObject result;
+   5144	  AllocationResult alloc = AllocateRaw(size, allocation, origin, alignment);
+```
+
+```c++
+-> 210 	        allocation = new_space_->AllocateRaw(size_in_bytes, alignment, origin);
+```
+```c++
+-> 95  	    result = AllocateFastUnaligned(size_in_bytes, origin);
+```
+
+```c++
+AllocationResult NewSpace::AllocateFastUnaligned(int size_in_bytes,
+                                                 AllocationOrigin origin) {
+  Address top = allocation_info_.top();
+
+  HeapObject obj = HeapObject::FromAddress(top);
+  allocation_info_.set_top(top + size_in_bytes);
+```
+Where `allocation_info_` is of type `LinearAllocationArea`. Notice that a
+HeapObject is created using the value of top. This is a pointer to the top
+of the address of mapped memory that this space manages. And after this top
+is increased by the size of the object. 
+
+`AllocateRawWithImmortalMap`:
+```c++
+   818 	  HeapObject result = AllocateRaw(size, allocation, alignment);
+-> 819 	  result.set_map_after_allocation(map, SKIP_WRITE_BARRIER);
+   820 	  return result;
+```
+
+
+
+Now, every Space will have a region of mapped memory that it can manage. For
+example the new space would have it and it would manage it with a pointer
+to the top of allocated memory. To create an object it could return the top address
+and increase the top with the size of the object in question. Functions that
+set values on the object would have to write to the field specified by the
+layout of the object. TODO: verify if that is actually what is happening.
+
+
