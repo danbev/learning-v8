@@ -12,7 +12,12 @@ namespace i = v8::internal;
 class HeapTest : public V8TestFixture {
 };
 
-TEST_F(HeapTest, FastProperties) {
+TEST_F(HeapTest, PageAllocator) {
+  v8::PageAllocator* allocator = platform_->GetPageAllocator();
+
+  std::cout << "AllocatePageSize: " << allocator->AllocatePageSize() << '\n';
+  std::cout << "CommitPageSize: " << allocator->CommitPageSize() << '\n';
+}
   const v8::HandleScope handle_scope(isolate_);
   Isolate::Scope isolate_scope(isolate_);
   i::Isolate* internal_isolate = asInternal(isolate_);
