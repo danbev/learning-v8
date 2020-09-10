@@ -18,11 +18,20 @@ TEST_F(HeapTest, PageAllocator) {
   std::cout << "AllocatePageSize: " << allocator->AllocatePageSize() << '\n';
   std::cout << "CommitPageSize: " << allocator->CommitPageSize() << '\n';
 }
+
+TEST_F(HeapTest, MemoryAllocator) {
   const v8::HandleScope handle_scope(isolate_);
   Isolate::Scope isolate_scope(isolate_);
   i::Isolate* internal_isolate = asInternal(isolate_);
 
   v8::internal::Heap* heap = internal_isolate->heap();
+  v8::internal::MemoryAllocator* allocator = heap->memory_allocator();
+  std::cout << "Size: " << allocator->Size() << '\n';
+
+  // PageAllocator for non-executable pages
+  v8::PageAllocator* data_page_allocator = allocator->data_page_allocator();
+  // PageAllocator for executable pages
+  v8::PageAllocator* code_page_allocator = allocator->code_page_allocator();
 }
 
 TEST_F(HeapTest, NewSpace) {
