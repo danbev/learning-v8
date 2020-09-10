@@ -218,6 +218,27 @@ AllocatePageSize: 4096
 CommitPageSize: 4096
 ```
 
+PageAllocator is the interface for interacting with with memory pages (memory
+units of 4096 bytes).
+The PageAllocator implemention provided by V8 is what interacts with the
+underlying operating system via the base::OS class (src/base/platform/platform.h).
+
+And this PageAllocator instance was created when the DefaultPlatform was
+created allowing it to be accessed using GetPlatformPageAllocator:
+```c++
+Address IsolateAllocator::InitReservation() {
+  v8::PageAllocator* platform_page_allocator = GetPlatformPageAllocator();
+  ...
+   VirtualMemory padded_reservation(platform_page_allocator,
+                                    reservation_size * 2,
+                                    reinterpret_cast<void*>(hint));
+
+  ...
+  reservation_ = std::move(reservation);
+```
+
+
+
 
 
 Notice that a VirtualMemory instance is created and the arguments passed. This
