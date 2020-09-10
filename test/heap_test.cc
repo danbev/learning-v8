@@ -42,7 +42,7 @@ TEST_F(HeapTest, NewSpace) {
   v8::internal::Heap* heap = internal_isolate->heap();
   PageAllocator* page_allocator = internal_isolate->page_allocator();
   std::cout << "Page size (bytes): " << i::Page::kPageSize << '\n';
-  i::NewSpace new_space(heap, page_allocator, i::Page::kPageSize, i::Page::kPageSize*8);
+  i::NewSpace new_space(heap, page_allocator, i::Page::kPageSize, i::Page::kPageSize*2);
 
   i::AllocationResult result = new_space.AllocateRaw(64,
       i::AllocationAlignment::kWordAligned);
@@ -73,10 +73,15 @@ TEST_F(HeapTest, MemoryChunk) {
   i::HeapObject object = result.ToObject();
   i::MemoryChunk* chunk = i::MemoryChunk::FromHeapObject(object);
   EXPECT_EQ(chunk->IsWritable(), true);
-  std::cout << "Page size (bytes): " << i::MemoryChunk::kPageSize << '\n';
+  std::cout << "Page size (bytes): " << i::MemoryChunk::kPageSize/1024 << '\n';
   std::cout << "Buckets: " << chunk->buckets() << '\n';
   std::cout << "owner: " << chunk->owner()->name() << '\n';
   EXPECT_EQ(chunk->owner_identity(), i::AllocationSpace::CODE_LO_SPACE);
+  // I think the this is the marking bit map used when the gc finds a
+  // live object and uses this bit map to indicate that it is alive.
+  // TODO: take a closer look at how this works with GC.
+  i::ConcurrentBitmap<i::AccessMode::NON_ATOMIC>* marking =
+      chunk->marking_bitmap<i::AccessMode::NON_ATOMIC>();
 }
 
 TEST_F(HeapTest, DISABLED_RegisterNewlyAllocatedCodeObject) {
