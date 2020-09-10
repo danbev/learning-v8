@@ -533,7 +533,7 @@ regards to garbage collection:
 |  +-------------+--------------+  +-----------+-------------+ +------------------+ |
 |  |        NEW_SPACE           |  | MAP_SPACE | OLD_SPACE   | | LO_SPACE         | |
 |  +-------------+--------------+  +-----------+-------------+ +------------------+ |
-|  |to_SemiSpace |from_SemiSpace|                                                   |
+|  |  from_Space   | to_Space   |                                                   |
 |  +-------------+--------------+                                                   |
 |  +-------------+                 +-----------+               +------------------+ |
 |  | NEW_LO_SPACE|                 | CODE_SPACE|               | CODE_LO_SPACE    | |
@@ -545,6 +545,11 @@ regards to garbage collection:
 |  +--------------+                                                                 |
 +-----------------------------------------------------------------------------------+
 ```
+The NEW_SPACE has a space called the nursery, and one called intermediate space.
+All newly allocated object go into the nursery, and if they are alive after a
+marking phase they are moved into the intermediate. If the object survives multiple
+gc rounds it will then be moved into the OLD_SPACE.
+
 The `Map space` contains only map objects and they are non-movable.
 
 The base class for all spaces is BaseSpace.
@@ -648,8 +653,67 @@ enum AllocationSpace {
 There is an abstract superclass that extends BaseSpace named `Space`.
 
 ### NewSpace
-A NewSpace contains two SemiSpaces, one name `to_space_` and the other
-`from_space`.
+A NewSpace contains two [SemiSpace](https://www.memorymanagement.org/glossary/s.html#semi.space)'s,
+one name `to_space_` and the other `from_space`. These are a subdivision and are
+sometimes called the nursery and intermediate spaces. 
+
+To understand the motivation for these semi spaces we need to understand a little
+about the garbage collection that V8 does.
+
+### Scavenger
+Garbage collection involves visiting all the known roots in the program, like
+globals and pointers on the stack, and marking all the objects that can be
+reached. When this stage is done every thing else is garbage. After this
+all the marked objects are moved into the to_space.
+```
+ptrs   from_space (evacuation)   to_space
+      +----------+            +------------+
+----->|marked: * | ---------->|marked: s   |       (s=survived)
+      +----------+            +------------+
+      |marked:   |      ----->|marked: s   |
+      +----------+     /      +------------+
+----->|marked: * | ----       |            |
+      +----------+            +------------+
+      |marked:   |            |            |
+      +----------+            +------------+
+      |marked:   |            |            |
+      +----------+            +------------+
+```
+Notice that the pointers from globals/stack are now invalid and pointing and
+need to be updated to point to the `to_space`. After that is done the spaces
+are switched and new object can be added to the nursery again, below the two
+objects that survived the gc. 
+If those object that were marked with an `s` above (that is just something I added
+as I'm not sure how the marking works. I can see that every HeapObject has a
+MemoryChunk has a `marking_bitmap which I should look closer at), they will
+be moved to the old generation.
+This type of GC is called scavenger.
+
+### Full Mark-Compact GC
+Deals with the whole heap including old generation.
+
+The first stage is a sweep, in which the heap is searched for non-marked object
+and those are pointed to by a FreeList
+```
+ Page 1              FreeList                        Page 1
++----------+        +--------------+		+------------+
+|marked: * |---\    |    Size 1    |	--------|marked: s   |
++----------+    \   | +----------+ |   /	+------------+
+|marked:   |     ---|>|__________| |  /	       -|marked: s   |
++----------+        | |__________|<|--        /	+------------+
+|marked: * |--\     | |__________| |         /	|            |
++----------+   \    |    Size 2    |        /	+------------+
+|marked:   |    \   | +----------+ |       /	|            |
++----------+     ---|>|__________|<|-------	+------------+
+|marked:   |        | |__________| |		|            |
++----------+        | |__________| |            +------------+
+                    +--------------+
+```
+So the free list separated by size of available object and can be reused
+for object that fit into that chunk of memory. So when placing something into
+the old space the free list can be searched for a slot.
+The pages (page 1 and page 2 above) can be compacted sometimes. TODO: when/how?
+
 
 Class NewSpace extends SpaceWithLinearArea (can be found in `src/heap/spaces.h`).
 
