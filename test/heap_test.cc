@@ -19,6 +19,19 @@ TEST_F(HeapTest, PlatformPageAllocator) {
   std::cout << "AllocatePageSize: " << platform_page_allocator->AllocatePageSize() << '\n';
   std::cout << "CommitPageSize: " << platform_page_allocator->CommitPageSize() << '\n';
 }
+
+TEST_F(HeapTest, IsolatePageAllocator) {
+  const v8::HandleScope handle_scope(isolate_);
+  Isolate::Scope isolate_scope(isolate_);
+  i::Isolate* internal_isolate = asInternal(isolate_);
+
+  v8::base::BoundedPageAllocator* bp =
+    reinterpret_cast<v8::base::BoundedPageAllocator*>(internal_isolate->page_allocator());
+  std::cout << "BoundedPageAllocator:\n";
+  std::cout << "begin addresss: " << bp->begin() << '\n';
+  std::cout << "size: " << bp->size() << '\n';
+  std::cout << "AllocatePageSize: " << bp->AllocatePageSize()/1024 << '\n';
+  std::cout << "CommitPageSize: " << bp->CommitPageSize() << '\n';
 }
 
 TEST_F(HeapTest, MemoryAllocator) {
