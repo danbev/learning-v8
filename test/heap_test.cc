@@ -12,11 +12,13 @@ namespace i = v8::internal;
 class HeapTest : public V8TestFixture {
 };
 
-TEST_F(HeapTest, PageAllocator) {
-  v8::PageAllocator* allocator = platform_->GetPageAllocator();
+TEST_F(HeapTest, PlatformPageAllocator) {
+  v8::PageAllocator* platform_page_allocator = platform_->GetPageAllocator();
 
-  std::cout << "AllocatePageSize: " << allocator->AllocatePageSize() << '\n';
-  std::cout << "CommitPageSize: " << allocator->CommitPageSize() << '\n';
+  std::cout << "Platform PageAllocator:\n";
+  std::cout << "AllocatePageSize: " << platform_page_allocator->AllocatePageSize() << '\n';
+  std::cout << "CommitPageSize: " << platform_page_allocator->CommitPageSize() << '\n';
+}
 }
 
 TEST_F(HeapTest, MemoryAllocator) {
