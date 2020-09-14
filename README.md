@@ -922,15 +922,24 @@ Lets take a closer look at the above:
   v8::internal::Object** gl = ((v8::internal::Object**)(*global));
 ```
 We use the dereference operator to get the value of a Local (*global), which is
-just of type `T*`, a pointer to the type the Local. We are then casting that to
-be of type pointer-to-pointer to Object.
+just of type `T*`, a pointer to the type the Local:
+```c++
+template <class T>
+class Local {
+  ...
+ private:
+  T* val_;
+}
 ```
-  gl         Object*         Object
+
+We are then casting that to be of type pointer-to-pointer to Object.
+```
+  gl**        Object*         Object
 +-----+      +------+      +-------+
 |     |----->|      |----->|       |
 +-----+      +------+      +-------+
 ```
-An instance of v8::internal::Object only has a single data member which is a
+An instance of `v8::internal::Object` only has a single data member which is a
 field named `ptr_` of type `Address`:
 
 `src/objects/objects.h`:
@@ -1010,13 +1019,14 @@ from its only super class and this is `ptr_`.
 
 So the following is telling the compiler to treat the value of our Local,
 `*global`, as a pointer (which it already is) to a pointer that points to
-a memory location that confirms to the layout of an v8::internal::Object type,
+a memory location that adhers to the layout of an `v8::internal::Object` type,
 which we know now has a `prt_` member. And we want to dereference it and pass
 it into the function.
 ```c++
 _v8_internal_Print_Object(*((v8::internal::Object**)(*global)));
 ```
 
+### ObjectTemplate
 But I'm still missing the connection between ObjectTemplate and object.
 When we create it we use:
 ```c++
@@ -1986,7 +1996,7 @@ Inspect third int field (bit_field3):
 So we know that a Map instance is a pointer allocated by the Heap and with a specific 
 size. Fields are accessed using indexes (remember there are no member fields in the Map class).
 We also know that all HeapObject have a Map. The Map is sometimes referred to as the HiddenClass
-and somethime the shape of an object. If two objects have the same properties they would share 
+and sometimes the shape of an object. If two objects have the same properties they would share 
 the same Map. This makes sense and I've see blog post that show this but I'd like to verify
 this to fully understand it.
 I'm going to try to match https://v8project.blogspot.com/2017/08/fast-properties.html with 
@@ -2848,8 +2858,9 @@ What we are doing caching knowledge about the layout of the previously seen obje
     $ lldb -- out/x64.debug/d8 class.js
 
 #### HeapObject
-This class describes heap allocated objects. It is in this class we find information regarding the type of object. This 
-information is contained in `v8::internal::Map`.
+This class describes heap allocated objects. It is in this class we find
+information regarding the type of object. This information is contained in
+`v8::internal::Map`.
 
 ### v8::internal::Map
 `src/objects/map.h`  
@@ -2873,15 +2884,16 @@ entries:
 [3] first descriptor  
 ```
 ### Factory
-Each Internal Isolate has a Factory which is used to create instances. This is because all handles needs to be allocated
-using the factory (src/heap/factory.h)
+Each Internal Isolate has a Factory which is used to create instances. This is
+because all handles needs to be allocated using the factory (src/heap/factory.h)
 
 
 ### Objects 
 All objects extend the abstract class Object (src/objects/objects.h).
 
 ### Oddball
-This class extends HeapObject and  describes `null`, `undefined`, `true`, and `false` objects.
+This class extends HeapObject and  describes `null`, `undefined`, `true`, and
+`false` objects.
 
 
 #### Map
@@ -3004,18 +3016,20 @@ FUNC at 0
 You can find the declaration of EXPRESSION in ast.h.
 
 ### Bytecode
-Can be found in src/interpreter/bytecodes.h
+Can be found in `src/interpreter/bytecodes.h`
 
 * StackCheck checks that stack limits are not exceeded to guard against overflow.
 * `Star` Store content in accumulator regiser in register (the operand).
 * Ldar   LoaD accumulator from Register argument a1 which is b
 
-The registers are not machine registers, apart from the accumlator as I understand it, but would instead be stack allocated.
+The registers are not machine registers, apart from the accumlator as I
+understand it, but would instead be stack allocated.
 
 
 #### Parsing
-Parsing is the parsing of the JavaScript and the generation of the abstract syntax tree. That tree is then visited and 
-bytecode generated from it. This section tries to figure out where in the code these operations are performed.
+Parsing is the parsing of the JavaScript and the generation of the abstract
+syntax tree. That tree is then visited and bytecode generated from it. This
+section tries to figure out where in the code these operations are performed.
 
 For example, take the script example.
 
