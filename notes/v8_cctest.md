@@ -56,3 +56,8 @@ test/cctest/heap/heap-tester.h which has the following macro:
 ```
 This will work to compile and run the test manually but it might fail on CI unless
 the functions being used are also declared with V8_EXPORT_PRIVATE.
+
+Running test with stress options:
+```console
+$ out/learning_v8/cctest test-heap/CodeLargeObjectSpace --random-seed=768076620 --stress-incremental-marking --nohard-abort --testing-d8-test-runner
+```
