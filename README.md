@@ -3760,8 +3760,20 @@ void BigIntToI64Assembler::GenerateBigIntToI64Impl() {
 From the resulting class you can see how `Parameter` can be used from within `TF_BUILTIN` macro.
 
 ## Building V8
-You'll need to have checked out the Google V8 sources to you local file system and build it by following 
-the instructions found [here](https://developers.google.com/v8/build).
+You'll need to have checked out the Google V8 sources to you local file system
+and build it by following the instructions found [here](https://developers.google.com/v8/build).
+
+### Configure v8 build for learning-v8
+There is a make target that can generate a build configuration for V8 that is
+specific to this project. It can be run using the following command:
+```
+$ make configure_v8
+```
+Then to compile this configuration:
+``` console
+$ make compile_v8
+```
+
 
 ### [gclient](https://www.chromium.org/developers/how-tos/depottools) sync
 ```console
