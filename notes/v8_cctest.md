@@ -39,5 +39,20 @@ $ out/learning_v8/cctest --list
 ```
 From this you can grep for the name and then use the name:
 ```console
-$ out/learning_v8/cctest test-spaces/OldLargeObjectSpace
+$ out/learning_v8/cctest test-heap/CodeLargeObjectSpace
+
 ```
+
+One might have to make certain functions available to tests. For example, I ran
+into this when adding a test to test/cctest/heap/test-heap.cc. There is header
+test/cctest/heap/heap-tester.h which has the following macro:
+```c++
+// Tests that should have access to private methods of {v8::internal::Heap}.
+// Those tests need to be defined using HEAP_TEST(Name) { ... }.
+#define HEAP_TEST_METHODS(V)                                \
+  V(CodeLargeObjectSpace)                                   \
+  V(CompactionFullAbortedPage)                              \
+  ...
+```
+This will work to compile and run the test manually but it might fail on CI unless
+the functions being used are also declared with V8_EXPORT_PRIVATE.
