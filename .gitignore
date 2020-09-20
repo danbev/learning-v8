@@ -46,3 +46,4 @@ test/arraybuffer_test
 gen
 snapshot_test
 test/functioncallbackargs_test
+test/parameterized_test
