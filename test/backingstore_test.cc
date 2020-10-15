@@ -41,6 +41,7 @@ TEST_F(BackingStoreTest, GetBackingStoreWithDeleter) {
   // A BackingStore is a wrapper around raw memory
   std::shared_ptr<BackingStore> backingstore = ab->GetBackingStore();
   EXPECT_EQ(static_cast<int>(backingstore->ByteLength()), 6);
+  std::cout << "store count: " << backingstore.use_count() << '\n';
 
   ab->Detach();
 }
