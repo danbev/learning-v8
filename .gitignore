@@ -47,3 +47,4 @@ gen
 snapshot_test
 test/functioncallbackargs_test
 test/parameterized_test
+test/backingstore_test
