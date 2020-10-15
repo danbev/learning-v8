@@ -53,7 +53,7 @@ SUMMARY: AddressSanitizer: new-delete-type-mismatch (/lib64/libasan.so.5+0x11117
 ==2773765==ABORTING
 ```
 Now this is somewhat hard to follow with the Node testing fixture mixed in but
-I've tried to reproduce this using [backingstore_test.cc](./test/backingstore_test.cc).
+I've tried to reproduce this using [backingstore_test.cc](../test/backingstore_test.cc).
 
 If we take a look at v8::ArrayBuffer::NewBackingStore we have the following:
 ```c++
