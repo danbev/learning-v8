@@ -116,4 +116,7 @@ index 06846d7005..8e71a04027 100644
  }  // namespace v8
 ```
 Which worked. I'm going to try this patch on Node upstream/master and see
-if this works there too.
+if this works there too. It worked there too. 
+
+Next step will be to open a pull request against V8 with a test reproducing and
+perhaps float that patch in node if the patch is accepted.
