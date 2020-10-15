@@ -84,7 +84,9 @@ exceptions: snapshot_blob.bin exceptions.cc
 snapshot_blob.bin: $(v8_build_dir)/$@
 	@cp $(v8_build_dir)/$@ .
 
-test/%: CXXFLAGS = -Wall -g -O0 test/main.cc $@.cc -o $@  ./lib/gtest/libgtest.a -std=c++14 \
+test/backingstore_test: CXXFLAGS = "-fsanitize=address"
+
+test/% test/backingstore_test: CXXFLAGS += -Wall -g -O0 test/main.cc $@.cc -o $@  ./lib/gtest/libgtest.a -std=c++14 \
 	  -fno-exceptions -fno-rtti -Wcast-function-type -Wno-unused-variable \
 	  -Wno-class-memaccess -Wno-comment -Wno-unused-but-set-variable \
 	  -DV8_COMPRESS_POINTERS \
@@ -99,8 +101,12 @@ test/%: CXXFLAGS = -Wall -g -O0 test/main.cc $@.cc -o $@  ./lib/gtest/libgtest.a
           $(v8_dylibs) \
           -Wl,-L$(v8_build_dir) -Wl,-rpath,$(v8_build_dir) -Wl,-lstdc++ -Wl,-lpthread
 
+
+
 test/%: test/%.cc test/v8_test_fixture.h
 	${CXX} ${CXXFLAGS}
+
+backingstore-asn: test/backingstore_test
 
 test/isolate_test: obj_files:="${v8_build_dir}/obj/v8_base_without_compiler/snapshot.o"
 test/map_test: obj_files:="${v8_build_dir}/obj/v8_base_without_compiler/map.o"

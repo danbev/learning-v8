@@ -12,10 +12,6 @@ namespace i = v8::internal;
 class BackingStoreTest : public V8TestFixture {
 };
 
-void FreeCallback(char* data, void* hint) {
-  std::cout << "FreeCallback data: " << data << '\n';
-}
-
 void BackingStoreDeleter(void* data, size_t length, void* deleter_data) {
   std::cout << "BackingStoreDeleter"
             << "  data: " << static_cast<char*>(data) 
@@ -45,4 +41,6 @@ TEST_F(BackingStoreTest, GetBackingStoreWithDeleter) {
   // A BackingStore is a wrapper around raw memory
   std::shared_ptr<BackingStore> backingstore = ab->GetBackingStore();
   EXPECT_EQ(static_cast<int>(backingstore->ByteLength()), 6);
+
+  ab->Detach();
 }
