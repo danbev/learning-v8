@@ -98,7 +98,7 @@ could lead to this error because we are deleting a BackingStoreBase object
 through BackingStore pointer. If the BackingStoreBase class's destructor is not
 virtual then BackingStore class's destructor will not be run. A standalone
 example of this can be found here 
-[virtual-desctructor.cc)](https://github.com/danbev/learning-cpp/blob/master/src/fundamentals/virtual-desctructor.cc).
+[virtual-desctructor.cc](https://github.com/danbev/learning-cpp/blob/master/src/fundamentals/virtual-desctructor.cc).
 
 
 I'm trying the following patch:
