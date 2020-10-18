@@ -68,9 +68,21 @@ To enable address sanitizer, first install asan:
 $ sudo dnf install libasan libasan-static
 ```
 And then add `is_asan=true` to the build args, which in my case is
-out/learning_v8/args.gn
+out/learning_v8/args.gn:
 ```console
 is_asan = true
+is_clang = true
+```
+Notice that `is_clang` also has to be set or there will be error:
+```console
+[1/1] Regenerating ninja files
+FAILED: build.ninja
+../../buildtools/linux64/gn --root=../.. -q gen .
+ERROR at //build/config/sanitizers/sanitizers.gni:195:1: Assertion failed.
+assert(!using_sanitizer || is_clang,
+^-----
+Sanitizers (is_*san) require setting is_clang = true in 'gn args'
+See //build/config/v8_target_cpu.gni:5:1: whence it was imported.
 ```
 
 #### Parameterized tests
