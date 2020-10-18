@@ -62,6 +62,16 @@ Running test with stress options:
 $ out/learning_v8/cctest test-heap/CodeLargeObjectSpace --random-seed=768076620 --stress-incremental-marking --nohard-abort --testing-d8-test-runner
 ```
 
+### Address sanitizer
+To enable address sanitizer, first install asan:
+```console
+$ sudo dnf install libasan libasan-static
+```
+And then add `is_asan=true` to the build args, which in my case is
+out/learning_v8/args.gn
+```console
+is_asan = true
+```
 
 #### Parameterized tests
 This section shows an example of a parameterized test in V8 and also notes
