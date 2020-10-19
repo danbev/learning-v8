@@ -184,13 +184,13 @@ class V8_EXPORT_PRIVATE BackingStore : public BackingStoreBase {
  public:
   ~BackingStore();
 ```
-And we have the definition of BackingStoreBase in include/v8-internal.h, with
+And we have the definition of BackingStoreBase in include/v8-internal.h, which
 I've added a destructor which prints out the this pointer:
 ```c++
 class BackingStoreBase {
   public:
     ~BackingStoreBase() {
-      std::cout << "BackingStoreBase. bs=" << this << '\n';
+      std::cout << "~BackingStoreBase. bs=" << this << '\n';
     }
 };
 ```
@@ -252,19 +252,62 @@ After the move the ownership is released and the shared_ptr owns it now.
 Now, after the `CHECK_IMPLIES` the scope of backing_store will end and if the
 usage count is 0 at this point then the destructor will be called.
 
-So this will v8::BackingStore::~BackingStore() which will manually call
-v8::internal::~BackingStore() which will call the custom deleter and then
-return. Then the next destructor for v8::BackingStore will be called which
-is v8::internal::~BackingStoreBase() and then the manual call to v8::internal::BackingStore
-is done. But v8::BackingStore also extends v8::internal::BackingStore so it its
-destructor will be called for it.
-
+So v8::BackingStore::~BackingStore() will be called, which will manually call
+v8::internal::~BackingStore(), which will call the custom deleter and then
+return. Next, v8::internal::~BackingStoreBase() is called. But v8::BackingStore
+also extends v8::internal::BackingStore so it its destructor will be called for
+it. 
 
 A standalone example of this issue can be found in 
 [virtual-desctructor.cc](https://github.com/danbev/learning-cpp/blob/master/src/fundamentals/virtual-desctructor.cc).
 It is interesting to note that this will report the asan error when compiled
 with gcc but not when compiled with clang.
 
+And lets make ~BackingStoreBase virtual and we will notice that there will only
+be one call to ~BackingStoreBase. Why is that? 
+First note/recall that we are dealing with pointers to the same underlying
+instance of BackingStoreBase, we have only casted it into a type of
+v8::BackingStore. When the destructor is non-virtual, or not defined, in
+v8::internal::BackingStoreBase, v8::BackingStore and v8::internal::BackingStore
+will have separate destructor implementations. When we add a virtual destructor
+polymorphism will be used and the destructor called will depend on the type
+of pointer, in our case in Detach the type will be v8::internal::BackingStore
+so it's destructor will be run which is what we want.  
+
+```c++
+  delete __ptr;
+```
+```console
+(lldb) expr __ptr
+(v8::BackingStore *) $0 = 0x0000604000008150
+```
+So we are using a pointer to v8::BackingStore which is derived from
+v8::internal::BackingStoreBase. 
+
+Lets see how asan describes this address:
+```console
+(lldb) expr (void)__asan_describe_address(0x604000008150)
+0x604000008150 is located 0 bytes inside of 48-byte region [0x604000008150,0x604000008180)
+allocated by thread T0 here:
+    #0 0x7ffff7684a97 in operator new(unsigned long) (/lib64/libasan.so.5+0x10fa97)
+    #1 0x7ffff5adf9ff in v8::internal::BackingStore::WrapAllocation(void*, unsigned long, void (*)(void*, unsigned long, void*), void*, v8::internal::SharedFlag) ../../src/objects/backing-store.cc:608
+    #2 0x7ffff54ca25c in v8::ArrayBuffer::NewBackingStore(void*, unsigned long, void (*)(void*, unsigned long, void*), void*) ../../src/api/api.cc:7658
+    #3 0x415706 in BackingStoreTest_GetBackingStoreWithDeleter_Test::TestBody() test/backingstore_test.cc:39
+    #4 0x43f4c8 in void testing::internal::HandleSehExceptionsInMethodIfSupported<testing::Test, void>(testing::Test*, void (testing::Test::*)(), char const*) /home/danielbevenius/work/google/learning-v8/deps/googletest/googletest/src/gtest.cc:2443
+    #5 0x439ffe in void testing::internal::HandleExceptionsInMethodIfSupported<testing::Test, void>(testing::Test*, void (testing::Test::*)(), char const*) /home/danielbevenius/work/google/learning-v8/deps/googletest/googletest/src/gtest.cc:2498
+    #6 0x41f8b5 in testing::Test::Run() /home/danielbevenius/work/google/learning-v8/deps/googletest/googletest/src/gtest.cc:2517
+    #7 0x41ffb6 in testing::TestInfo::Run() /home/danielbevenius/work/google/learning-v8/deps/googletest/googletest/src/gtest.cc:2693
+    #8 0x420540 in testing::TestCase::Run() /home/danielbevenius/work/google/learning-v8/deps/googletest/googletest/src/gtest.cc:2811
+    #9 0x428d9b in testing::internal::UnitTestImpl::RunAllTests() /home/danielbevenius/work/google/learning-v8/deps/googletest/googletest/src/gtest.cc:5177
+    #10 0x4404bb in bool testing::internal::HandleSehExceptionsInMethodIfSupported<testing::internal::UnitTestImpl, bool>(testing::internal::UnitTestImpl*, bool (testing::internal::UnitTestImpl::*)(), char const*) /home/danielbevenius/work/google/learning-v8/deps/googletest/googletest/src/gtest.cc:2443
+    #11 0x43aad8 in bool testing::internal::HandleExceptionsInMethodIfSupported<testing::internal::UnitTestImpl, bool>(testing::internal::UnitTestImpl*, bool (testing::internal::UnitTestImpl::*)(), char const*) /home/danielbevenius/work/google/learning-v8/deps/googletest/googletest/src/gtest.cc:2498
+    #12 0x427cf1 in testing::UnitTest::Run() /home/danielbevenius/work/google/learning-v8/deps/googletest/googletest/src/gtest.cc:4786
+    #13 0x4150f5 in RUN_ALL_TESTS() deps/googletest/googletest/include/gtest/gtest.h:2341
+    #14 0x415016 in main test/main.cc:5
+    #15 0x7ffff29011a2 in __libc_start_main (/lib64/libc.so.6+0x271a2)
+```
+So this is just the as the output we got originally but this we can print this
+before the error happens. 
 
 I'm trying the following patch:
 ```console
