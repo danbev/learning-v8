@@ -55,29 +55,83 @@ SUMMARY: AddressSanitizer: new-delete-type-mismatch (/lib64/libasan.so.5+0x11117
 Now this is somewhat hard to follow with the Node testing fixture mixed in but
 I've tried to reproduce this using [backingstore_test.cc](../test/backingstore_test.cc).
 
-If we take a look at v8::ArrayBuffer::NewBackingStore we have the following:
+If we take a look at v8::ArrayBuffer::NewBackingStore in src/api/api.cc we have
+the following:
 ```c++
 std::unique_ptr<v8::BackingStore> v8::ArrayBuffer::NewBackingStore(
-    Isolate* isolate, size_t byte_length) {
+    void* data, size_t byte_length, v8::BackingStore::DeleterCallback deleter,
+    void* deleter_data) {
+  CHECK_LE(byte_length, i::JSArrayBuffer::kMaxByteLength);
   std::unique_ptr<i::BackingStoreBase> backing_store =
-      i::BackingStore::Allocate(i_isolate, byte_length, i::SharedFlag::kNotShared,
-                                i::InitializedFlag::kZeroInitialized);
+      i::BackingStore::WrapAllocation(data, byte_length, deleter, deleter_data,
+                                      i::SharedFlag::kNotShared);
 ```
-Notice that the unique_ptr is of type v8::internal::BackingStoreBase.
-This is then returned with a cast:
+Notice that the `unique_ptr` is of type v8::internal::BackingStoreBase, and
+WrapAllocation returns `std::unique_ptr<v8::internal::BackingStore>`:
+```c++
+std::unique_ptr<BackingStore> BackingStore::WrapAllocation(
+    void* allocation_base, size_t allocation_length,
+    v8::BackingStore::DeleterCallback deleter, void* deleter_data,
+    SharedFlag shared) {
+  bool is_empty_deleter = (deleter == v8::BackingStore::EmptyDeleter);
+  auto result = new BackingStore(allocation_base,    // start
+                                 allocation_length,  // length
+                                 allocation_length,  // capacity
+                                 shared,             // shared
+                                 false,              // is_wasm_memory
+                                 true,               // free_on_destruct
+                                 false,              // has_guard_regions
+                                 true,               // custom_deleter
+                                 is_empty_deleter);  // empty_deleter
+  result->type_specific_data_.deleter = {deleter, deleter_data};
+  TRACE_BS("BS:wrap   bs=%p mem=%p (length=%zu)\n", result,
+           result->buffer_start(), result->byte_length());
+  return std::unique_ptr<BackingStore>(result);
+}
+```
+
+```console
+(lldb) expr backing_store
+(std::unique_ptr<v8::internal::BackingStoreBase, std::default_delete<v8::internal::BackingStoreBase> >) $1 = 0x51fe70 {
+  pointer = 0x000000000051fe70
+}
+```
+This is then returned with a cast to `v8::BackingStore`:
 ```c++
 return std::unique_ptr<v8::BackingStore>(
       static_cast<v8::BackingStore*>(backing_store.release()));
 ```
-The usage in the test looks like this:
+Next, the returned backing store will be passed into ArrayBuffer::New:
 ```c++
   Local<ArrayBuffer> ab;
   {
     std::unique_ptr<BackingStore> bs = ArrayBuffer::NewBackingStore(
         data, data_len, BackingStoreDeleter, nullptr);
     ab = ArrayBuffer::New(isolate_, std::move(bs));
-    std::cout << "ArrayBuffer create\n";
 ```
+The backingstore is then moved into ArrayBuffer::New, also in src/api/api.cc:
+```c++
+  std::shared_ptr<i::BackingStore> i_backing_store(ToInternal(std::move(backing_store)));
+  i::Handle<i::JSArrayBuffer> obj = i_isolate->factory()->NewJSArrayBuffer(std::move(i_backing_store));
+```
+This will call js-array-buffer.cc `Attach`:
+```c++
+void JSArrayBuffer::Attach(std::shared_ptr<BackingStore> backing_store) {
+  Isolate* isolate = GetIsolate();
+  set_backing_store(isolate, backing_store->buffer_start());
+  set_byte_length(backing_store->byte_length());
+  if (backing_store->is_wasm_memory()) set_is_detachable(false);
+  if (!backing_store->free_on_destruct()) set_is_external(true);
+  Heap* heap = isolate->heap();
+  ArrayBufferExtension* extension = EnsureExtension();
+  size_t bytes = backing_store->PerIsolateAccountingLength();
+  extension->set_accounting_length(bytes);
+  extension->set_backing_store(std::move(backing_store));
+  heap->AppendArrayBufferExtension(*this, extension);
+}
+```
+
+
 Notice that the type of pointer is `v8::BackingStore`. Now, at some later point
 ab->Detach() will be called and this will end up in `src/objects/js-array-buffer.cc`:
 ```c++
@@ -92,13 +146,124 @@ void JSArrayBuffer::Detach(bool force_for_wasm_memory) {
   ...
 }
 ```
-When this shared pointer goes out of scope its deleter will be called.
+When this shared pointer goes out of scope its deleter will be called and
+`v8::BackingStore` destructor will be called:
+```c++
+v8::BackingStore::~BackingStore() {
+  auto i_this = reinterpret_cast<const i::BackingStore*>(this);
+  i_this->~BackingStore();  // manually call internal destructor
+}
+```
+And this will land in backing-store.cc in v8::internal::~BackingStore:
+```c++
+if (custom_deleter_) {
+    DCHECK(free_on_destruct_);
+    TRACE_BS("BS:custome deleter bs=%p mem=%p (length=%zu, capacity=%zu)\n",
+             this, buffer_start_, byte_length(), byte_capacity_);
+    type_specific_data_.deleter.callback(buffer_start_, byte_length_,
+                                         type_specific_data_.deleter.data);
+    Clear();
+    return;
+  }
+```
+This is where the deleter callback will be called. After the return
+v8::internal::~BackingStoreBase destructor will be called (if there is one that
+is), and for testing I've added one so I can step into it. After this we will
+be back in v8::BackingStore::~BackingStore which will also call ~BackingStoreBase.
+
+Ok, to sort this out, in include/v8.h we have:
+```c++
+class V8_EXPORT BackingStore : public v8::internal::BackingStoreBase {
+ public:
+  ~BackingStore();
+```
+
+In src/objects/backing-store.h we have:
+```c++
+class V8_EXPORT_PRIVATE BackingStore : public BackingStoreBase {
+ public:
+  ~BackingStore();
+```
+And we have the definition of BackingStoreBase in include/v8-internal.h, with
+I've added a destructor which prints out the this pointer:
+```c++
+class BackingStoreBase {
+  public:
+    ~BackingStoreBase() {
+      std::cout << "BackingStoreBase. bs=" << this << '\n';
+    }
+};
+```
+So first ~BackingStoreBase() will be called via the call to i_this->~BackingStore()
+and then again after v8::BackingStore::~BackingStore() is run as it also extends
+BackingStoreBase.
+
 Now, v8::internal::BackingStoreBase does not have an virtual destructor which
 could lead to this error because we are deleting a BackingStoreBase object
-through BackingStore pointer. If the BackingStoreBase class's destructor is not
-virtual then BackingStore class's destructor will not be run. A standalone
-example of this can be found here 
+through BackingStore pointer. 
+
+Going back to the error
+```console
+0x60400001af50 is located 0 bytes inside of 48-byte region [0x60400001af50,0x60400001af80)
+allocated by thread T0 here:
+    #0 0x7f0a3a304a97 in operator new(unsigned long) (/lib64/libasan.so.5+0x10fa97)
+    #1 0x34cb1a8 in v8::internal::BackingStore::WrapAllocation(void*, unsigned long, void (*)(void*, unsigned long, void*), void*, v8::internal::SharedFlag) (/home/danielbevenius/work/nodejs/node/out/Release/cctest+0x34cb1a8)
+    #2 0x29c18d5 in v8::ArrayBuffer::NewBackingStore(void*, unsigned long, void (*)(void*, unsigned long, void*), void*) (/home/danielbevenius/work/nodejs/node/out/Release/cctest+0x29c18d5)
+```
+We now know that WrapAllocation will create a new v8::internal::BackingStore.
+```console
+(lldb) expr result
+(v8::internal::BackingStore *) $0 = 0x000000000051ee70
+(lldb) n
+BS:wrap   bs=0x51ee70 mem=0x7fffffffcd69 (length=6
+```
+And before we return this backingstoe will be released (remember that this only
+releasing ownership so the constructor is not called, not like reset()). And
+is casted into a v8::BackingStore which will be owned/managed by a unique_ptr.
+
+And asan is complaining later at.
+```console
+==2773765==ERROR: AddressSanitizer: new-delete-type-mismatch on 0x60400001af50 in thread T0:
+  object passed to delete has wrong type:
+  size of the allocated type:   48 bytes;
+  size of the deallocated type: 1 bytes.
+    #0 0x7f0a3a306175 in operator delete(void*, unsigned long) (/lib64/libasan.so.5+0x111175)
+    #1 0x38328c2 in v8::internal::JSArrayBuffer::Detach(bool) (/home/danielbevenius/work/nodejs/node/out/Release/cctest+0x38328c2)
+    #2 0x29bf88a in v8::ArrayBuffer::Detach() (/home/danielbevenius/work/nodejs/node/out/Release/cctest+0x29bf88a)
+    #3 0x151adae in node::Buffer::(anonymous namespace)::CallbackInfo::CleanupHook(void*) (/home/danielbevenius/work/nodejs/node/out/Release/cctest+0x151adae)
+    #4 0x144a5ff in node::Environment::RunCleanup() (/home/danielbevenius/work/nodejs/node/out/Release/cctest+0x144a5ff)
+```
+So we are again looking at js-array-buffer.cc and its Detach function:
+```c++
+  if (backing_store()) {
+    std::shared_ptr<BackingStore> backing_store;
+      backing_store = RemoveExtension();
+    CHECK_IMPLIES(force_for_wasm_memory, backing_store->is_wasm_memory());
+  }
+```
+The `RemoveExtension()` function will perform a move of the v8::internal::BackingStore
+that v8::internal::ArrayBufferExtension has:
+```c++
+  std::shared_ptr<BackingStore> RemoveBackingStore() {
+    return std::move(backing_store_);
+  }
+```
+After the move the ownership is released and the shared_ptr owns it now.
+Now, after the `CHECK_IMPLIES` the scope of backing_store will end and if the
+usage count is 0 at this point then the destructor will be called.
+
+So this will v8::BackingStore::~BackingStore() which will manually call
+v8::internal::~BackingStore() which will call the custom deleter and then
+return. Then the next destructor for v8::BackingStore will be called which
+is v8::internal::~BackingStoreBase() and then the manual call to v8::internal::BackingStore
+is done. But v8::BackingStore also extends v8::internal::BackingStore so it its
+destructor will be called for it.
+
+
+A standalone example of this issue can be found in 
 [virtual-desctructor.cc](https://github.com/danbev/learning-cpp/blob/master/src/fundamentals/virtual-desctructor.cc).
+It is interesting to note that this will report the asan error when compiled
+with gcc but not when compiled with clang.
 
 
 I'm trying the following patch:
