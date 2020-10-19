@@ -18,6 +18,8 @@ void BackingStoreDeleter(void* data, size_t length, void* deleter_data) {
             << ", length: " << length
             << ", deleter_data: ";
   std::cout << deleter_data << '\n';
+  bool* deleter_called = static_cast<bool*>(deleter_data);
+  *deleter_called = true;
 }
 
 TEST_F(BackingStoreTest, GetBackingStoreWithDeleter) {
@@ -27,21 +29,15 @@ TEST_F(BackingStoreTest, GetBackingStoreWithDeleter) {
   Handle<v8::Context> context = Context::New(isolate_);
   Context::Scope context_scope(context);
 
+  bool deleter_called = false;
   char data[] = "bajja";
-  std::cout << "data: " << data << '\n';
-  int data_len = sizeof(data);
   Local<ArrayBuffer> ab;
   {
     std::unique_ptr<BackingStore> bs = ArrayBuffer::NewBackingStore(
-        data, data_len, BackingStoreDeleter, nullptr);
+        data, sizeof(data), BackingStoreDeleter, &deleter_called);
     ab = ArrayBuffer::New(isolate_, std::move(bs));
-    std::cout << "ArrayBuffer create\n";
+    std::cout << "ArrayBuffer created\n";
   }
-
-  // A BackingStore is a wrapper around raw memory
-  std::shared_ptr<BackingStore> backingstore = ab->GetBackingStore();
-  EXPECT_EQ(static_cast<int>(backingstore->ByteLength()), 6);
-  std::cout << "store count: " << backingstore.use_count() << '\n';
-
   ab->Detach();
+  EXPECT_TRUE(deleter_called);
 }
