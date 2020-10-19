@@ -28,6 +28,8 @@ TEST_F(BackingStoreTest, GetBackingStoreWithDeleter) {
 
   Handle<v8::Context> context = Context::New(isolate_);
   Context::Scope context_scope(context);
+  const char* trace = "--trace_backing-store";
+  v8::internal::FlagList::SetFlagsFromString(trace, strlen(trace));
 
   bool deleter_called = false;
   char data[] = "bajja";
