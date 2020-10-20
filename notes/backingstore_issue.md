@@ -1,7 +1,10 @@
 ### Backingstore issue
 This document contains notes for an issue that was discovered in Node.js.
 
-The following address sanitizer failure happens:
+Node.js issue: https://github.com/nodejs/node/issues/35669
+
+The following address sanitizer error is generated then this
+[test](https://github.com/nodejs/node/blob/11f1ad939f902ddbeb406350a6162359e04c13ec/test/cctest/test_environment.cc#L349):
 ```console
 $ out/Release/cctest --gtest_filter=EnvironmentTest.BufferWithFreeCallbackIsDetached
 Running main() from ../test/cctest/gtest/gtest_main.cc
