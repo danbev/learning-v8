@@ -254,7 +254,7 @@ But what I missed was the following line in the debugger:
 ```console
 * thread #1, name = 'cctest', stop reason = Deallocation size different from allocation size
 ```
-So asan is saying that the sizes of the types being deleted miss match which
+So asan is saying that the sizes of the types being deleted mismatch which
 is correct. We can avoid this error for our test by setting the following:
 ```c++
 extern "C" const char* __asan_default_options() {
@@ -262,7 +262,8 @@ extern "C" const char* __asan_default_options() {
 }
 ```
 
-I'm trying the following patch:
+I'm still curious if this could be worked around using a virtual destructor
+and I'm trying the following patch:
 ```console
 diff --git a/include/v8-internal.h b/include/v8-internal.h
 index 06846d7005..8e71a04027 100644
