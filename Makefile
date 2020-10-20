@@ -32,7 +32,8 @@ v8_gn_args = \
   v8_optimized_debug=false \
   v8_enable_debugging_features=true \
   v8_enable_fast_torque=false \
-  v8_enable_fast_mksnapshot=false
+  v8_enable_fast_mksnapshot=false \
+  is_asan = false
 
 .PHONY: configure_v8
 configure_v8:
@@ -42,7 +43,7 @@ configure_v8:
 compile_v8:
 	cd $(V8_HOME) && ninja -C out/$(v8_out_dir)
 
-CXXFLAGS = -Wall -g -O0 $@.cc -o $@ -std=c++14 -Wcast-function-type \
+CXXFLAGS = -Wall -g -O0 -std=c++14 -Wcast-function-type \
 	    -fno-exceptions -fno-rtti \
 	    -DV8_COMPRESS_POINTERS \
             -I$(v8_include_dir) \
@@ -53,7 +54,7 @@ CXXFLAGS = -Wall -g -O0 $@.cc -o $@ -std=c++14 -Wcast-function-type \
             -Wl,-L$(v8_build_dir) -Wl,-rpath,$(v8_build_dir) -Wl,-lpthread
 
 hello-world: hello-world.cc
-	$(CXX) ${CXXFLAGS}
+	$(CXX) ${CXXFLAGS} $@.cc -o $@
 
 .PHONY: gtest-compile
 gtest-compile: CXXFLAGS = --verbose -Wall -O0 -g -c $(gtest_home)/src/gtest-all.cc \
@@ -63,7 +64,7 @@ gtest-compile: CXXFLAGS = --verbose -Wall -O0 -g -c $(gtest_home)/src/gtest-all.
           -I$(gtest_home)/include
 gtest-compile: 
 	@echo "Building gtest library"
-	${CXX} ${CXXFLAGS}
+	$(CXX) ${CXXFLAGS} $@.cc -o $@
 	@mkdir -p $(CURDIR)/lib/gtest
 	${AR} -rv $(CURDIR)/lib/gtest/libgtest.a $(gtest_home)/gtest-all.o
 
@@ -73,38 +74,29 @@ gdb-hello:
 	@LD_LIBRARY_PATH=$(v8_build_dir)/ gdb --cd=$(v8_build_dir) --args $(CURDIR)/hello-world
 	
 instances: snapshot_blob.bin instances.cc
-	${CXX} ${CXXFLAGS}
+	$(CXX) ${CXXFLAGS} $@.cc -o $@
           
 run-script: run-script.cc
-	$(CXX) ${CXXFLAGS}
+	$(CXX) ${CXXFLAGS} $@.cc -o $@
 
 exceptions: snapshot_blob.bin exceptions.cc
-	${CXX} ${CXXFLAGS}
+	$(CXX) ${CXXFLAGS} $@.cc -o $@
 
 snapshot_blob.bin: $(v8_build_dir)/$@
 	@cp $(v8_build_dir)/$@ .
 
-test/backingstore_test: CXXFLAGS = "-fsanitize=address"
-
-test/% test/backingstore_test: CXXFLAGS += -Wall -g -O0 test/main.cc $@.cc -o $@  ./lib/gtest/libgtest.a -std=c++14 \
-	  -fno-exceptions -fno-rtti -Wcast-function-type -Wno-unused-variable \
+test/backingstore_test: CXXFLAGS += "-fsanitize=address"
+test/%: CXXFLAGS += test/main.cc $@.cc -o $@ ./lib/gtest/libgtest.a \
+	  -Wcast-function-type -Wno-unused-variable \
 	  -Wno-class-memaccess -Wno-comment -Wno-unused-but-set-variable \
-	  -DV8_COMPRESS_POINTERS \
 	  -DV8_INTL_SUPPORT \
 	  -DDEBUG \
-          -I$(v8_include_dir) \
-          -I$(V8_HOME) \
           -I$(V8_HOME)/third_party/icu/source/common/ \
-          -I$(v8_build_dir)/gen \
-          -L$(v8_build_dir) \
           -I./deps/googletest/googletest/include \
-          $(v8_dylibs) \
-          -Wl,-L$(v8_build_dir) -Wl,-rpath,$(v8_build_dir) -Wl,-lstdc++ -Wl,-lpthread
-
-
+          -Wl,-lstdc++
 
 test/%: test/%.cc test/v8_test_fixture.h
-	${CXX} ${CXXFLAGS}
+	$(CXX) ${CXXFLAGS}
 
 backingstore-asn: test/backingstore_test
 
