@@ -40,8 +40,18 @@ $ out/learning_v8/cctest --list
 From this you can grep for the name and then use the name:
 ```console
 $ out/learning_v8/cctest test-heap/CodeLargeObjectSpace
-
 ```
+
+### Gtest
+V8 also have test that use Google Test as opposed to the CcTest "driver".
+
+Running a single test:
+```console
+$ env ASAN_OPTIONS="detect_odr_violation=0" ./out/learning_v8/unittests --gtest_filter=BackingStoreTest.CopyWasmMemory
+```
+
+
+
 
 One might have to make certain functions available to tests. For example, I ran
 into this when adding a test to test/cctest/heap/test-heap.cc. There is header
