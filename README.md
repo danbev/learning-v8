@@ -757,6 +757,14 @@ $19 = 0x5
 See [handle_test.cc](./test/handle_test.cc) for an example.
 
 ### HandleScope
+Contains a number of Local/Handle's (think pointers to objects but is managed
+by V8) and will take care of deleting the Local/Handles for us. HandleScopes
+are stack allocated
+
+When ~HandleScope is called all handles created within that scope are removed
+from the stack maintained by the HandleScope which makes objects to which the
+handles point being eligible for deletion from the heap by the GC.
+
 A HandleScope only has three members:
 ```c++
   internal::Isolate* isolate_;
@@ -785,8 +793,8 @@ void HandleScope::Initialize(Isolate* isolate) {
 ```
 Every `v8::internal::Isolate` has member of type HandleScopeData:
 ```c++
-HandleScopeData handle_scope_data_;
 HandleScopeData* handle_scope_data() { return &handle_scope_data_; }
+HandleScopeData handle_scope_data_;
 ```
 HandleScopeData is a struct defined in `src/handles/handles.h`:
 ```c++
@@ -811,20 +819,6 @@ stores the next/limit pointers of the current isolate so that they can be restor
 when this HandleScope is closed (see CloseScope).
 
 So with a HandleScope created, how does a Local<T> interact with this instance?  
-HandleScope:CreateHandle will get the handle_scope_data from the isolate:
-```c++
-Address* HandleScope::CreateHandle(Isolate* isolate, Address value) {
-  HandleScopeData* data = isolate->handle_scope_data();
-  if (result == data->limit) {
-    result = Extend(isolate);
-  }
-  // Update the current next field, set the value in the created handle,        
-  // and return the result.
-  data->next = reinterpret_cast<Address*>(reinterpret_cast<Address>(result) + sizeof(Address));
-  *result = value;
-  return result;
-}                         
-```
 
 When a Local<T> is created this will/might go through FactoryBase::NewStruct
 which will allocate a new Map and then create a Handle for the InstanceType
@@ -868,9 +862,131 @@ and after that get the isolates HandleScopeImplementer:
 ```
 `HandleScopeImplementer` is declared in `src/api/api.h`
 
+HandleScope:CreateHandle will get the handle_scope_data from the isolate:
+```c++
+Address* HandleScope::CreateHandle(Isolate* isolate, Address value) {
+  HandleScopeData* data = isolate->handle_scope_data();
+  if (result == data->limit) {
+    result = Extend(isolate);
+  }
+  // Update the current next field, set the value in the created handle,        
+  // and return the result.
+  data->next = reinterpret_cast<Address*>(reinterpret_cast<Address>(result) + sizeof(Address));
+  *result = value;
+  return result;
+}                         
+```
+Notice that `data->next` is set to the address passed in + the size of an
+Address.
+
 
 The destructor for HandleScope will call CloseScope.
 See [handlescope_test.cc](./test/handlescope_test.cc) for an example.
+
+### EscapableHandleScope
+Local handles are located on the stack and are deleted when the appropriate
+destructor is called. If there is a local HandleScope then it will take care
+of this when the scope returns. When there are no references left to a handle
+it can be garbage collected. This means if a function has a HandleScope and
+wants to return a handle/local it will not be available after the function
+returns. This is what EscapableHandleScope is for, it enable the value to be
+placed in the enclosing handle scope to allow it to survive. When the enclosing
+HandleScope goes out of scope it will be cleaned up.
+
+```c++
+class V8_EXPORT EscapableHandleScope : public HandleScope {                        
+ public:                                                                           
+  explicit EscapableHandleScope(Isolate* isolate);
+  V8_INLINE ~EscapableHandleScope() = default;
+  template <class T>
+  V8_INLINE Local<T> Escape(Local<T> value) {
+    internal::Address* slot = Escape(reinterpret_cast<internal::Address*>(*value));
+    return Local<T>(reinterpret_cast<T*>(slot));
+  }
+
+  template <class T>
+  V8_INLINE MaybeLocal<T> EscapeMaybe(MaybeLocal<T> value) {
+    return Escape(value.FromMaybe(Local<T>()));
+  }
+
+ private:
+  ...
+  internal::Address* escape_slot_;
+};
+
+From `api.cc`
+```c++
+EscapableHandleScope::EscapableHandleScope(Isolate* v8_isolate) {
+  i::Isolate* isolate = reinterpret_cast<i::Isolate*>(v8_isolate);
+  escape_slot_ = CreateHandle(isolate, i::ReadOnlyRoots(isolate).the_hole_value().ptr());
+  Initialize(v8_isolate);
+}
+```
+So when an EscapableHandleScope is created it will create a handle with the
+hole value and store it in the `escape_slot_` which is of type Address. This
+Handle will be created in the current HandleScope, and EscapableHandleScope
+can later set a value for that pointer/address which it want to be escaped.
+Later when that HandleScope goes out of scope it will be cleaned up.
+It then calls Initialize just like a normal HandleScope would.
+
+```c++
+i::Address* HandleScope::CreateHandle(i::Isolate* isolate, i::Address value) {
+  return i::HandleScope::CreateHandle(isolate, value);
+}
+```
+From `handles-inl.h`:
+```c++
+Address* HandleScope::CreateHandle(Isolate* isolate, Address value) {
+  DCHECK(AllowHandleAllocation::IsAllowed());
+  HandleScopeData* data = isolate->handle_scope_data();
+  Address* result = data->next;
+  if (result == data->limit) {
+    result = Extend(isolate);
+  }
+  // Update the current next field, set the value in the created handle,
+  // and return the result.
+  DCHECK_LT(reinterpret_cast<Address>(result),
+            reinterpret_cast<Address>(data->limit));
+  data->next = reinterpret_cast<Address*>(reinterpret_cast<Address>(result) +
+                                          sizeof(Address));
+  *result = value;
+  return result;
+}
+```
+
+When Escape is called the following happens (v8.h):
+```c++
+template <class T>
+  V8_INLINE Local<T> Escape(Local<T> value) {
+    internal::Address* slot = Escape(reinterpret_cast<internal::Address*>(*value));
+    return Local<T>(reinterpret_cast<T*>(slot));
+  }
+```
+An the EscapeableHandleScope::Escape (api.cc):
+```c++
+i::Address* EscapableHandleScope::Escape(i::Address* escape_value) {
+  i::Heap* heap = reinterpret_cast<i::Isolate*>(GetIsolate())->heap();
+  Utils::ApiCheck(i::Object(*escape_slot_).IsTheHole(heap->isolate()),
+                  "EscapableHandleScope::Escape", "Escape value set twice");
+  if (escape_value == nullptr) {
+    *escape_slot_ = i::ReadOnlyRoots(heap).undefined_value().ptr();
+    return nullptr;
+  }
+  *escape_slot_ = *escape_value;
+  return escape_slot_;
+}
+```
+If the escape_value is null, the `escape_slot` that is a pointer into the 
+parent HandleScope is set to the undefined_value() instead of the hole value
+which is was previously, and nullptr will be returned. This returned 
+address/pointer will then be returned after being casted to T*.
+Next, we take a look at what happens when the EscapableHandleScope goes out of
+scope. This will call HandleScope::~HandleScope which makes sense as any other
+Local handles should be cleaned up.
+
+`Escape` copies the value of its argument into the enclosing scope, deletes alli
+its local handles, and then gives back the new handle copy which can safely be
+returned.
 
 ### HeapObject
 TODO:
