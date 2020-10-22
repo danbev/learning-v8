@@ -217,37 +217,9 @@ v8::BackingStore::~BackingStore() {
 Now, this might seem confusing since we checked the type of the pointer and
 it is `v8::internal::BackingStore`. To understand this better the following
 example [backing-store-original.cc](../src/backing-store-original.cc) can be used
-to the see what is happening. In this example BaseStore plays the part of
-`v8::internal::BackingStoreBase`, InternalStore `v8::internal::BackingStore, and
-PublicStore `v8::BackingStore`.
-```c++
-  std::unique_ptr<BaseStore> base = std::unique_ptr<BaseStore>(new InternalStore());
-  { 
-    std::unique_ptr<PublicStore> p_store = std::unique_ptr<PublicStore>(static_cast<PublicStore*>(base.release()));
-
-    std::shared_ptr<BaseStore> base_store = std::move(p_store);
-    {
-      std::shared_ptr<InternalStore> i_store = std::static_pointer_cast<InternalStore>(base_store);
-      std::cout << "inside i_store scope...use_count: " << base_store.use_count() << '\n';
-      // count is 1 so the underlying object will not be deleted.
-    }
-    std::cout << "after i_store...use_count: " << base_store.use_count() << '\n';
-    // When the this scope ends, base_store's use_count  will be checked and it
-    // will be 0 and hence deleted. Static/early binding is in use here so
-    // ~PublicStore will be called. ~BaseStore's destructor will be called
-    // twice in this case, once by the call to i->~InternalStore(), and the
-    // after ~PublicStore as completed.
-  }
-```
-When `p_store`is created above it is done so using `base` which is released so
-`p_store` now owns this object, and `base` will be nullptr after that line.
-Next, a shared_ptr<BaseStore> is created of type `PublicStore` and it takes
-over the ownership of `p_store`. The next scope 
-
-A proposal of using a virtual destructor can be found in 
-[backing-store-new.cc](../src/backing-store-new.cc).
-
-Ok, to sort this out, in `include/v8.h` we have:
+to the see what is happening. 
+The class hierarchy for the BackingStore's look like this, in `include/v8.h` we
+have:
 ```c++
 class V8_EXPORT BackingStore : public v8::internal::BackingStoreBase {
  public:
@@ -274,26 +246,32 @@ class BackingStoreBase {
     }
 };
 ```
+In [backing-store-original.cc](../src/backing-store-original.cc) BaseStore plays
+the part of `v8::internal::BackingStoreBase`, InternalStore represents
+`v8::internal::BackingStore, and PublicStore represents `v8::BackingStore`:
+```c++
+  std::unique_ptr<BaseStore> base = std::unique_ptr<BaseStore>(new InternalStore());
+  { 
+    std::unique_ptr<PublicStore> p_store = std::unique_ptr<PublicStore>(static_cast<PublicStore*>(base.release()));
 
-I'm still curious if this could be worked around using a virtual destructor
-and I'm trying the following patch:
-```console
-diff --git a/include/v8-internal.h b/include/v8-internal.h
-index 06846d7005..8e71a04027 100644
---- a/include/v8-internal.h
-+++ b/include/v8-internal.h
-@@ -452,7 +452,10 @@ V8_INLINE void PerformCastCheck(T* data) {
-
- // A base class for backing stores, which is needed due to vagaries of
- // how static casts work with std::shared_ptr.
--class BackingStoreBase {};
-+class BackingStoreBase {
-+ public:
-+  virtual ~BackingStoreBase() {}
-+};
-
- }  // namespace internal
- }  // namespace v8
+    std::shared_ptr<BaseStore> base_store = std::move(p_store);
+    {
+      std::shared_ptr<InternalStore> i_store = std::static_pointer_cast<InternalStore>(base_store);
+      std::cout << "inside i_store scope...use_count: " << base_store.use_count() << '\n';
+      // count is 1 so the underlying object will not be deleted.
+    }
+    std::cout << "after i_store...use_count: " << base_store.use_count() << '\n';
+    // When the this scope ends, base_store's use_count  will be checked and it
+    // will be 0 and hence deleted. Static/early binding is in use here so
+    // ~PublicStore will be called. ~BaseStore's destructor will be called
+    // twice in this case, once by the call to i->~InternalStore(), and the
+    // after ~PublicStore as completed.
+  }
 ```
-Which worked. I'm going to try this patch on Node upstream/master and see
-if this works there too. It worked there too. 
+When `p_store`is created above it is done so using `base` which is released so
+`p_store` now owns this object, and `base` will be nullptr after that line.
+Next, a shared_ptr<BaseStore> is created of type `PublicStore` and it takes
+over the ownership of `p_store`. The next scope 
+
+A proposal of using a virtual destructor can be found in 
+[backing-store-new.cc](../src/backing-store-new.cc).
