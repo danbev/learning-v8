@@ -216,7 +216,7 @@ v8::BackingStore::~BackingStore() {
 ```
 Now, this might seem confusing since we checked the type of the pointer and
 it is `v8::internal::BackingStore`. To understand this better the following
-example [backing-store-original.cc](./src/backing-store-original.cc) can be used
+example [backing-store-original.cc](../src/backing-store-original.cc) can be used
 to the see what is happening. In this example BaseStore plays the part of
 `v8::internal::BackingStoreBase`, InternalStore `v8::internal::BackingStore, and
 PublicStore `v8::BackingStore`.
@@ -245,7 +245,7 @@ Next, a shared_ptr<BaseStore> is created of type `PublicStore` and it takes
 over the ownership of `p_store`. The next scope 
 
 A proposal of using a virtual destructor can be found in 
-[backing-store-new.cc](./src/backing-store-new.cc).
+[backing-store-new.cc](../src/backing-store-new.cc).
 
 Ok, to sort this out, in `include/v8.h` we have:
 ```c++
