@@ -218,7 +218,7 @@ Now, this might seem confusing since we checked the type of the pointer and
 it is `v8::internal::BackingStore`. To understand this better the following
 example [backing-store-original.cc](../src/backing-store-original.cc) can be used
 to the see what is happening. 
-The class hierarchy for the BackingStore's look like this, in `include/v8.h` we
+The class hierarchy for the BackingStore's looks like this, in `include/v8.h` we
 have:
 ```c++
 class V8_EXPORT BackingStore : public v8::internal::BackingStoreBase {
@@ -248,7 +248,7 @@ class BackingStoreBase {
 ```
 In [backing-store-original.cc](../src/backing-store-original.cc) BaseStore plays
 the part of `v8::internal::BackingStoreBase`, InternalStore represents
-`v8::internal::BackingStore, and PublicStore represents `v8::BackingStore`:
+`v8::internal::BackingStore`, and PublicStore represents `v8::BackingStore`:
 ```c++
   std::unique_ptr<BaseStore> base = std::unique_ptr<BaseStore>(new InternalStore());
   { 
@@ -271,7 +271,30 @@ the part of `v8::internal::BackingStoreBase`, InternalStore represents
 When `p_store`is created above it is done so using `base` which is released so
 `p_store` now owns this object, and `base` will be nullptr after that line.
 Next, a shared_ptr<BaseStore> is created of type `PublicStore` and it takes
-over the ownership of `p_store`. The next scope 
+over the ownership of `p_store`.
+
+What asan does is it both instruments code at compile time and then there is the
+runtime library which replaces malloc, free etc.
+So asan is telling us that there was an allocation of a 100 byte region (this
+is using the example above) which it has stored information about. This is our
+InternalStore:
+```console
+(lldb) expr (void) __asan_describe_address(0x60b0000000f0)
+0x60b0000000f0 is located 0 bytes inside of 100-byte region [0x60b0000000f0,0x60b000000154)
+allocated by thread T0 here:
+    #0 0x7ffff7684a97 in operator new(unsigned long) (/lib64/libasan.so.5+0x10fa97)
+    #1 0x4013f0 in main src/backing-store-original.cc:42
+    #2 0x7ffff707a1a2 in __libc_start_main (/lib64/libc.so.6+0x271a2)
+
+(lldb) memory history 0x60b0000000f0
+  thread #4294967295: tid = 1, 0x00007ffff7684a97 libasan.so.5`operator new(unsigned long) + 199, name = 'Memory allocated by Thread 1'
+    frame #0: 0x00007ffff7684a97 libasan.so.5`operator new(unsigned long) + 199
+    frame #1: 0x00000000004013f0 backing-store-org`main at backing-store-original.cc:43:82
+    frame #2: 0x00007ffff707a1a2 libc.so.6`.annobin_libc_start.c + 242
+```
+
+But later asan records a delete/free with a size of 10 bytes, which is the
+PublicStore in the example.
 
 A proposal of using a virtual destructor can be found in 
 [backing-store-new.cc](../src/backing-store-new.cc).
