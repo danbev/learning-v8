@@ -55,9 +55,3 @@ int main(void)
 
   return 0; 
 } 
-/*
-    std::shared_ptr<BaseStore> base_store = std::move(p_store); 
- * >  0x401503 <+464>: call   0x401ba6                  ; std::shared_ptr<BaseStore>::~shared_ptr at shared_ptr.h:103:11
- * ->  0x401bb9 <+19>: call   0x401b86                  ; std::__shared_ptr<BaseStore, (__gnu_cxx::_Lock_policy)2>::~__shared_ptr at shared_ptr_base.h:1169:7
- *  ->  0x401b9d <+23>: call   0x401ec4                  ; std::__shared_count<(__gnu_cxx::_Lock_policy)2>::~__shared_count at shared_ptr_base.h:727:7
-
