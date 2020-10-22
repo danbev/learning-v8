@@ -107,7 +107,7 @@ std::unique_ptr<v8::BackingStore> v8::ArrayBuffer::NewBackingStore(
 }
 ```
 Notice that the `unique_ptr` is of type `v8::internal::BackingStoreBase`, and
-WrapAllocation returns `std::unique_ptr<v8::internal::BackingStore>`:
+`WrapAllocation` returns `std::unique_ptr<v8::internal::BackingStore>`:
 ```c++
 std::unique_ptr<BackingStore> BackingStore::WrapAllocation(
     void* allocation_base, size_t allocation_length,
@@ -129,7 +129,7 @@ std::unique_ptr<BackingStore> BackingStore::WrapAllocation(
   return std::unique_ptr<BackingStore>(result);
 }
 ```
-WrapAllocation creates a new `v8::internal::BackingStore` which is then returned
+`WrapAllocation` creates a new `v8::internal::BackingStore` which is then returned
 in a unique_ptr but recall that the type of pointer this is stored in is
 `std::unique_ptr<i::BackingStoreBase`.
 This is then returned by `ArrayBuffer::NewBackingStore` with a cast to
@@ -141,8 +141,8 @@ This is then returned by `ArrayBuffer::NewBackingStore` with a cast to
   return std::unique_ptr<v8::BackingStore>(
       static_cast<v8::BackingStore*>(backing_store.release()));
 ```
-Notice that `backing_store` is of type _v8::internal::BackingStoreBase_, so
-we are using the base class here. We are then casting it to a v8::BackingStore.
+Notice that `backing_store` is of type __v8::internal::BackingStoreBase__, so
+we are using the base class here. We are then casting it to a `v8::BackingStore`.
 
 Next, the returned `v8::BackingStore` will be passed into `ArrayBuffer::New`:
 ```c++
@@ -217,9 +217,11 @@ v8::BackingStore::~BackingStore() {
 Now, this might seem confusing since we checked the type of the pointer and
 it is `v8::internal::BackingStore`. To understand this better the following
 example [backing-store-original.cc](../src/backing-store-original.cc) can be used
-to the see what is happening. 
-The class hierarchy for the BackingStore's looks like this, in `include/v8.h` we
-have:
+to the see what is happening. It uses the same unique_ptr/shared_ptr that have
+been discussed above but in a single main function.
+
+First lets look at the class hierarchy for the BackingStore's looks like this,
+in `include/v8.h` we have:
 ```c++
 class V8_EXPORT BackingStore : public v8::internal::BackingStoreBase {
  public:
