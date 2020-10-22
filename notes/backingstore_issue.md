@@ -66,9 +66,9 @@ Notice the following line in the debugger:
 ```
 So asan is saying that the sizes of the types being deleted mismatch which
 is correct. I'm going to go through the details below but the short story is
-that asan will have recorded when an instance of v8::internal::BackingStore
+that asan will have recorded when an instance of `v8::internal::BackingStore`
 was created (which is the type of 48 bytes) and later when delete is called
-on a pointer to that memory allocation the size will be on 1 (v8::BackingStore).
+on a pointer to that memory allocation the size will be on 1 (`v8::BackingStore`).
 
 We can work around this error for our test by setting the following:
 ```c++
