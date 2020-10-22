@@ -80,7 +80,7 @@ extern "C" const char* __asan_default_options() {
 The following are notes from investigating this issue.
 
 Now this is somewhat hard to follow with the Node testing fixture mixed in but
-There is a standalone example in [backingstore_test.cc](../test/backingstore_test.cc).
+there is a standalone example in [backingstore_test.cc](../test/backingstore_test.cc).
 We will be focusing on the following parts of that example:
 ```c++
   Local<ArrayBuffer> ab;
