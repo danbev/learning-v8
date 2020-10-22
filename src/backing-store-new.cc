@@ -17,14 +17,16 @@ class BaseStore {
 class InternalStore: public BaseStore { 
   public: 
     InternalStore() { std::cout << "Constructing InternalStore " << this << '\n'; } 
-    ~InternalStore() { std::cout << "~InternalStore " << this << '\n'; } 
+    ~InternalStore() override {
+      std::cout << "~InternalStore " << this << '\n';
+    }
   private:
     char c[100];
 }; 
 
 class PublicStore: public BaseStore {
   public: 
-    ~PublicStore() { 
+    ~PublicStore() override {
       std::cout << "~PublicStore " << this << '\n';
     } 
   private:

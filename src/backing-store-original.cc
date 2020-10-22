@@ -1,6 +1,10 @@
 #include <iostream>
 #include <memory>
 
+extern "C" void __asan_on_error(void) {
+  std::cout << "asan_on_error\n";
+}
+
 // This example tries to mimic how the destructors currently work for V8
 // BackingStore's. Running this example will produce a Address Sanitizer
 // error as described in notes/backing_store_issue.md.
@@ -31,6 +35,7 @@ class PublicStore: public BaseStore {
     } 
   private:
     PublicStore() { std::cout << "Constructing PublicStore " << this << '\n'; } 
+    char c[10];
 }; 
 
 int main(void) 
