@@ -49,3 +49,5 @@ test/functioncallbackargs_test
 test/parameterized_test
 test/backingstore_test
 test/test/escapable_handlescope_test
+src/backing-store-org
+src/backing-store-new

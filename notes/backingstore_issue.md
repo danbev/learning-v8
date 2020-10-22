@@ -58,8 +58,27 @@ SUMMARY: AddressSanitizer: new-delete-type-mismatch (/lib64/libasan.so.5+0x11117
 (lldb) AddressSanitizer report breakpoint hit. Use 'thread info -s' to get extended information about the report.
 Process 3712019 stopped
 * thread #1, name = 'cctest', stop reason = Deallocation size different from allocation size
-
 ```
+
+Notice the following line in the debugger:
+```console
+* thread #1, name = 'cctest', stop reason = Deallocation size different from allocation size
+```
+So asan is saying that the sizes of the types being deleted mismatch which
+is correct. I'm going to go through the details below but the short story is
+that asan will have recorded when an instance of v8::internal::BackingStore
+was created (which is the type of 48 bytes) and later when delete is called
+on a pointer to that memory allocation the size will be on 1 (v8::BackingStore).
+
+We can work around this error for our test by setting the following:
+```c++
+extern "C" const char* __asan_default_options() {
+  return "new_delete_type_mismatch=0";
+}
+```
+
+The following are notes from investigating this issue.
+
 Now this is somewhat hard to follow with the Node testing fixture mixed in but
 There is a standalone example in [backingstore_test.cc](../test/backingstore_test.cc).
 We will be focusing on the following parts of that example:
@@ -73,7 +92,7 @@ We will be focusing on the following parts of that example:
   }
   ab->Detach();
 ```
-If we take a look at v8::ArrayBuffer::NewBackingStore in src/api/api.cc we have
+If we take a look at `v8::ArrayBuffer::NewBackingStore` in `src/api/api.cc` we have
 the following:
 ```c++
 std::unique_ptr<v8::BackingStore> v8::ArrayBuffer::NewBackingStore(
@@ -87,7 +106,7 @@ std::unique_ptr<v8::BackingStore> v8::ArrayBuffer::NewBackingStore(
       static_cast<v8::BackingStore*>(backing_store.release()));
 }
 ```
-Notice that the `unique_ptr` is of type v8::internal::BackingStoreBase, and
+Notice that the `unique_ptr` is of type `v8::internal::BackingStoreBase`, and
 WrapAllocation returns `std::unique_ptr<v8::internal::BackingStore>`:
 ```c++
 std::unique_ptr<BackingStore> BackingStore::WrapAllocation(
@@ -110,21 +129,22 @@ std::unique_ptr<BackingStore> BackingStore::WrapAllocation(
   return std::unique_ptr<BackingStore>(result);
 }
 ```
-WrapAllocation creates a new `v8::internalBackingStore` which is then returned
-in a unique_ptr:
-```console
-(lldb) expr backing_store
-(std::unique_ptr<v8::internal::BackingStoreBase, std::default_delete<v8::internal::BackingStoreBase> >) $1 = 0x51fe70 {
-  pointer = 0x000000000051fe70
-}
-```
+WrapAllocation creates a new `v8::internal::BackingStore` which is then returned
+in a unique_ptr but recall that the type of pointer this is stored in is
+`std::unique_ptr<i::BackingStoreBase`.
 This is then returned by `ArrayBuffer::NewBackingStore` with a cast to
 `v8::BackingStore`:
 ```c++
-return std::unique_ptr<v8::BackingStore>(
+  std::unique_ptr<i::BackingStoreBase> backing_store =
+      i::BackingStore::WrapAllocation(data, byte_length, deleter, deleter_data,
+                                      i::SharedFlag::kNotShared);
+  return std::unique_ptr<v8::BackingStore>(
       static_cast<v8::BackingStore*>(backing_store.release()));
 ```
-Next, the returned `v8::BackingStore` will be passed into ArrayBuffer::New:
+Notice that `backing_store` is of type _v8::internal::BackingStoreBase_, so
+we are using the base class here. We are then casting it to a v8::BackingStore.
+
+Next, the returned `v8::BackingStore` will be passed into `ArrayBuffer::New`:
 ```c++
   Local<ArrayBuffer> ab;
   {
@@ -132,12 +152,23 @@ Next, the returned `v8::BackingStore` will be passed into ArrayBuffer::New:
         data, data_len, BackingStoreDeleter, nullptr);
     ab = ArrayBuffer::New(isolate_, std::move(bs));
 ```
-The backingstore is then moved into ArrayBuffer::New (in src/api/api.cc):
+The backingstore is then moved into `ArrayBuffer::New` (in src/api/api.cc):
 ```c++
   std::shared_ptr<i::BackingStore> i_backing_store(ToInternal(std::move(backing_store)));
   i::Handle<i::JSArrayBuffer> obj = i_isolate->factory()->NewJSArrayBuffer(std::move(i_backing_store));
 ```
-This will call js-array-buffer.cc `Attach`:
+`ToInternal` looks like this:
+```c++
+std::shared_ptr<i::BackingStore> ToInternal(
+    std::shared_ptr<i::BackingStoreBase> backing_store) {
+  return std::static_pointer_cast<i::BackingStore>(backing_store);
+}
+```
+Notice that the parameter type is `std::shared_ptr<i::BackingStoreBase>` and
+the passed in type will be `std::unique_ptr<v8::BackingStore>`. This is then
+being cast into `std::shared_ptr<i::BackingStore>`. 
+
+`NewJSArrayBuffer` will call `Attach` in js-array-buffer.cc:
 ```c++
 void JSArrayBuffer::Attach(std::shared_ptr<BackingStore> backing_store) {
   Isolate* isolate = GetIsolate();
@@ -153,16 +184,15 @@ void JSArrayBuffer::Attach(std::shared_ptr<BackingStore> backing_store) {
   heap->AppendArrayBufferExtension(*this, extension);
 }
 ```
-
-Notice that the type of pointer is `v8::BackingStore`. Now, at some later point
-ab->Detach() will be called and this will end up in `src/objects/js-array-buffer.cc`:
+Now, at some later point ab->Detach() will be called and this will end up in
+`src/objects/js-array-buffer.cc`:
 ```c++
 void JSArrayBuffer::Detach(bool force_for_wasm_memory) {
   ...
   Isolate* const isolate = GetIsolate();
   if (backing_store()) {
-     std::shared_ptr<BackingStore> backing_store;
-     backing_store = RemoveExtension();
+    std::shared_ptr<BackingStore> backing_store;
+    backing_store = RemoveExtension();
     CHECK_IMPLIES(force_for_wasm_memory, backing_store->is_wasm_memory());
   }
   ...
@@ -185,30 +215,37 @@ v8::BackingStore::~BackingStore() {
 }
 ```
 Now, this might seem confusing since we checked the type of the pointer and
-it is `v8::internal::BackingStore`. But that is the type of the pointer and how
-the compiler interprets what is at the memory location, and what is actually 
-there an instance of `v8::BackingStore` which done by as cast in ArrayBuffer::New.
-Now, the destructor of v8::BackingStore is not inherited so it's implementation
-will be run.
-
-And this will land in `backing-store.cc` in `v8::internal::~BackingStore`:
+it is `v8::internal::BackingStore`. To understand this better the following
+example [backing-store-original.cc](./src/backing-store-original.cc) can be used
+to the see what is happening. In this example BaseStore plays the part of
+`v8::internal::BackingStoreBase`, InternalStore `v8::internal::BackingStore, and
+PublicStore `v8::BackingStore`.
 ```c++
-if (custom_deleter_) {
-    DCHECK(free_on_destruct_);
-    TRACE_BS("BS:custome deleter bs=%p mem=%p (length=%zu, capacity=%zu)\n",
-             this, buffer_start_, byte_length(), byte_capacity_);
-    type_specific_data_.deleter.callback(buffer_start_, byte_length_,
-                                         type_specific_data_.deleter.data);
-    Clear();
-    return;
+  std::unique_ptr<BaseStore> base = std::unique_ptr<BaseStore>(new InternalStore());
+  { 
+    std::unique_ptr<PublicStore> p_store = std::unique_ptr<PublicStore>(static_cast<PublicStore*>(base.release()));
+
+    std::shared_ptr<BaseStore> base_store = std::move(p_store);
+    {
+      std::shared_ptr<InternalStore> i_store = std::static_pointer_cast<InternalStore>(base_store);
+      std::cout << "inside i_store scope...use_count: " << base_store.use_count() << '\n';
+      // count is 1 so the underlying object will not be deleted.
+    }
+    std::cout << "after i_store...use_count: " << base_store.use_count() << '\n';
+    // When the this scope ends, base_store's use_count  will be checked and it
+    // will be 0 and hence deleted. Static/early binding is in use here so
+    // ~PublicStore will be called. ~BaseStore's destructor will be called
+    // twice in this case, once by the call to i->~InternalStore(), and the
+    // after ~PublicStore as completed.
   }
 ```
-This is where the deleter callback will be called. After this function returns,
-`v8::internal::~BackingStoreBase` destructor will be called (if there is one that
-is), and for testing I've added one so I can step into it. 
-After it returns we will be back in `v8::BackingStore::~BackingStore` which will
-also call `v8::internal::~BackingStoreBase` since `v8::BackingStore` also extends
-`v8::internal::BackingStoreBase`.
+When `p_store`is created above it is done so using `base` which is released so
+`p_store` now owns this object, and `base` will be nullptr after that line.
+Next, a shared_ptr<BaseStore> is created of type `PublicStore` and it takes
+over the ownership of `p_store`. The next scope 
+
+A proposal of using a virtual destructor can be found in 
+[backing-store-new.cc](./src/backing-store-new.cc).
 
 Ok, to sort this out, in `include/v8.h` we have:
 ```c++
@@ -236,30 +273,6 @@ class BackingStoreBase {
       std::cout << "~BackingStoreBase. bs=" << this << '\n';
     }
 };
-```
-So first `~BackingStoreBase()` will be called via the call to 
-`i_this->~BackingStore()` and then again after `v8::BackingStore::~BackingStore()`
-is run as it also extends `v8::internal::BackingStoreBase`.
-
-A standalone example of this issue can be found in 
-[virtual-desctructor.cc](https://github.com/danbev/learning-cpp/blob/master/src/fundamentals/virtual-desctructor.cc).
-It is interesting to note that this will report the asan error when compiled
-with gcc but not when compiled with clang.
-
-Since `v8::~BackingStore` is just casting itself into `v8::internal::BackingStore`
-and both extend `v8::internal::BackingStoreBase` if we added a virtual destructor
-to `v8::internal::BackingStoreBase` it would be used.
-
-But what I missed was the following line in the debugger:
-```console
-* thread #1, name = 'cctest', stop reason = Deallocation size different from allocation size
-```
-So asan is saying that the sizes of the types being deleted mismatch which
-is correct. We can avoid this error for our test by setting the following:
-```c++
-extern "C" const char* __asan_default_options() {
-  return "new_delete_type_mismatch=0";
-}
 ```
 
 I'm still curious if this could be worked around using a virtual destructor

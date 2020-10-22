@@ -148,6 +148,12 @@ check-all test-all test:
 		"$${test}" ; \
 	done
 
+src/backing-store-org: src/backing-store-original.cc
+	g++ -g -fsanitize=address -o $@ $<
+
+src/backing-store-new: src/backing-store-new.cc
+	g++ -g -fsanitize=address -o $@ $<
+
 .PHONY: clean
 
 clean: 
