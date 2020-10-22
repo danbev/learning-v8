@@ -51,7 +51,7 @@ int main(void)
       // binding in the case of a non-virtual version.
     }
     std::cout << "after i_store...use_count: " << base_store.use_count() << '\n';
-    // When the this scope ends, base_store's use_count will be checked and it 
+    // When this scope ends, base_store's use_count will be checked and it 
     // will be 0 and hence deleted. In this case since BaseStore has a virtual
     // destructor and InternalStore implements it, InternalStore's destructor
     // will be called. Dynamic look up is in place as opposed to static/early
