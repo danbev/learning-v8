@@ -297,6 +297,32 @@ allocated by thread T0 here:
 
 But later asan records a delete/free with a size of 10 bytes, which is the
 PublicStore in the example.
+```console
+==4002536==ERROR: AddressSanitizer: new-delete-type-mismatch on 0x60b0000000f0 in thread T0:
+  object passed to delete has wrong type:
+  size of the allocated type:   100 bytes;
+  size of the deallocated type: 10 bytes.
+    #0 0x7f20793e0175 in operator delete(void*, unsigned long) (/lib64/libasan.so.5+0x111175)
+    #1 0x402124 in std::default_delete<PublicStore>::operator()(PublicStore*) const /usr/include/c++/9/bits/unique_ptr.h:81
+    #2 0x40352a in std::_Sp_counted_deleter<PublicStore*, std::default_delete<PublicStore>, std::allocator<void>, (__gnu_cxx::_Lock_policy)2>::_M_dispose() /usr/include/c++/9/bits/shared_ptr_base.h:471
+    #3 0x40239e in std::_Sp_counted_base<(__gnu_cxx::_Lock_policy)2>::_M_release() /usr/include/c++/9/bits/shared_ptr_base.h:155
+    #4 0x401f21 in std::__shared_count<(__gnu_cxx::_Lock_policy)2>::~__shared_count() /usr/include/c++/9/bits/shared_ptr_base.h:730
+    #5 0x401bb7 in std::__shared_ptr<BaseStore, (__gnu_cxx::_Lock_policy)2>::~__shared_ptr() /usr/include/c++/9/bits/shared_ptr_base.h:1169
+    #6 0x401bd3 in std::shared_ptr<BaseStore>::~shared_ptr() /usr/include/c++/9/bits/shared_ptr.h:103
+    #7 0x40151d in main src/backing-store-original.cc:47
+    #8 0x7f2078dd41a2 in __libc_start_main (/lib64/libc.so.6+0x271a2)
+    #9 0x40125d in _start (/home/danielbevenius/work/google/learning-v8/src/backing-store-org+0x40125d)
+
+(lldb) AddressSanitizer report breakpoint hit. Use 'thread info -s' to get extended information about the report.
+Process 4002682 stopped
+* thread #1, name = 'backing-store-o', stop reason = Deallocation size different from allocation size
+    frame #0: 0x00007ffff768ce70 libasan.so.5`__asan::AsanDie()
+libasan.so.5`__asan::AsanDie:
+->  0x7ffff768ce70 <+0>:  endbr64 
+    0x7ffff768ce74 <+4>:  mov    eax, 0x1
+    0x7ffff768ce79 <+9>:  lock   
+    0x7ffff768ce7a <+10>: xadd   dword ptr [rip + 0x883b7], eax ; __asan::AsanDie()::num_calls
+```
 
 A proposal of using a virtual destructor can be found in 
 [backing-store-new.cc](../src/backing-store-new.cc).
