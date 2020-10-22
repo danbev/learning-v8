@@ -51,11 +51,11 @@ int main(void)
       // count is 1 so the underlying object will not be deleted.
     }
     std::cout << "after i_store...use_count: " << base_store.use_count() << '\n';
-    // When the this scope ends, base_store's use_count  will be checked and it
+    // When this scope ends, base_store's use_count  will be checked and it
     // will be 0 and hence deleted. Static/early binding is in use here so
     // ~PublicStore will be called. ~BaseStore's destructor will be called
     // twice in this case, once by the call to i->~InternalStore(), and the
-    // after ~PublicStore as completed.
+    // after ~PublicStore has completed.
   }
 
   return 0; 
