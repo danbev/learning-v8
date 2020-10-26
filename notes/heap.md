@@ -188,8 +188,18 @@ size_t OS::AllocatePageSize() {
   return static_cast<size_t>(sysconf(_SC_PAGESIZE));
 }
 ```
-This is the number of fixed block of bytes that is the unit that mmap works with.
-(_SC is a prefix for System Config parameters for the sysconf function).
+This is the number of fixed block of bytes that is the unit of the page frames
+in physical memory. (_SC is a prefix for System Config parameters for the sysconf function).
+A page is the unit that is stored in a page frame:
+```
+                             Physical Memory                                          
+                         +---------------------------+                                  
+      physical address 1 | PageFrame 1: page content |                                  
+                         +---------------------------+                                  
+      physical address 2 | PageFrame 2: page content |                                  
+                         +---------------------------+                                  
+             ...		     ...
+``` 
 
 commit_page_size_ is implemented like this:
 ```c++
@@ -198,7 +208,7 @@ size_t OS::CommitPageSize() {
   return page_size;
 }
 ```
-Accourding to the man page of getpagesize, portable solutions should use
+According to the man page of getpagesize, portable solutions should use
 sysconf(_SC_PAGESIZE) instead (which is what AllocatePageSize does). I'm a little
 confused about this. TODO: take a closer look at this.
 
@@ -219,9 +229,9 @@ CommitPageSize: 4096
 ```
 
 PageAllocator is the interface for interacting with with memory pages (memory
-units of 4096 bytes).
-The PageAllocator implemention provided by V8 is what interacts with the
-underlying operating system via the base::OS class (src/base/platform/platform.h).
+units of 4096 bytes). The PageAllocator implemention provided by V8 is what
+interacts with the underlying operating system via the base::OS class
+(src/base/platform/platform.h).
 
 And this PageAllocator instance was created when the DefaultPlatform was
 created allowing it to be accessed using GetPlatformPageAllocator:
@@ -236,10 +246,6 @@ Address IsolateAllocator::InitReservation() {
   ...
   reservation_ = std::move(reservation);
 ```
-
-
-
-
 
 Notice that a VirtualMemory instance is created and the arguments passed. This
 is actually part of a retry loop but I've excluded that above.
@@ -435,13 +441,26 @@ void IsolateAllocator::CommitPagesForIsolate(Address heap_reservation_address) {
 (lldb) expr isolate_root
 (v8::internal::Address) $54 = 30309584207872
 ```
-And notice that the `VirtualMemory` that we allocated above has the same memory
-address. 
+So the `platform_page_allocator` is just the page allocator returned by the
+platform. The `page_allocator_` for the IsolateAllocator will be a
+BoundedPageAllocator which is passed the platform_page_allocator.
+To recap, `InitReservation` returns the address of the memory map and this
+address is passed into `CommitPagesForIsolate`.
+```console
+(lldb) expr isolate_root
+(v8::internal::Address) $3 = 43748536877056
+(lldb) expr page_size/1024
+(unsigned long) $5 = 256
+(lldb) expr size_t{1} << 32
+(size_t) $6 = 4294967296
+```
+BoundedPageAllocator's constructor will create a new RegionAllocator with
+the platform page allocator, the address of the memory map, 4 GB pointer compression
+heap reservation size, and a page size of 256. When memory is requested for an
+object it will call BoundedPageAllocator's AllocatePages implementation which
+will delegate to RegionAllocator and provide memory for the object. 
 
-So we are creating a new instance of BoundedPageAllocator and setting this to
-page_allocator_instance_ (smart pointer) and also setting the pointer
-page_allocator_.
-
+Next in `CommitPagesForIsolate` we have:
 ```c++
   Address isolate_address = isolate_root - Isolate::isolate_root_bias();
   Address isolate_end = isolate_address + sizeof(Isolate);
@@ -455,6 +474,9 @@ page_allocator_.
         PageAllocator::Permission::kNoAccess));
   }
 ```
+The above will reserve the address space of the Isolate so that is not used
+for other object.
+
 `AllocatePagesAt` will call `BoundedPageAllocator::AllocatePagesAt`:
 ```c++
 bool BoundedPageAllocator::AllocatePagesAt(Address address, size_t size,
@@ -467,6 +489,7 @@ bool BoundedPageAllocator::AllocatePagesAt(Address address, size_t size,
   return true;
 }
 ```
+
 `SetPermissions` can be found in `platform-posix.cc` and looks like this:
 ```c++
 bool OS::SetPermissions(void* address, size_t size, MemoryPermission access) {
@@ -740,10 +763,24 @@ BasicMemoryChunk::BasicMemoryChunk(size_t size, Address area_start,
   area_end_ = area_end;
 }
 ```
-So there is nothing else to creating an instance of a BasicMemoryChunk.
+So there is nothing else to creating an instance of a BasicMemoryChunk, but
+it has other protected fields like:
+```c++
+  Heap* heap;
+  size_t allocated_bytes_;
+  size_t wasted_memory_;
+  std::atomic<intptr_t> high_water_mark_;
 
-But note that BasicMemoryChunk also has a Heap member which was not specified
-in the above constructor.
+  // The space owning this memory chunk.
+  std::atomic<BaseSpace*> owner_;
+
+  // If the chunk needs to remember its memory reservation, it is stored here.
+  VirtualMemory reservation_;
+
+
+```
+
+
 There is a static function named `Initialize` that does take a pointer to a
 Heap though:
 ```c++
@@ -752,6 +789,7 @@ Heap though:
                                       BaseSpace* owner,
                                       VirtualMemory reservation);
 ```
+This can be used to create a BasicMemory chun
 
 
 ### MemoryChunk
@@ -867,10 +905,7 @@ enum AllocationAlignment {
 ```
 
 ### MemoryAllocator
-A memory allocator is what requires chunks of memory from the OS.
-Is defined in `src/heap/memory-allocator.h` and is created in Heap::SetUpg
-
-I want to know/understand where memory is allocated.
+Is defined in `src/heap/memory-allocator.h` and is created in Heap::SetUp.
 
 When a MemoryAllocator is created it is passes an internal isolate, a capacity,
 and a code_range_size.
@@ -1019,4 +1054,155 @@ and increase the top with the size of the object in question. Functions that
 set values on the object would have to write to the field specified by the
 layout of the object. TODO: verify if that is actually what is happening.
 
+
+###
+Pages in the heap are of size 256K.
+Large pages are any objects that are of size greater than
+kMaxRegularHeapObjectSize, which is half the of the page size of the OS?
+
+Page size:
+The allocation page size is retrieved from the OS using sysconf(_SC_PAGESIZE).
+So this would be the size physical memory page frames. 
+This could be 4K or 64K on some systems.
+
+AreaSize:
+A PagedSpace has a field named area_size_ which is set in the constructor:
+```c++
+PagedSpace::PagedSpace(Heap* heap, AllocationSpace space,
+                       Executability executable, FreeList* free_list,
+                       LocalSpaceKind local_space_kind)
+    : SpaceWithLinearArea(heap, space, free_list),
+      executable_(executable),
+      local_space_kind_(local_space_kind) {
+  area_size_ = MemoryChunkLayout::AllocatableMemoryInMemoryChunk(space);
+  accounting_stats_.Clear();
+}
+```
+```c++
+size_t MemoryChunkLayout::AllocatableMemoryInMemoryChunk(
+    AllocationSpace space) {
+  if (space == CODE_SPACE) {
+    return AllocatableMemoryInCodePage();
+  }
+  return AllocatableMemoryInDataPage();
+}
+```
+```c++
+size_t MemoryChunkLayout::AllocatableMemoryInCodePage() {
+  size_t memory = ObjectEndOffsetInCodePage() - ObjectStartOffsetInCodePage();
+  DCHECK_LE(kMaxRegularHeapObjectSize, memory);
+  return memory;
+}
+```
+
+```
+intptr_t MemoryChunkLayout::ObjectEndOffsetInCodePage() {
+  // We are guarding code pages: the last OS page will be protected as
+  // non-writable.
+  return MemoryChunk::kPageSize -
+         static_cast<int>(MemoryAllocator::GetCommitPageSize());
+}
+```
+```
+intptr_t MemoryAllocator::GetCommitPageSize() {
+  if (FLAG_v8_os_page_size != 0) {
+    DCHECK(base::bits::IsPowerOfTwo(FLAG_v8_os_page_size));
+    return FLAG_v8_os_page_size * KB;
+  } else {
+    return CommitPageSize();
+  }
+}
+```
+```c++
+size_t OS::CommitPageSize() {
+#if defined(__APPLE__) && V8_TARGET_ARCH_ARM64
+  static size_t page_size = kAppleArmPageSize;
+#else
+  static size_t page_size = getpagesize();
+#endif
+  return page_size;
+}
+```
+MemoryChunk::kPageSize:
+```c++
+// Page size in bytes.  This must be a multiple of the OS page size.
+  static const int kPageSize = 1 << kPageSizeBits;
+```
+```c++
+// Number of bits to represent the page size for paged spaces.
+#if defined(V8_TARGET_ARCH_PPC) || defined(V8_TARGET_ARCH_PPC64)
+// PPC has large (64KB) physical pages.
+const int kPageSizeBits = 19;
+#else
+const int kPageSizeBits = 18;
+#endif
+```
+$ ./size
+Size (page_size_bits: 19):524288=512
+Size (page_size_bits: 18):262144=256
+_SC_PAGESIZE: 4096
+
+On my machine area_size_ is 236Kb
+
+
+
+CodeSpace extends PagedSpace:
+```c++
+class CodeSpace : public PagedSpace {
+ public:
+  // Creates an old space object. The constructor does not allocate pages
+  // from OS.
+  explicit CodeSpace(Heap* heap)
+      : PagedSpace(heap, CODE_SPACE, EXECUTABLE, FreeList::CreateFreeList()) {}
+};
+```
+
+I think that it is possible for the OS to be configured with 4Kb pages or
+64Kb pages.
+
+```c++
+  bool large_object = size_in_bytes > kMaxRegularHeapObjectSize;
+  ...
+  } else if (AllocationType::kCode == type) {
+      if (size_in_bytes <= code_space()->AreaSize() && !large_object) {
+        allocation = code_space_->AllocateRawUnaligned(size_in_bytes);
+      } else {
+        allocation = code_lo_space_->AllocateRaw(size_in_bytes);
+      }
+
+ if (allocation.To(&object)) {                                                 
+    if (AllocationType::kCode == type && !V8_ENABLE_THIRD_PARTY_HEAP_BOOL) {    
+      ...
+      if (!large_object) {                                                      
+        MemoryChunk::FromHeapObject(object)                                     
+            ->GetCodeObjectRegistry()                                           
+            ->RegisterNewlyAllocatedCodeObject(object.address());               
+      }                                                                         
+    }      
+```
+Notice that the check is `size_in_bytes` <= `code_space()->AreaSize()`
+We could be in a situation where the size_in_bytes less than 128 and hence
+not considered a large object, but it is larger than the available area_size
+which will cause it to be created in the CodeLargeObjectSpace. And later the
+!large_object will be entered causing a segment fault.
+
+This solution is to add a check when createing the bool large_object to take
+into consideration the area_size.
+```c++
+  size_t large_object_threshold = kMaxRegularHeapObjectSize;
+  if (AllocationType::kCode == type)
+    large_object_threshold = std::min(kMaxRegularHeapObjectSize,
+                                      code_space()->AreaSize());
+  bool large_object =
+      static_cast<size_t>(size_in_bytes) > large_object_threshold;
+```
+This code will take the min value of the kMaxRegularHeapObjectSize and the code_space
+area_size and use use that value to determine if the size of the requested object
+should be considered a large object or not.
+
+```c++
+size_t area_size() const {
+    return static_cast<size_t>(area_end() - area_start());
+  }
+```
 
