@@ -43,12 +43,7 @@ int main(void)
     {
       std::shared_ptr<InternalStore> i_store = std::static_pointer_cast<InternalStore>(base_store);
       std::cout << "inside i_store scope...use_count: " << base_store.use_count() << '\n';
-      // count is 1 so the underlying object will not be deleted. When the
-      // next scope ends, base_store's use_count  will be checked and it will be
-      // 0 and hence deleted. In this case since BaseStore has a virtual
-      // destructor and InternalStore implements it, InternalStore's destructor
-      // will be called. Dynamic look up is in place as opposed to static/early
-      // binding in the case of a non-virtual version.
+      // count is 1 so the underlying object will not be deleted.
     }
     std::cout << "after i_store...use_count: " << base_store.use_count() << '\n';
     // When this scope ends, base_store's use_count will be checked and it 
