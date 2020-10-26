@@ -325,4 +325,6 @@ libasan.so.5`__asan::AsanDie:
 ```
 
 A proposal of using a virtual destructor can be found in 
-[backing-store-new.cc](../src/backing-store-new.cc).
+[backing-store-new.cc](../src/backing-store-new.cc) which adds a virtual
+destructor to `v8::internal::BackingStoreBase`, and removes the current manual
+call from v8::BackingStore.
