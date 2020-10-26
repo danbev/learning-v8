@@ -1,5 +1,5 @@
 ## Introduction
-V8 is bascially consists of the memory management of the heap and the execution
+V8 basically consists of the memory management of the heap and the execution
 stack (very simplified but helps make my point). Things like the callback queue,
 the event loop and other things like the WebAPIs (DOM, ajax, setTimeout etc) are
 found inside Chrome or in the case of Node the APIs are Node.js APIs:
