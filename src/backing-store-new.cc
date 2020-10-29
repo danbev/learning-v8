@@ -11,13 +11,13 @@ class BaseStore {
     BaseStore() {
       std::cout << "Constructing BaseStore " << this << '\n'; 
     }
-    virtual ~BaseStore() { std::cout << "~BaseStore " << this <<  '\n'; }      
+    ~BaseStore() { std::cout << "~BaseStore " << this <<  '\n'; }      
 }; 
 
 class InternalStore: public BaseStore { 
   public: 
     InternalStore() { std::cout << "Constructing InternalStore " << this << '\n'; } 
-    ~InternalStore() override {
+    ~InternalStore() {
       std::cout << "~InternalStore " << this << '\n';
     }
   private:
@@ -26,9 +26,16 @@ class InternalStore: public BaseStore {
 
 class PublicStore: public BaseStore {
   public: 
-    ~PublicStore() override {
+    ~PublicStore() { 
       std::cout << "~PublicStore " << this << '\n';
+      InternalStore* i = reinterpret_cast<InternalStore*>(this);
+      i->~InternalStore();
     } 
+    void operator delete(void* ptr) { 
+      std::cout << "PublicStore::delete\n";
+      ::operator delete(ptr, 100); 
+    }
+
   private:
     PublicStore() { std::cout << "Constructing PublicStore " << this << '\n'; } 
 }; 
@@ -47,10 +54,7 @@ int main(void)
     }
     std::cout << "after i_store...use_count: " << base_store.use_count() << '\n';
     // When this scope ends, base_store's use_count will be checked and it 
-    // will be 0 and hence deleted. In this case since BaseStore has a virtual
-    // destructor and InternalStore implements it, InternalStore's destructor
-    // will be called. Dynamic look up is in place as opposed to static/early
-    // binding in the case of a non-virtual version.
+    // will be 0 and hence deleted. 
   }
 
   return 0; 
