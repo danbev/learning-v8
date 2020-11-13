@@ -1,0 +1,8 @@
+[package]
+name = "rusty-v8"
+version = "0.1.0"
+authors = ["Daniel Bevenius <daniel.bevenius@gmail.com>"]
+edition = "2018"
+
+[dependencies]
+rusty_v8 = "0.12.0"
