@@ -3,10 +3,12 @@ use rusty_v8 as v8;
 fn doit(
   scope: &mut v8::HandleScope,
   args: v8::FunctionCallbackArguments,
-  mut _retval: v8::ReturnValue,
+  mut retval: v8::ReturnValue,
 ) {
   let str = args.get(0).to_string(scope).unwrap().to_rust_string_lossy(scope);
   println!("doit argument = {}", str);
+  let ret_string = v8::String::new(scope, "doit...done").unwrap();
+  retval.set(ret_string.into());
 }
 
 fn main() {
