@@ -196,7 +196,7 @@ TEST_F(SnapshotTest, ExternalReference) {
             ConstructorBehavior::kThrow,
             SideEffectType::kHasSideEffect)->GetFunction(context).ToLocalChecked();
 
-        Local<String> func_name = String::NewFromUtf8Literal(isolate, "doit");
+        Local<String> func_name = String::NewFromUtf8Literal(isolate, "external");
         context->Global()->Set(context, func_name, function).Check();
         function->SetName(func_name);
       }
@@ -207,10 +207,13 @@ TEST_F(SnapshotTest, ExternalReference) {
   }
 
   Isolate::CreateParams create_params;
+  // Use the startup_data (the snapshot blob created above)
   create_params.snapshot_blob = &startup_data;
   // Add the external references to functions 
   create_params.external_references = external_refs.data();
+
   create_params.array_buffer_allocator = ArrayBuffer::Allocator::NewDefaultAllocator();
+
   Isolate* isolate = Isolate::New(create_params);
   {
     HandleScope scope(isolate);
@@ -218,17 +221,17 @@ TEST_F(SnapshotTest, ExternalReference) {
     {
       Context::Scope context_scope(context);
       TryCatch try_catch(isolate);
-        Local<String> src = String::NewFromUtf8Literal(isolate, "doit('some arg');");
-        ScriptOrigin origin(String::NewFromUtf8Literal(isolate, "function"));
-        ScriptCompiler::Source source(src, origin);                     
-        Local<Script> script;
-        EXPECT_TRUE(ScriptCompiler::Compile(context, &source).ToLocal(&script));
-        MaybeLocal<Value> maybe_result = script->Run(context);
-        EXPECT_FALSE(maybe_result.IsEmpty());
-        Local<Value> result = maybe_result.ToLocalChecked();
-        String::Utf8Value utf8(isolate, result);
-        EXPECT_STREQ("ExternalRefFunction done.", *utf8);
-        EXPECT_FALSE(try_catch.HasCaught());
+      Local<String> src = String::NewFromUtf8Literal(isolate, "external('some arg');");
+      ScriptOrigin origin(String::NewFromUtf8Literal(isolate, "function"));
+      ScriptCompiler::Source source(src, origin);
+      Local<Script> script;
+      EXPECT_TRUE(ScriptCompiler::Compile(context, &source).ToLocal(&script));
+      MaybeLocal<Value> maybe_result = script->Run(context);
+      EXPECT_FALSE(maybe_result.IsEmpty());
+      Local<Value> result = maybe_result.ToLocalChecked();
+      String::Utf8Value utf8(isolate, result);
+      EXPECT_STREQ("ExternalRefFunction done.", *utf8);
+      EXPECT_FALSE(try_catch.HasCaught());
     }
   }
   isolate->Dispose();
