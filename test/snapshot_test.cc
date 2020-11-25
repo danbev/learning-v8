@@ -266,7 +266,7 @@ TEST_F(SnapshotTest, InternalFields) {
 
   std::vector<intptr_t> external_refs;
   std::cout << "address of Constructor function: " << 
-    reinterpret_cast<void*>(Constructor) << '\n';
+    reinterpret_cast<intptr_t*>(Constructor) << '\n';
   external_refs.push_back(reinterpret_cast<intptr_t>(Constructor));
 
   std::cout << "external_refs: ";
@@ -294,7 +294,7 @@ TEST_F(SnapshotTest, InternalFields) {
         Local<Object> global = context->Global();
         Local<FunctionTemplate> ft = FunctionTemplate::New(isolate,
             Constructor, Local<Value>(), Local<Signature>(), 0, 
-            ConstructorBehavior::kThrow,
+            ConstructorBehavior::kAllow,
             SideEffectType::kHasSideEffect);
 
         ft->InstanceTemplate()->SetInternalFieldCount(1);
@@ -321,8 +321,7 @@ TEST_F(SnapshotTest, InternalFields) {
       DeserializeInternalFields, nullptr);
   {
     HandleScope scope(isolate);
-    Local<Context> context = Context::FromSnapshot(isolate,
-        index, di_cb).ToLocalChecked();
+    Local<Context> context = Context::FromSnapshot(isolate, index, di_cb).ToLocalChecked();
     {
       Context::Scope context_scope(context);
       TryCatch try_catch(isolate);
