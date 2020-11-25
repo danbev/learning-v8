@@ -388,6 +388,56 @@ it is possible to reference:
 (v8::Maybe<unsigned int>) $11 = (has_value_ = true, value_ = 2147483648)
 ```
 
+So after we have created the StartupData blob and then use it when creating
+a new Isolate, the blob will be deserialised. In
+Deserializer::ReadSingleBytecodeData we then have:
+```c++
+    case kApiReference: {                                                           
+      uint32_t reference_id = static_cast<uint32_t>(source_.GetInt());              
+      Address address;                                                              
+      if (isolate()->api_external_references()) {                                   
+        DCHECK_WITH_MSG(reference_id < num_api_references_,                         
+                        "too few external references provided through the API");
+        address = static_cast<Address>(                                             
+            isolate()->api_external_references()[reference_id]);                    
+      } else {                                                                      
+        address = reinterpret_cast<Address>(NoExternalReferencesCallback);          
+      }                                                                             
+      if (V8_HEAP_SANDBOX_BOOL && data == kSandboxedApiReference) {                 
+        return WriteExternalPointer(slot_accessor.slot(), address,                  
+                                    kForeignForeignAddressTag);                     
+      } else {                                                                      
+        DCHECK(!V8_HEAP_SANDBOX_BOOL);                                              
+        return WriteAddress(slot_accessor.slot(), address);                         
+      }                                                                             
+    }                            
+```
+
+```console
+(lldb) expr reference_id
+(uint32_t) $15 = 0
+(lldb) expr isolate()->api_external_references()[0]
+(intptr_t) $18 = 4298802
+```
+So in the blob the current source_ position is of type api reference type and
+the value is an index into the api_external_references array. This address
+is then written to the using WriteAddress which does a memory copy
+```c++
+template <typename TSlot>
+int Deserializer::WriteAddress(TSlot dest, Address value) {
+  base::Memcpy(dest.ToVoidPtr(), &value, kSystemPointerSize);
+  return (kSystemPointerSize / TSlot::kSlotDataSize);
+}
+```
+So 4298802 (the value of the passed in Address which is also the pointer to
+our external function) will be written to the destination slot in memory.
+Just to recap this a little and remember that I'm using a single test here but
+in a real world situation the StartupData would have been written to some
+external storage like the file system. Another program would then use the blob
+and the address of the external function would most likely be a different
+address, so this is where V8 need to link this with the correct address of the
+function.
+
 
 
 In the constructor of SnapshotCreator we have the following code:
