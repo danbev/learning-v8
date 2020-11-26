@@ -2,6 +2,7 @@
 #include "gtest/gtest.h"
 #include "v8.h"
 #include "libplatform/libplatform.h"
+#include "src/execution/isolate-inl.h"
 
 using namespace v8;
 
@@ -11,6 +12,13 @@ void print_data(StartupData* startup_data) {
     char endchar = i != size - 1 ? ',' : '\n';
     std::cout << std::to_string(startup_data->data[i]) << endchar;
   }
+}
+
+extern void _v8_internal_Print_Object(void* object);
+
+template<typename T>
+static void print_local(v8::Local<T> obj) {
+  _v8_internal_Print_Object(*((v8::internal::Object**)*obj));
 }
 
 class SnapshotTest : public ::testing::Test {
@@ -164,6 +172,14 @@ void ExternalRefFunction(const FunctionCallbackInfo<Value>& args) {
           "ExternalRefFunction done."));
 }
 
+void ExternalRefFunction2(const FunctionCallbackInfo<Value>& args) {
+    String::Utf8Value str(args.GetIsolate(), args[0]);
+    printf("ExternalRefFunction2 argument = %s\n", *str);
+    args.GetReturnValue().Set(
+        String::NewFromUtf8Literal(args.GetIsolate(),
+          "ExternalRefFunction2 done."));
+}
+
 TEST_F(SnapshotTest, ExternalReference) {
   StartupData startup_data;
   size_t index;
@@ -196,9 +212,13 @@ TEST_F(SnapshotTest, ExternalReference) {
             ConstructorBehavior::kThrow,
             SideEffectType::kHasSideEffect)->GetFunction(context).ToLocalChecked();
 
+
         Local<String> func_name = String::NewFromUtf8Literal(isolate, "external");
         context->Global()->Set(context, func_name, function).Check();
         function->SetName(func_name);
+
+        v8::internal::HeapObject heap_obj = v8::internal::HeapObject::cast(*((v8::internal::Object*)*function));
+        print_local(function);
       }
 
       index = snapshot_creator.AddContext(context);
@@ -210,7 +230,11 @@ TEST_F(SnapshotTest, ExternalReference) {
   // Use the startup_data (the snapshot blob created above)
   create_params.snapshot_blob = &startup_data;
   // Add the external references to functions 
-  create_params.external_references = external_refs.data();
+  std::vector<intptr_t> external_refs2;
+  std::cout << "address of ExternalRefFunction2 function: " << 
+    reinterpret_cast<intptr_t>(ExternalRefFunction2) << '\n';
+  external_refs2.push_back(reinterpret_cast<intptr_t>(ExternalRefFunction2));
+  create_params.external_references = external_refs2.data();
 
   create_params.array_buffer_allocator = ArrayBuffer::Allocator::NewDefaultAllocator();
 
@@ -230,7 +254,7 @@ TEST_F(SnapshotTest, ExternalReference) {
       EXPECT_FALSE(maybe_result.IsEmpty());
       Local<Value> result = maybe_result.ToLocalChecked();
       String::Utf8Value utf8(isolate, result);
-      EXPECT_STREQ("ExternalRefFunction done.", *utf8);
+      EXPECT_STREQ("ExternalRefFunction2 done.", *utf8);
       EXPECT_FALSE(try_catch.HasCaught());
     }
   }
@@ -266,7 +290,7 @@ TEST_F(SnapshotTest, InternalFields) {
 
   std::vector<intptr_t> external_refs;
   std::cout << "address of Constructor function: " << 
-    reinterpret_cast<intptr_t*>(Constructor) << '\n';
+    reinterpret_cast<intptr_t>(Constructor) << '\n';
   external_refs.push_back(reinterpret_cast<intptr_t>(Constructor));
 
   std::cout << "external_refs: ";
