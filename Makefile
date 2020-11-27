@@ -63,7 +63,7 @@ gtest-compile: CXXFLAGS = --verbose -Wall -O0 -g -c $(gtest_home)/src/gtest-all.
           -I$(gtest_home) \
           -I$(gtest_home)/include
 gtest-compile: 
-	@echo "Building gtest library"
+	${info Building gtest library}
 	$(CXX) ${CXXFLAGS} $@.cc -o $@
 	@mkdir -p $(CURDIR)/lib/gtest
 	${AR} -rv $(CURDIR)/lib/gtest/libgtest.a $(gtest_home)/gtest-all.o
