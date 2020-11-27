@@ -267,19 +267,7 @@ TEST_F(SnapshotTest, ExternalReference) {
   isolate->Dispose();
 }
 
-StartupData SerializeInternalFields(Local<Object> holder,
-                                    int index,
-                                    void* data) {
-  std::cout << "SerializeInternalFields..." << '\n';
-  return {};
-}
 
-void DeserializeInternalFields(Local<Object> holder,
-                               int index,
-                               StartupData payload,
-                               void* data) {
-  std::cout << "DeserializeInternalFields..." << '\n';
-}
 
 void internal_function() {
   std::cout << "internal_function..." << '\n';
@@ -292,20 +280,41 @@ void Constructor(const FunctionCallbackInfo<Value>& args) {
 
 class Something {
  public:
-   Something(const char* s) : s_(s) {}
-   const char* s() { return s_; }
+   Something(const char* s) : value_(s) {}
+   const char* value() { return value_; }
  private:
-   const char* s_;
+   const char* value_;
 };
+
+StartupData SerializeInternalFields(Local<Object> holder,
+                                    int index,
+                                    void* data) {
+  Something* s = static_cast<Something*>(holder->GetAlignedPointerFromInternalField(index));
+  std::cout << "SerializeInternalFields index: " << index
+            << "value: " << s->value() << '\n';
+
+  return StartupData{nullptr, 0};
+}
+
+void DeserializeInternalFields(Local<Object> holder,
+                               int index,
+                               StartupData payload,
+                               void* data) {
+  std::cout << "DeserializeInternalFields..." << '\n';
+}
 
 TEST_F(SnapshotTest, InternalFields) {
   StartupData startup_data;
   size_t index = 0;
 
+  // This is the data that we want to add as an internal field
+  Something s("Some data...");
+
+  // Serialize callback which also takes a pointer to the internal field
+  // so that it can be written out.
   SerializeInternalFieldsCallback si_cb = SerializeInternalFieldsCallback(
       SerializeInternalFields, nullptr);
 
-  Something s("Some data...");
   int context_index;
   {
     Isolate* isolate = nullptr;
