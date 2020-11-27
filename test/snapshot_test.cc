@@ -239,6 +239,12 @@ TEST_F(SnapshotTest, ExternalReference) {
   create_params.array_buffer_allocator = ArrayBuffer::Allocator::NewDefaultAllocator();
 
   Isolate* isolate = Isolate::New(create_params);
+  /*
+  v8::internal::Isolate* i_isolate = reinterpret_cast<v8::internal::Isolate*>(isolate);
+  v8::internal::ExternalReferenceTable* ert = i_isolate->external_reference_table();
+  const char* name = ert->ResolveSymbol((void*)reinterpret_cast<intptr_t>(ExternalRefFunction2));
+  std::cout << "ResoleSymbol ExternalRefFunction2: " << name << '\n';
+  */
   {
     HandleScope scope(isolate);
     Local<Context> context = Context::FromSnapshot(isolate, index).ToLocalChecked();
@@ -284,9 +290,17 @@ void Constructor(const FunctionCallbackInfo<Value>& args) {
   args.Holder()->SetAlignedPointerInInternalField(0, reinterpret_cast<void*>(internal_function));
 }
 
+class Something {
+ public:
+   Something(const char* s) : s_(s) {}
+   const char* s() { return s_; }
+ private:
+   const char* s_;
+};
+
 TEST_F(SnapshotTest, InternalFields) {
   StartupData startup_data;
-  size_t index;
+  size_t index = 0;
 
   std::vector<intptr_t> external_refs;
   std::cout << "address of Constructor function: " << 
@@ -302,7 +316,8 @@ TEST_F(SnapshotTest, InternalFields) {
   SerializeInternalFieldsCallback si_cb = SerializeInternalFieldsCallback(
       SerializeInternalFields, nullptr);
 
-  int field_index = 1;
+  Something s("Some data...");
+  int context_index;
   {
     Isolate* isolate = nullptr;
     isolate = Isolate::Allocate();
@@ -327,9 +342,20 @@ TEST_F(SnapshotTest, InternalFields) {
         Local<Function> function = ft->GetFunction(context).ToLocalChecked();
         function->SetName(func_name);
         global->Set(context, func_name, function).Check();
+
+        Local<FunctionTemplate> constructor = Local<FunctionTemplate>();
+        Local<ObjectTemplate> ot = ObjectTemplate::New(isolate, constructor);
+        ot->SetInternalFieldCount(1);
+
+        MaybeLocal<Object> maybe_instance = ot->NewInstance(context);
+        Local<Object> obj = maybe_instance.ToLocalChecked();
+
+        Local<String> obj_name = String::NewFromUtf8Literal(isolate, "something");
+        obj->SetAlignedPointerInInternalField(0, static_cast<void*>(&s));
+        global->Set(context, obj_name, obj).Check();
       }
 
-      index = snapshot_creator.AddContext(context, si_cb);
+      context_index = snapshot_creator.AddContext(context, si_cb);
     }
     startup_data = snapshot_creator.CreateBlob(SnapshotCreator::FunctionCodeHandling::kKeep);
   }
@@ -345,7 +371,7 @@ TEST_F(SnapshotTest, InternalFields) {
       DeserializeInternalFields, nullptr);
   {
     HandleScope scope(isolate);
-    Local<Context> context = Context::FromSnapshot(isolate, index, di_cb).ToLocalChecked();
+    Local<Context> context = Context::FromSnapshot(isolate, context_index, di_cb).ToLocalChecked();
     {
       Context::Scope context_scope(context);
       TryCatch try_catch(isolate);
