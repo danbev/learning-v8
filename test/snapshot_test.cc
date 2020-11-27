@@ -286,6 +286,10 @@ class Something {
    const char* value_;
 };
 
+/*
+ * This is part of the snapshot serialization process, taking in-memory objects
+ * and adding them to the StartupData to be written to storage.
+ */
 StartupData SerializeInternalFields(Local<Object> holder,
                                     int index,
                                     void* data) {
@@ -293,7 +297,11 @@ StartupData SerializeInternalFields(Local<Object> holder,
   std::cout << "SerializeInternalFields index: " << index
             << "value: " << s->value() << '\n';
 
-  return StartupData{nullptr, 0};
+
+  int size = sizeof(*s);
+  char* payload = new char[size];
+  memcpy(payload, s, size);
+  return {payload, size};
 }
 
 void DeserializeInternalFields(Local<Object> holder,
@@ -304,6 +312,11 @@ void DeserializeInternalFields(Local<Object> holder,
 }
 
 TEST_F(SnapshotTest, InternalFields) {
+  /*
+  const char* trace = "--trace_serializer";
+  v8::internal::FlagList::SetFlagsFromString(trace, strlen(trace));
+  */
+
   StartupData startup_data;
   size_t index = 0;
 
