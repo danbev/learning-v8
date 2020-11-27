@@ -3731,7 +3731,7 @@ And bootstrapper.cc:
 
     SimpleInstallFunction(prototype, "len", Builtins::kGetStringLength, 0, true);
 
-If you now build using 'ninja -C out.gn/learning' you should be able to run d8 and try this out:
+If you now build using 'ninja -C out.gn/learning_v8' you should be able to run d8 and try this out:
 
     d8> const s = 'testing'
     undefined
