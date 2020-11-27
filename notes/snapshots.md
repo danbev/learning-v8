@@ -278,6 +278,66 @@ static MaybeLocal<Context> FromSnapshot(
       MicrotaskQueue* microtask_queue = nullptr);
 ```
 
+In our case Context::FromSnapshot will call:
+```c++
+return NewContext(external_isolate, extensions, MaybeLocal<ObjectTemplate>(), 
+                    global_object, index_including_default_context,             
+                    embedder_fields_deserializer, microtask_queue)
+```
+
+This will trickle down into bootstrapper.cc which has the following call:
+```c++
+if (isolate->initialized_from_snapshot()) {                                       
+    Handle<Context> context;                                                        
+    if (Snapshot::NewContextFromSnapshot(isolate, global_proxy,                     
+                                         context_snapshot_index,                    
+                                         embedder_fields_deserializer)              
+            .ToHandle(&context)) {                                                  
+      native_context_ = Handle<NativeContext>::cast(context);                       
+    }                                                                               
+  }              
+```
+This will land in snapshot.cc:
+```c++
+MaybeHandle<Context> Snapshot::NewContextFromSnapshot(
+    Isolate* isolate, Handle<JSGlobalProxy> global_proxy, size_t context_index,
+    v8::DeserializeEmbedderFieldsCallback embedder_fields_deserializer) {
+  ...
+  const v8::StartupData* blob = isolate->snapshot_blob();
+  bool can_rehash = ExtractRehashability(blob);
+  Vector<const byte> context_data = SnapshotImpl::ExtractContextData(
+      blob, static_cast<uint32_t>(context_index));
+  SnapshotData snapshot_data(MaybeDecompress(context_data));
+
+  MaybeHandle<Context> maybe_result = ContextDeserializer::DeserializeContext(
+      isolate, &snapshot_data, can_rehash, global_proxy,
+      embedder_fields_deserializer);
+
+  Handle<Context> result;
+  if (!maybe_result.ToHandle(&result)) return MaybeHandle<Context>();
+
+  return result;
+}
+```
+In this case the most interesting part is the
+ContextDeserializer::DeserializeContext call (src/snapshot/context-deserializer.cc):
+```c++
+MaybeHandle<Context> ContextDeserializer::DeserializeContext(
+    Isolate* isolate, const SnapshotData* data, bool can_rehash,
+    Handle<JSGlobalProxy> global_proxy,
+    v8::DeserializeEmbedderFieldsCallback embedder_fields_deserializer) {
+  ContextDeserializer d(isolate, data, can_rehash);
+
+  MaybeHandle<Object> maybe_result =
+      d.Deserialize(isolate, global_proxy, embedder_fields_deserializer);
+
+  Handle<Object> result;
+  return maybe_result.ToHandle(&result) ? Handle<Context>::cast(result)
+                                        : MaybeHandle<Context>();
+}
+```
+`d.Deserialize` will call `ContextDeserializer::Deserialize`.
+
 
 ### External references
 When we have functions that are not defined in V8 itself these functions will
@@ -602,13 +662,20 @@ void ExternalReferenceTable::Init(Isolate* isolate) {
 ```
 Lets take a look at these Add functions and see what they are doing.
 First, `ref_addr_` is an array of v8::internal::Address's:
+```c++
+void ExternalReferenceTable::Add(Address address, int* index) {                 
+  ref_addr_[(*index)++] = address;                                              
+}
+```
+
 ```console
 (lldb) expr ref_addr_
 (v8::internal::Address [986]) $14 = {
   [0] = 16045690975706529519
   [1] = 16045690975706529519
 ```
-And the first entry in this array will be set to the kNullAddress:
+And the first entry in this array will be set to the kNullAddress, after the
+first call to Add:
 ```console
 (v8::internal::Address [986]) $18 = {
   [0] = 0
@@ -655,9 +722,17 @@ void abort_with_reason(int reason) {
 }
 ```
 So what is happening here is that this function is being added to the array
-of Address's at location 1.
+of Address's at location 1. Remember that V8 also supports snapshots and has
+the command mksnapshot which creates a snapshot. It too has functions addresses
+that need to be resolved when the snapshot is loaded.
+
 But we have not seen any of the external references that we passed in, these
-are still V8's own references as far as I can tell.
+are still V8's references as far as I can tell. And also notice that these
+are added to the Isolate when it is created. When we later create a context
+is when we pass in the StartupData:
+```c++
+  Local<Context> context = Context::FromSnapshot(isolate, index).ToLocalChecked();
+```
 
 After we have returned from this function we will be back in Isolate::Init
 and after stepping through a little we come to:
@@ -742,11 +817,10 @@ void Deserializer::ReadData(FullMaybeObjectSlot start,
 }
 ```
 If we look at ReadSingleBytecodeData we can find rather large switch statement
-that takes the data passed in.
+that takes the data passed in:
 ```c++
   switch (data) {
     ....
-
 
     case kApiReference: {                                                       
       uint32_t reference_id = static_cast<uint32_t>(source_.GetInt());          
@@ -768,7 +842,10 @@ that takes the data passed in.
       }                                                                         
     }                                           
 ```
-This is where the references that we passed come into play.
+This is where the references that we passed come into play. If the instance_type
+of the Map of the HeapObject that is being read from the snapshot is of type
+`kApiReference` then use the value reference_id as the index into the
+api_external_references array.
 
 ```console
 (lldb) br s -f deserializer.cc -l 1016
@@ -780,6 +857,10 @@ This is where the references that we passed come into play.
 
 
 ### Internal Fields
+We looked at how external functions can be handled when creating a snapshot,
+but we also have to be able to deal with things like classes and be able to
+serialize/deserialize them (at least that is my understading so far).
+
 When adding a Context to SnapshotCreator there is a parameter named
 `callback` which is of type `SerializeInternalFieldsCallback` :
 ```c++
@@ -799,11 +880,97 @@ struct SerializeInternalFieldsCallback {
   void* data;
 };
 ```
-So we can see that the default implementation is a noop (no operation).
+An implementation can be provided by creating a new instance of this struct
+and passing in the data that should be passed to it's callback function.
 
 What exactly are internal fields? 
 
 When is the callback called?
+These is a test case that demonstrates this and it has a callback in which
+a break point can be set:
+```console
+./test/snapshot_test --gtest_filter=SnapshotTest.InternalFields
+````
+
+`src/snapshot/context-serializer.cc` contains the following function:
+```c++
+bool ContextSerializer::SerializeJSObjectWithEmbedderFields(                    
+    Handle<HeapObject> obj) {     
+```
+Lets stick a break point in that function and work backwards from there:
+```console
+(lldb) br s -f context-serializer.cc -l 208
+```
+Starting from Snapshot::Create, which will iterate over all the contexts passed
+in:
+```c++
+v8::StartupData Snapshot::Create(
+    Isolate* isolate, std::vector<Context>* contexts,
+    const std::vector<SerializeInternalFieldsCallback>& embedder_fields_serializers,
+    const DisallowGarbageCollection& no_gc, SerializerFlags flags) {
+
+    const int num_contexts = static_cast<int>(contexts->size());
+    for (int i = 0; i < num_contexts; i++) {
+      ContextSerializer context_serializer(isolate, flags, &startup_serializer,
+                                         embedder_fields_serializers[i]);
+      context_serializer.Serialize(&contexts->at(i), no_gc);
+      can_be_rehashed = can_be_rehashed && context_serializer.can_be_rehashed();
+      context_snapshots.push_back(new SnapshotData(&context_serializer));
+    }
+  }
+```
+Notice that each context will have a ContextSerializer created for it, and it
+gets passed the SerializeInternalFieldsCallback and Serialized will be called
+on that instance passing in the first context. So that leads us to
+ContextSeralizer::Serialize:
+```c++
+void ContextSerializer::Serialize(Context* o, const DisallowGarbageCollection& no_gc) {
+```c++
+  VisitRootPointer(Root::kStartupObjectCache, nullptr, FullObjectSlot(o));
+```
+The second argument is for the description (cont char*). VisitRootPointers can
+be found in visitors.h and will delegate to Serializer::VisitRootPointers:
+(src/snapshot/serializer.cc)
+```c++
+void Serializer::VisitRootPointers(Root root, const char* description,          
+                                   FullObjectSlot start, FullObjectSlot end) {  
+  for (FullObjectSlot current = start; current < end; ++current) {              
+    SerializeRootObject(current);                                               
+  }                                                                             
+}
+```
+And SerializeRootObject will call SerializeObject in our case:
+```c++
+void Serializer::SerializeRootObject(FullObjectSlot slot) {
+  Object o = *slot;
+  if (o.IsSmi()) {
+    PutSmiRoot(slot);
+  } else {
+    SerializeObject(Handle<HeapObject>(slot.location()));
+  }
+}
+
+void Serializer::SerializeObject(Handle<HeapObject> obj) {
+  // ThinStrings are just an indirection to an internalized string, so elide the
+  // indirection and serialize the actual string directly.
+  if (obj->IsThinString(isolate())) {
+    obj = handle(ThinString::cast(*obj).actual(isolate()), isolate());
+  }
+  SerializeObjectImpl(obj);
+}
+```
+This will bring us into ContextSerializer::SerializeObjectImpl
+(src/snapshot/context-serializer.cc):
+```c++
+void ContextSerializer::SerializeObjectImpl(Handle<HeapObject> obj) {
+  ...
+  if (SerializeJSObjectWithEmbedderFields(obj)) {
+    return;
+  }
+  ...
+}
+```
+`SerializeJSObjectWithEmbedderFields` 
 
 ```console
 $ lldb -- ./test/snapshot_test --gtest_filter=SnapshotTest.InternalFields
