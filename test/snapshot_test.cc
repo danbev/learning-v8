@@ -301,14 +301,24 @@ StartupData SerializeInternalFields(Local<Object> holder,
   int size = sizeof(*s);
   char* payload = new char[size];
   memcpy(payload, s, size);
+  std::cout << "SerializeInternalFields payload size: " << size << '\n';
   return {payload, size};
 }
 
+/*
+ * This is part of the snapshot deserialization process, this function is passed
+ * the payload data the was stored in the serialization process. This raw data
+ * should now be put into a new Something instance and set on the passed in
+ * holder object using the index passed in.
+ */
 void DeserializeInternalFields(Local<Object> holder,
                                int index,
                                StartupData payload,
                                void* data) {
-  std::cout << "DeserializeInternalFields..." << '\n';
+  std::cout << "DeserializeInternalFields payload size: " << payload.raw_size << '\n';
+  Something* s = new Something(nullptr);
+  memcpy(s, payload.data, payload.raw_size);
+  holder->SetAlignedPointerInInternalField(index, s);
 }
 
 TEST_F(SnapshotTest, InternalFields) {
@@ -320,8 +330,6 @@ TEST_F(SnapshotTest, InternalFields) {
   StartupData startup_data;
   size_t index = 0;
 
-  // This is the data that we want to add as an internal field
-  Something s("Some data...");
 
   // Serialize callback which also takes a pointer to the internal field
   // so that it can be written out.
@@ -342,6 +350,9 @@ TEST_F(SnapshotTest, InternalFields) {
         TryCatch try_catch(isolate);
 
         Local<Object> global = context->Global();
+
+        // This is the data that we want to add as an internal field
+        Something s("Some data...");
 
         Local<FunctionTemplate> constructor = Local<FunctionTemplate>();
         Local<ObjectTemplate> ot = ObjectTemplate::New(isolate, constructor);
@@ -369,6 +380,16 @@ TEST_F(SnapshotTest, InternalFields) {
   {
     HandleScope scope(isolate);
     Local<Context> context = Context::FromSnapshot(isolate, context_index, di_cb).ToLocalChecked();
+
+    Local<String> obj_name = String::NewFromUtf8Literal(isolate, "something");
+    Local<Object> global = context->Global();
+    MaybeLocal<Value> maybe_obj = global->Get(context, obj_name);
+    EXPECT_FALSE(maybe_obj.IsEmpty());
+
+    Local<Object> obj = Local<Object>::Cast(maybe_obj.ToLocalChecked());
+    Something* ptr = static_cast<Something*>(obj->GetAlignedPointerFromInternalField(0));
+    std::cout << "Something was deserialized: " << ptr->value() << '\n';
+    EXPECT_STREQ("Some data...", ptr->value());
   }
   isolate->Dispose();
 }
