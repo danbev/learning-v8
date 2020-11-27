@@ -970,7 +970,58 @@ void ContextSerializer::SerializeObjectImpl(Handle<HeapObject> obj) {
   ...
 }
 ```
-`SerializeJSObjectWithEmbedderFields` 
+`SerializeJSObjectWithEmbedderFields` (src/snapshot/context-serializer.cc):
+```c++
+bool ContextSerializer::SerializeJSObjectWithEmbedderFields(Handle<HeapObject> obj) {
+  ...
+  std::vector<StartupData> serialized_data;
+
+  for (int i = 0; i < embedder_fields_count; i++) {
+    EmbedderDataSlot embedder_data_slot(*js_obj, i);
+    original_embedder_values.emplace_back(embedder_data_slot.load_raw(isolate(), no_gc));
+    Object object = embedder_data_slot.load_tagged();
+    if (object.IsHeapObject()) {
+      serialized_data.push_back({nullptr, 0});
+    } else {
+      if (serialize_embedder_fields_.callback == nullptr && object == Smi::zero()) {
+        serialized_data.push_back({nullptr, 0});
+      } else {
+        StartupData data = serialize_embedder_fields_.callback(
+            api_obj, i, serialize_embedder_fields_.data);
+        serialized_data.push_back(data);
+      }
+    }
+  }
+``` 
+Notice that ths call to the callback, `serialize_embedder_fields_.callback`
+returns an instance of StartupData, which is then addes to the serialized_data
+vector:
+```c++
+lass V8_EXPORT StartupData {                                                   
+   public:                                                                        
+    bool CanBeRehashed() const;                                                        
+    bool IsValid() const;                                                              
+    const char* data;                                                             
+    int raw_size;                                                                 
+  };          
+```
+A little further down we then have:
+```c++
+  for (int i = 0; i < embedder_fields_count; i++) {
+    StartupData data = serialized_data[i];
+    if (DataIsEmpty(data)) continue;
+    // Restore original values from cleared fields.
+    EmbedderDataSlot(*js_obj, i).store_raw(isolate(), original_embedder_values[i], no_gc);
+    embedder_fields_sink_.Put(kNewObject, "embedder field holder");
+    embedder_fields_sink_.PutInt(reference->back_ref_index(), "BackRefIndex");
+    embedder_fields_sink_.PutInt(i, "embedder field index");
+    embedder_fields_sink_.PutInt(data.raw_size, "embedder fields data size");
+    embedder_fields_sink_.PutRaw(reinterpret_cast<const byte*>(data.data),
+                                 data.raw_size, "embedder fields data");
+    delete[] data.data;
+  }
+```
+TODO: take a closer look at how this works.
 
 ```console
 $ lldb -- ./test/snapshot_test --gtest_filter=SnapshotTest.InternalFields
