@@ -302,17 +302,6 @@ TEST_F(SnapshotTest, InternalFields) {
   StartupData startup_data;
   size_t index = 0;
 
-  std::vector<intptr_t> external_refs;
-  std::cout << "address of Constructor function: " << 
-    reinterpret_cast<intptr_t>(Constructor) << '\n';
-  external_refs.push_back(reinterpret_cast<intptr_t>(Constructor));
-
-  std::cout << "external_refs: ";
-  for (std::vector<intptr_t>::const_iterator i = external_refs.begin(); i != external_refs.end(); ++i) {
-    std::cout << *i << ' ';
-  }
-  std::cout << '\n';
-
   SerializeInternalFieldsCallback si_cb = SerializeInternalFieldsCallback(
       SerializeInternalFields, nullptr);
 
@@ -321,7 +310,7 @@ TEST_F(SnapshotTest, InternalFields) {
   {
     Isolate* isolate = nullptr;
     isolate = Isolate::Allocate();
-    SnapshotCreator snapshot_creator(isolate, external_refs.data());
+    SnapshotCreator snapshot_creator(isolate, nullptr);
     {
       HandleScope scope(isolate);
       snapshot_creator.SetDefaultContext(Context::New(isolate));
@@ -331,17 +320,6 @@ TEST_F(SnapshotTest, InternalFields) {
         TryCatch try_catch(isolate);
 
         Local<Object> global = context->Global();
-        Local<FunctionTemplate> ft = FunctionTemplate::New(isolate,
-            Constructor, Local<Value>(), Local<Signature>(), 0, 
-            ConstructorBehavior::kAllow,
-            SideEffectType::kHasSideEffect);
-
-        ft->InstanceTemplate()->SetInternalFieldCount(1);
-        Local<String> func_name = String::NewFromUtf8Literal(isolate, "Something");
-        ft->SetClassName(func_name);
-        Local<Function> function = ft->GetFunction(context).ToLocalChecked();
-        function->SetName(func_name);
-        global->Set(context, func_name, function).Check();
 
         Local<FunctionTemplate> constructor = Local<FunctionTemplate>();
         Local<ObjectTemplate> ot = ObjectTemplate::New(isolate, constructor);
@@ -349,7 +327,6 @@ TEST_F(SnapshotTest, InternalFields) {
 
         MaybeLocal<Object> maybe_instance = ot->NewInstance(context);
         Local<Object> obj = maybe_instance.ToLocalChecked();
-
         Local<String> obj_name = String::NewFromUtf8Literal(isolate, "something");
         obj->SetAlignedPointerInInternalField(0, static_cast<void*>(&s));
         global->Set(context, obj_name, obj).Check();
@@ -362,8 +339,6 @@ TEST_F(SnapshotTest, InternalFields) {
 
   Isolate::CreateParams create_params;
   create_params.snapshot_blob = &startup_data;
-  // Add the external references to functions 
-  create_params.external_references = external_refs.data();
   create_params.array_buffer_allocator = ArrayBuffer::Allocator::NewDefaultAllocator();
   Isolate* isolate = Isolate::New(create_params);
 
@@ -372,32 +347,6 @@ TEST_F(SnapshotTest, InternalFields) {
   {
     HandleScope scope(isolate);
     Local<Context> context = Context::FromSnapshot(isolate, context_index, di_cb).ToLocalChecked();
-    {
-      Context::Scope context_scope(context);
-      TryCatch try_catch(isolate);
-      Local<String> src = String::NewFromUtf8Literal(isolate, "const s = new Something();");
-      ScriptOrigin origin(String::NewFromUtf8Literal(isolate, "function"));
-      ScriptCompiler::Source source(src, origin);                     
-      Local<Script> script;
-      EXPECT_TRUE(ScriptCompiler::Compile(context, &source).ToLocal(&script));
-      MaybeLocal<Value> maybe_result = script->Run(context);
-      if (maybe_result.IsEmpty()) {
-        std::cout << std::boolalpha << "was an exception thrown: " << try_catch.HasCaught() << '\n';
-        Local<Object> obj = try_catch.Exception()->ToObject(context).ToLocalChecked();
-        Local<v8::String> msg_key = String::NewFromUtf8(isolate, "message").ToLocalChecked();
-        Local<Value> message = obj->Get(context, msg_key).ToLocalChecked();
-        Local<String> str = message->ToString(context).ToLocalChecked();
-        String::Utf8Value e(isolate, str);
-        std::cout << "exception: " << *e << '\n';
-      }
-      /*
-      EXPECT_FALSE(maybe_result.IsEmpty());
-      Local<Value> result = maybe_result.ToLocalChecked();
-      String::Utf8Value utf8(isolate, result);
-      EXPECT_STREQ("ExternalRefFunction done.", *utf8);
-      */
-      EXPECT_FALSE(try_catch.HasCaught());
-    }
   }
   isolate->Dispose();
 }
