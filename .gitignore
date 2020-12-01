@@ -51,3 +51,4 @@ test/backingstore_test
 test/test/escapable_handlescope_test
 src/backing-store-org
 src/backing-store-new
+src/fast_api_test
