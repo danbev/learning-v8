@@ -55,7 +55,7 @@ def jih(debugger, param, *args):
 def jlh(debugger, param, *args):
   """Print v8::Local handle value"""
   ptr_arg_cmd(debugger, 'jlh', param,
-              "_v8_internal_Print_Object(*((v8::internal::Object**)({}.val_)))")
+              "_v8_internal_Print_Object(*((v8::internal::Object**)({}.location_)))")
 
 def jco(debugger, param, *args):
   """Print the code object at the given pc (default: current pc)"""
