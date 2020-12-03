@@ -16,17 +16,17 @@ void doit(const FunctionCallbackInfo<Value>& args) {
     args.GetReturnValue().Set(String::NewFromUtf8(args.GetIsolate(), "doit...done", NewStringType::kNormal).ToLocalChecked());
 }
 
-void ageGetter(Local<String> property, const PropertyCallbackInfo<Value>& info) {
-    printf("ageGetter...\n");
+void age_getter(Local<String> property, const PropertyCallbackInfo<Value>& info) {
+    printf("age_getter...\n");
     info.GetReturnValue().Set(age);
 }
 
-void ageSetter(Local<String> property, Local<Value> value, const PropertyCallbackInfo<void>& info) {
-    printf("ageSetter...\n");
+void age_setter(Local<String> property, Local<Value> value, const PropertyCallbackInfo<void>& info) {
+    printf("age_setter...\n");
     age = value->Int32Value(info.GetIsolate()->GetCurrentContext()).FromJust();
 }
 
-void propertyListener(Local<String> name, const PropertyCallbackInfo<Value>& info) {
+void property_listener(Local<String> name, const PropertyCallbackInfo<Value>& info) {
     String::Utf8Value utf8_value(info.GetIsolate(), name);
     std::string key = std::string(*utf8_value);
     printf("ageListener called for nam %s.\n", key.c_str());
@@ -64,10 +64,10 @@ int main(int argc, char* argv[]) {
                 FunctionTemplate::New(isolate, doit));
         // make 'age' available to JavaScript
         global->SetAccessor(String::NewFromUtf8(isolate, "age", NewStringType::kNormal).ToLocalChecked(),
-                ageGetter,
-                ageSetter);
+                age_getter,
+                age_setter);
         // set a named property interceptor
-        //global->SetNamedPropertyHandler(propertyListener);
+        //global->SetNamedPropertyHandler(property_listener);
 
         // Inside an instance of V8 (an Isolate) you can have multiple unrelated JavaScript applications
         // running. JavaScript has global level stuff, and one application should not mess things up for
