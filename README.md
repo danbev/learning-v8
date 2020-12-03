@@ -41,8 +41,56 @@ To allow separate JavaScript applications to run in the same isolate a context
 must be specified for each one.  This is to avoid them interfering with each
 other, for example by changing the builtin objects provided.
 
+### Template
+This is the super class of both ObjecTemplate and FunctionTemplate. Remember
+that in JavaScript a function can have fields just like objects.
+
+```c++
+class V8_EXPORT Template : public Data {
+ public:
+  void Set(Local<Name> name, Local<Data> value,
+           PropertyAttribute attributes = None);
+  void SetPrivate(Local<Private> name, Local<Data> value,
+                  PropertyAttribute attributes = None);
+  V8_INLINE void Set(Isolate* isolate, const char* name, Local<Data> value);
+
+  void SetAccessorProperty(
+     Local<Name> name,
+     Local<FunctionTemplate> getter = Local<FunctionTemplate>(),
+     Local<FunctionTemplate> setter = Local<FunctionTemplate>(),
+     PropertyAttribute attribute = None,
+     AccessControl settings = DEFAULT);
+```
+The `Set` function can be used to have an name and a value set on an instance
+created from this template.
+The `SetAccessorProperty` is for properties that are get/set using functions.
+
+```c++
+enum PropertyAttribute {
+  /** None. **/
+  None = 0,
+  /** ReadOnly, i.e., not writable. **/
+  ReadOnly = 1 << 0,
+  /** DontEnum, i.e., not enumerable. **/
+  DontEnum = 1 << 1,
+  /** DontDelete, i.e., not configurable. **/
+  DontDelete = 1 << 2
+};
+
+enum AccessControl {
+  DEFAULT               = 0,
+  ALL_CAN_READ          = 1,
+  ALL_CAN_WRITE         = 1 << 1,
+  PROHIBITS_OVERWRITING = 1 << 2
+};
+```
+
+
 ### ObjectTemplate
 These allow you to create JavaScript objects without a dedicated constructor.
+When an instance is create using an ObjectTemplate the new instance will have
+the properties and functions configured on the ObjectTemplate.
+
 This would be something like:
 ```js
 const obj = {};
@@ -60,8 +108,6 @@ class V8_EXPORT Data {
   Data();                                                                       
 };
 ```
-Template does not have any members/fields, it only declares functions.
-
 We create an instance of ObjectTemplate and we can add properties to it that
 all instance created using this ObjectTemplate instance will have. This is done
 by calling `Set` which is member of the `Template` class. You specify a
@@ -82,7 +128,13 @@ void Template::Set<v8::Local<Name> name, v8::Local<Data> value, v8::PropertyAttr
 There is an example in [objecttemplate_test.cc](./test/objecttemplate_test.cc)
 
 ### FunctionTemplate
-Is a template that is used to create functions.
+Is a template that is used to create functions and like ObjectTemplate it inherits
+from Template:
+```c++
+class V8_EXPORT FunctionTemplate : public Template {
+}
+```
+Rememeber that a function in javascript can have properties just like object.
 
 There is an example in [functionttemplate_test.cc](./test/functiontemplate_test.cc)
 
