@@ -17,10 +17,12 @@ void doit(const FunctionCallbackInfo<Value>& args) {
 }
 
 void ageGetter(Local<String> property, const PropertyCallbackInfo<Value>& info) {
+    printf("ageGetter...\n");
     info.GetReturnValue().Set(age);
 }
 
 void ageSetter(Local<String> property, Local<Value> value, const PropertyCallbackInfo<void>& info) {
+    printf("ageSetter...\n");
     age = value->Int32Value(info.GetIsolate()->GetCurrentContext()).FromJust();
 }
 
@@ -78,7 +80,7 @@ int main(int argc, char* argv[]) {
         Context::Scope context_scope(context);
 
         // Create a string containing the JavaScript source code.
-        const char* js = "const age = 40; doit(age);";
+        const char* js = "age = 40; doit(age);";
         printf("js: %s\n", js);
         Local<String> source = String::NewFromUtf8(isolate, js, NewStringType::kNormal).ToLocalChecked();
 
