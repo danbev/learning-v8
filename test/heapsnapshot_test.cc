@@ -23,7 +23,7 @@ class TestObjectNameResolver : public HeapProfiler::ObjectNameResolver {
  public:
    const char* GetName(Local<Object> object) override {
      std::cout << "GetName" << '\n';
-     return "something";
+     return "???";
    }
 };
 
@@ -50,6 +50,12 @@ class FileOutputStream : public OutputStream {
 TEST_F(HeapSnapshotTest, TakeHeapSnapshot) {
   const HandleScope handle_scope(isolate_);
   Handle<Context> context = Context::New(isolate_);
+  Context::Scope context_scope(context);
+
+  Local<String> name = String::NewFromUtf8Literal(isolate_, "bajja");
+  Local<String> value = String::NewFromUtf8Literal(isolate_, "bajja_value");
+  context->Global()->Set(context, name, value).Check();
+
   HeapProfiler* heap_profiler = isolate_->GetHeapProfiler();
 
   TestActivityControl activity_control;
