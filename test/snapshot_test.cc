@@ -295,7 +295,7 @@ StartupData SerializeInternalFields(Local<Object> holder,
                                     void* data) {
   Something* s = static_cast<Something*>(holder->GetAlignedPointerFromInternalField(index));
   std::cout << "SerializeInternalFields index: " << index
-            << "value: " << s->value() << '\n';
+            << ", value: " << s->value() << '\n';
 
 
   int size = sizeof(*s);
@@ -318,6 +318,7 @@ void DeserializeInternalFields(Local<Object> holder,
   std::cout << "DeserializeInternalFields payload size: " << payload.raw_size << '\n';
   Something* s = new Something(nullptr);
   memcpy(s, payload.data, payload.raw_size);
+  std::cout << "DeserializeInternalFields payload value: " << s->value() << '\n';
   holder->SetAlignedPointerInInternalField(index, s);
 }
 
