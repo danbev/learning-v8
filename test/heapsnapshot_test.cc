@@ -47,6 +47,10 @@ class FileOutputStream : public OutputStream {
    FILE* stream_;
 };
 
+void build_graph_callback(Isolate* isolate, EmbedderGraph* graph, void* data) {
+  std::cout << "build_graph_callback...\n";
+}
+
 TEST_F(HeapSnapshotTest, TakeHeapSnapshot) {
   const HandleScope handle_scope(isolate_);
   Handle<Context> context = Context::New(isolate_);
@@ -57,6 +61,7 @@ TEST_F(HeapSnapshotTest, TakeHeapSnapshot) {
   context->Global()->Set(context, name, value).Check();
 
   HeapProfiler* heap_profiler = isolate_->GetHeapProfiler();
+  heap_profiler->AddBuildEmbedderGraphCallback(build_graph_callback, nullptr);
 
   TestActivityControl activity_control;
   TestObjectNameResolver objectname_resolver;
