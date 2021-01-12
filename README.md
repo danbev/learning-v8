@@ -608,6 +608,7 @@ class V8_EXPORT EscapableHandleScope : public HandleScope {
   ...
   internal::Address* escape_slot_;
 };
+```
 
 From `api.cc`
 ```c++
