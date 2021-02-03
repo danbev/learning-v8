@@ -75,6 +75,6 @@ not be and could just be the Release build manifestation of this issue).
 The above patch does not apply cleanly and needs to be manually applied for
 Node.js 14.15.4.
 
-[Notes about page sizes in V8](./heap.md#pagesize_in_v8).
+[Notes about page sizes in V8](./heap.md#pagesize-in-v8).
 
 __work in progress__
