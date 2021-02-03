@@ -1206,3 +1206,23 @@ size_t area_size() const {
   }
 ```
 
+### Pagesize in V8
+V8 heap pages are `256kb`. For an executable object 3 OS pages are allocated,
+which normally means `3*4kb` if the page size is `4kb`, but could also be
+`3*64kb` if the system is `aarch64` and I think this is also true for some
+PowerPC systems.
+
+```
+4 kb page size                        64 kb page size
+3*4096=12288=12kb                     3*65536=192kb
+256-12=244                            256-192=64
+
+244kb available for alloction         64kb available for allocation
+```
+
+Now, an object is considered large if it is larger than
+`kMaxRegularHeapObjectSize` which is half of the V8 page size, `256/2=128`.
+So, when 64kb pages sizes are used an object me be considered to be able to
+be stored in a normal sized page even though it might be between 64-128, but
+there is only 64kb available for allocation.
+
