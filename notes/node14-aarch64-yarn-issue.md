@@ -7,7 +7,7 @@ When building node with debug enabled the following error is generated from
 mksnapshot:
 ```console
 $ ./configure --debug && make -j8
-...
+ ...
  ln -fs out/Release/node node; fi
   touch 768c82b5c8db30aa6ca639ca252071b77b55f399.intermediate
   LD_LIBRARY_PATH=/home/sxa/node/out/Debug/lib.host:/home/sxa/node/out/Debug/lib.target:$LD_LIBRARY_PATH; export LD_LIBRARY_PATH; cd ../tools/v8_gypfiles; mkdir -p /home/sxa/node/out/Debug/obj.target/v8_snapshot/geni; "/home/sxa/node/out/Debug/mksnapshot" --turbo_instruction_scheduling "--target_os=linux" "--target_arch=arm64" --startup_src "/home/sxa/node/out/Debug/obj.target/v8_snapshot/geni/snapshot.cc" --embedded_variant Default --embedded_src "/home/sxa/node/out/Debug/obj.target/v8_snapshot/geni/embedded.S" --no-native-code-counters
@@ -74,5 +74,7 @@ not be and could just be the Release build manifestation of this issue).
 
 The above patch does not apply cleanly and needs to be manually applied for
 Node.js 14.15.4.
+
+[Notes about page sizes in V8](./heap.md#pagesize_in_v8).
 
 __work in progress__
