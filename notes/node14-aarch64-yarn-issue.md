@@ -75,7 +75,7 @@ Then we should be able to run yarn in debugger to look at the issue there
 manifestation of this issue).
 
 The above patch does not apply cleanly and needs to be manually applied for
-Node.js 14.15.4 using this [patch]().
+Node.js 14.15.4 using this [patch](aarch64-node-14.15.4-pagesize.patch).
 
 After applying that patch and retrying the above yarn command:
 ```console
@@ -84,8 +84,19 @@ $ export PATH=/home/sxx/node:$PATH
 $ /home/sxa/node/deps/npm/bin/npm-cli.js init
 $ /home/sxa/node/deps/npm/bin/npm-cli.js install yarn
 $ ./node_modules/yarn/bin/yarn add lodash 
+yarn add v1.22.10
+warning ../../package.json: No license field
+[1/4] Resolving packages...
+[2/4] Fetching packages...
+[3/4] Linking dependencies...
+[4/4] Building fresh packages...
+success Saved 1 new dependency.
+info Direct dependencies
+└─ lodash@4.17.20
+info All dependencies
+└─ lodash@4.17.20
+Done in 4.19s.
 ```
-
 
 [Notes about page sizes in V8](./heap.md#pagesize-in-v8) might be helpful to
 try to understand this issue.

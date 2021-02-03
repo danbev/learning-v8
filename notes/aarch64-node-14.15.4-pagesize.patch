@@ -1,0 +1,284 @@
+diff --git a/deps/v8/src/base/build_config.h b/deps/v8/src/base/build_config.h
+index 8d142c456c..327f9ab306 100644
+--- a/deps/v8/src/base/build_config.h
++++ b/deps/v8/src/base/build_config.h
+@@ -205,6 +205,10 @@
+ // PPC has large (64KB) physical pages.
+ const int kPageSizeBits = 19;
+ #else
++// Arm64 supports up to 64k OS pages on Linux, however 4k pages are more common
++// so we keep the V8 page size at 256k. Nonetheless, we need to make sure we
++// don't decrease it further in the future due to reserving 3 OS pages for every
++// executable V8 page.
+ const int kPageSizeBits = 18;
+ #endif
+ 
+diff --git a/deps/v8/src/compiler/allocation-builder.h b/deps/v8/src/compiler/allocation-builder.h
+index 040dd01405..38e1911f3e 100644
+--- a/deps/v8/src/compiler/allocation-builder.h
++++ b/deps/v8/src/compiler/allocation-builder.h
+@@ -27,7 +27,7 @@ class AllocationBuilder final {
+   // Primitive allocation of static size.
+   void Allocate(int size, AllocationType allocation = AllocationType::kYoung,
+                 Type type = Type::Any()) {
+-    DCHECK_LE(size, kMaxRegularHeapObjectSize);
++    DCHECK_LE(size, Heap::MaxRegularHeapObjectSize(allocation)); 
+     effect_ = graph()->NewNode(
+         common()->BeginRegion(RegionObservability::kNotObservable), effect_);
+     allocation_ =
+diff --git a/deps/v8/src/compiler/memory-lowering.cc b/deps/v8/src/compiler/memory-lowering.cc
+index 8c230b6efd..d9ab0b8174 100644
+--- a/deps/v8/src/compiler/memory-lowering.cc
++++ b/deps/v8/src/compiler/memory-lowering.cc
+@@ -98,6 +98,10 @@ Reduction MemoryLowering::ReduceAllocateRaw(
+   DCHECK_EQ(IrOpcode::kAllocateRaw, node->opcode());
+   DCHECK_IMPLIES(allocation_folding_ == AllocationFolding::kDoAllocationFolding,
+                  state_ptr != nullptr);
++  // Code objects may have a maximum size smaller than kMaxHeapObjectSize due to
++  // guard pages. If we need to support allocating code here we would need to
++  // call MemoryChunkLayout::MaxRegularCodeObjectSize() at runtime.
++  DCHECK_NE(allocation_type, AllocationType::kCode);
+   Node* value;
+   Node* size = node->InputAt(0);
+   Node* effect = node->InputAt(1);
+diff --git a/deps/v8/src/diagnostics/objects-debug.cc b/deps/v8/src/diagnostics/objects-debug.cc
+index 32caba2da8..6f90dc51c3 100644
+--- a/deps/v8/src/diagnostics/objects-debug.cc
++++ b/deps/v8/src/diagnostics/objects-debug.cc
+@@ -955,7 +955,8 @@ void Code::CodeVerify(Isolate* isolate) {
+   // everything is set up.
+   // CHECK_EQ(ReadOnlyHeap::Contains(*this), !IsExecutable());
+   relocation_info().ObjectVerify(isolate);
+-  CHECK(Code::SizeFor(body_size()) <= kMaxRegularHeapObjectSize ||
++  CHECK(Code::SizeFor(body_size()) <=                                          
++            MemoryChunkLayout::MaxRegularCodeObjectSize() ||
+         isolate->heap()->InSpace(*this, CODE_LO_SPACE));
+   Address last_gc_pc = kNullAddress;
+ 
+diff --git a/deps/v8/src/heap/factory-base.cc b/deps/v8/src/heap/factory-base.cc
+index 028949e861..861ff54d90 100644
+--- a/deps/v8/src/heap/factory-base.cc
++++ b/deps/v8/src/heap/factory-base.cc
+@@ -721,7 +721,8 @@ template <typename Impl>
+ HeapObject FactoryBase<Impl>::AllocateRawArray(int size,
+                                                AllocationType allocation) {
+   HeapObject result = AllocateRaw(size, allocation);
+-  if (size > kMaxRegularHeapObjectSize && FLAG_use_marking_progress_bar) {
++  if ((size > Heap::MaxRegularHeapObjectSize(allocation)) &&                   
++      FLAG_use_marking_progress_bar) {
+     MemoryChunk* chunk = MemoryChunk::FromHeapObject(result);
+     chunk->SetFlag<AccessMode::ATOMIC>(MemoryChunk::HAS_PROGRESS_BAR);
+   }
+diff --git a/deps/v8/src/heap/factory.cc b/deps/v8/src/heap/factory.cc
+index 7e4f897fee..194b63f923 100644
+--- a/deps/v8/src/heap/factory.cc
++++ b/deps/v8/src/heap/factory.cc
+@@ -346,7 +346,8 @@ MaybeHandle<FixedArray> Factory::TryNewFixedArray(
+   AllocationResult allocation = heap->AllocateRaw(size, allocation_type);
+   HeapObject result;
+   if (!allocation.To(&result)) return MaybeHandle<FixedArray>();
+-  if (size > kMaxRegularHeapObjectSize && FLAG_use_marking_progress_bar) {
++  if ((size > Heap::MaxRegularHeapObjectSize(allocation_type)) &&              
++      FLAG_use_marking_progress_bar) { 
+     MemoryChunk* chunk = MemoryChunk::FromHeapObject(result);
+     chunk->SetFlag<AccessMode::ATOMIC>(MemoryChunk::HAS_PROGRESS_BAR);
+   }
+diff --git a/deps/v8/src/heap/heap-inl.h b/deps/v8/src/heap/heap-inl.h
+index 39f5ec6c66..cb7d05c3b0 100644
+--- a/deps/v8/src/heap/heap-inl.h
++++ b/deps/v8/src/heap/heap-inl.h
+@@ -192,7 +192,9 @@ AllocationResult Heap::AllocateRaw(int size_in_bytes, AllocationType type,
+   IncrementObjectCounters();
+ #endif
+ 
+-  bool large_object = size_in_bytes > kMaxRegularHeapObjectSize;
++  size_t large_object_threshold = MaxRegularHeapObjectSize(type);
++  bool large_object =
++       static_cast<size_t>(size_in_bytes) > large_object_threshold;
+ 
+   HeapObject object;
+   AllocationResult allocation;
+@@ -279,7 +281,7 @@ HeapObject Heap::AllocateRawWith(int size, AllocationType allocation,
+   Address* limit = heap->NewSpaceAllocationLimitAddress();
+   if (allocation == AllocationType::kYoung &&
+       alignment == AllocationAlignment::kWordAligned &&
+-      size <= kMaxRegularHeapObjectSize &&
++      size <= MaxRegularHeapObjectSize(allocation) &&
+       (*limit - *top >= static_cast<unsigned>(size)) &&
+       V8_LIKELY(!FLAG_single_generation && FLAG_inline_new &&
+                 FLAG_gc_interval == 0)) {
+diff --git a/deps/v8/src/heap/heap.cc b/deps/v8/src/heap/heap.cc
+index d035fece83..fe24bdfc31 100644
+--- a/deps/v8/src/heap/heap.cc
++++ b/deps/v8/src/heap/heap.cc
+@@ -4963,6 +4963,15 @@ bool Heap::AllocationLimitOvershotByLargeMargin() {
+   return v8_overshoot >= v8_margin || global_overshoot >= global_margin;
+ }
+ 
++// static                                                                      
++int Heap::MaxRegularHeapObjectSize(AllocationType allocation) {
++  if (allocation == AllocationType::kCode) {
++    return MemoryChunkLayout::MaxRegularCodeObjectSize();
++  }
++  return kMaxRegularHeapObjectSize;
++}
++
++
+ bool Heap::ShouldOptimizeForLoadTime() {
+   return isolate()->rail_mode() == PERFORMANCE_LOAD &&
+          !AllocationLimitOvershotByLargeMargin() &&
+diff --git a/deps/v8/src/heap/heap.h b/deps/v8/src/heap/heap.h
+index 888d174c02..b40f5433b7 100644
+--- a/deps/v8/src/heap/heap.h
++++ b/deps/v8/src/heap/heap.h
+@@ -481,7 +481,7 @@ class Heap {
+ 
+   bool IsImmovable(HeapObject object);
+ 
+-  static bool IsLargeObject(HeapObject object);
++  V8_EXPORT_PRIVATE static bool IsLargeObject(HeapObject object);
+ 
+   // This method supports the deserialization allocator.  All allocations
+   // are word-aligned.  The method should never fail to allocate since the
+@@ -1316,6 +1316,15 @@ class Heap {
+   // more eager to finalize incremental marking.
+   bool AllocationLimitOvershotByLargeMargin();
+ 
++  // Return the maximum size objects can be before having to allocate them as
++  // large objects. This takes into account allocating in the code space for
++  // which the size of the allocatable space per V8 page may depend on the OS
++  // page size at runtime. You may use kMaxRegularHeapObjectSize as a constant
++  // instead if you know the allocation isn't in the code spaces.
++  V8_EXPORT_PRIVATE static int MaxRegularHeapObjectSize(
++      AllocationType allocation);
++ 
++
+   // ===========================================================================
+   // Prologue/epilogue callback methods.========================================
+   // ===========================================================================
+diff --git a/deps/v8/src/heap/memory-chunk.cc b/deps/v8/src/heap/memory-chunk.cc
+index 865e6f1a72..854699b862 100644
+--- a/deps/v8/src/heap/memory-chunk.cc
++++ b/deps/v8/src/heap/memory-chunk.cc
+@@ -47,7 +47,6 @@ intptr_t MemoryChunkLayout::ObjectEndOffsetInCodePage() {
+ 
+ size_t MemoryChunkLayout::AllocatableMemoryInCodePage() {
+   size_t memory = ObjectEndOffsetInCodePage() - ObjectStartOffsetInCodePage();
+-  DCHECK_LE(kMaxRegularHeapObjectSize, memory);
+   return memory;
+ }
+ 
+@@ -77,6 +76,12 @@ size_t MemoryChunkLayout::AllocatableMemoryInMemoryChunk(
+   return AllocatableMemoryInDataPage();
+ }
+ 
++int MemoryChunkLayout::MaxRegularCodeObjectSize() {
++  int size = static_cast<int>(AllocatableMemoryInCodePage() / 2);
++  DCHECK_LE(size, kMaxRegularHeapObjectSize);
++  return size;
++}
++
+ #ifdef THREAD_SANITIZER
+ void MemoryChunk::SynchronizedHeapLoad() {
+   CHECK(reinterpret_cast<Heap*>(base::Acquire_Load(
+diff --git a/deps/v8/src/heap/memory-chunk.h b/deps/v8/src/heap/memory-chunk.h
+index 4381a229ab..58fdbefa17 100644
+--- a/deps/v8/src/heap/memory-chunk.h
++++ b/deps/v8/src/heap/memory-chunk.h
+@@ -32,6 +32,8 @@ class V8_EXPORT_PRIVATE MemoryChunkLayout {
+   static size_t AllocatableMemoryInDataPage();
+   static size_t ObjectStartOffsetInMemoryChunk(AllocationSpace space);
+   static size_t AllocatableMemoryInMemoryChunk(AllocationSpace space);
++
++  static int MaxRegularCodeObjectSize();
+ };
+ 
+ // MemoryChunk represents a memory region owned by a specific space.
+diff --git a/deps/v8/src/heap/spaces.h b/deps/v8/src/heap/spaces.h
+index 72ae96cadd..50688dda20 100644
+--- a/deps/v8/src/heap/spaces.h
++++ b/deps/v8/src/heap/spaces.h
+@@ -127,8 +127,10 @@ class Space;
+ #define DCHECK_OBJECT_SIZE(size) \
+   DCHECK((0 < size) && (size <= kMaxRegularHeapObjectSize))
+ 
+-#define DCHECK_CODEOBJECT_SIZE(size, code_space) \
+-  DCHECK((0 < size) && (size <= code_space->AreaSize()))
++#define DCHECK_CODEOBJECT_SIZE(size, code_space)                          \
++  DCHECK((0 < size) &&                                                    \
++         (size <= std::min(MemoryChunkLayout::MaxRegularCodeObjectSize(), \
++                           code_space->AreaSize())))
+ 
+ using FreeListCategoryType = int32_t;
+ 
+diff --git a/deps/v8/test/cctest/heap/test-heap.cc b/deps/v8/test/cctest/heap/test-heap.cc
+index b9a4b2101c..a00dd49d1a 100644
+--- a/deps/v8/test/cctest/heap/test-heap.cc
++++ b/deps/v8/test/cctest/heap/test-heap.cc
+@@ -6404,7 +6404,7 @@ HEAP_TEST(Regress5831) {
+ 
+   // Generate the code.
+   Handle<Code> code = GenerateDummyImmovableCode(isolate);
+-  CHECK_GE(i::kMaxRegularHeapObjectSize, code->Size());
++  CHECK_GE(MemoryChunkLayout::MaxRegularCodeObjectSize(), code->Size());
+   CHECK(!heap->code_space()->first_page()->Contains(code->address()));
+ 
+   // Ensure it's not in large object space.
+diff --git a/deps/v8/test/cctest/test-code-pages.cc b/deps/v8/test/cctest/test-code-pages.cc
+index 7fafe62629..9624a79504 100644
+--- a/deps/v8/test/cctest/test-code-pages.cc
++++ b/deps/v8/test/cctest/test-code-pages.cc
+@@ -263,7 +263,7 @@ TEST(LargeCodeObject) {
+ 
+   // Create a big function that ends up in CODE_LO_SPACE.
+   const int instruction_size = Page::kPageSize + 1;
+-  STATIC_ASSERT(instruction_size > kMaxRegularHeapObjectSize);
++  CHECK_GT(instruction_size, MemoryChunkLayout::MaxRegularCodeObjectSize());
+   std::unique_ptr<byte[]> instructions(new byte[instruction_size]);
+ 
+   CodeDesc desc;
+@@ -379,7 +379,7 @@ TEST(LargeCodeObjectWithSignalHandler) {
+ 
+   // Create a big function that ends up in CODE_LO_SPACE.
+   const int instruction_size = Page::kPageSize + 1;
+-  STATIC_ASSERT(instruction_size > kMaxRegularHeapObjectSize);
++  CHECK_GT(instruction_size, MemoryChunkLayout::MaxRegularCodeObjectSize());
+   std::unique_ptr<byte[]> instructions(new byte[instruction_size]);
+ 
+   CodeDesc desc;
+@@ -455,7 +455,7 @@ TEST(Sorted) {
+ 
+   // Create a big function that ends up in CODE_LO_SPACE.
+   const int instruction_size = Page::kPageSize + 1;
+-  STATIC_ASSERT(instruction_size > kMaxRegularHeapObjectSize);
++  CHECK_GT(instruction_size, MemoryChunkLayout::MaxRegularCodeObjectSize());
+   std::unique_ptr<byte[]> instructions(new byte[instruction_size]);
+ 
+   CodeDesc desc;
+diff --git a/deps/v8/test/cctest/test-factory.cc b/deps/v8/test/cctest/test-factory.cc
+index 98823f1ec9..859698f886 100644
+--- a/deps/v8/test/cctest/test-factory.cc
++++ b/deps/v8/test/cctest/test-factory.cc
+@@ -60,7 +60,8 @@ TEST(Factory_CodeBuilder) {
+   HandleScope scope(isolate);
+ 
+   // Create a big function that ends up in CODE_LO_SPACE.
+-  const int instruction_size = kMaxRegularHeapObjectSize + 1;
++  const int instruction_size =
++      MemoryChunkLayout::MaxRegularCodeObjectSize() + 1;
+   std::unique_ptr<byte[]> instructions(new byte[instruction_size]);
+ 
+   CodeDesc desc;
+diff --git a/deps/v8/test/cctest/test-unwinder-code-pages.cc b/deps/v8/test/cctest/test-unwinder-code-pages.cc
+index fc023e4145..8737b34077 100644
+--- a/deps/v8/test/cctest/test-unwinder-code-pages.cc
++++ b/deps/v8/test/cctest/test-unwinder-code-pages.cc
+@@ -564,7 +564,7 @@ TEST(PCIsInV8_LargeCodeObject_CodePagesAPI) {
+ 
+   // Create a big function that ends up in CODE_LO_SPACE.
+   const int instruction_size = Page::kPageSize + 1;
+-  STATIC_ASSERT(instruction_size > kMaxRegularHeapObjectSize);
++  CHECK_GT(instruction_size, MemoryChunkLayout::MaxRegularCodeObjectSize())
+   std::unique_ptr<byte[]> instructions(new byte[instruction_size]);
+ 
+   CodeDesc desc;
