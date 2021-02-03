@@ -66,15 +66,45 @@ info No lockfile found.
 [-] 0/1Segmentation fault (core dumped)
 ```
 
-### Troubleshoting
-To be able to do a debug build applying [patch](https://github.com/v8/v8/commit/f4376ec801e1dedfde5309b2cb50ed70f052b7e4.patch)
-so that the build will pass would be a good. Then we should be able to run
-yarn in debugger to look at the issue there (if it is different which it might
-not be and could just be the Release build manifestation of this issue).
+### Troubleshooting
+To be able to do a debug build we need to apply
+[patch](https://github.com/v8/v8/commit/f4376ec801e1dedfde5309b2cb50ed70f052b7e4.patch)
+so that the build will pass (currently failing on mdsnapshot as mentioned above).
+Then we should be able to run yarn in debugger to look at the issue there
+(if it is different which it might not be and could just be the Release build
+manifestation of this issue).
 
 The above patch does not apply cleanly and needs to be manually applied for
-Node.js 14.15.4.
+Node.js 14.15.4 using this [patch](./aarch64-nodejs-14.15.4-pagesize.patch).
+After applying that patch and retrying the above yarn command:
+```console
+$ cd danbev/test
+$ export PATH=/home/sxx/node:$PAT
+$ /home/sxa/node/deps/npm/bin/npm-cli.js init
+$ /home/sxa/node/deps/npm/bin/npm-cli.js install yarn
+$ ./node_modules/yarn/bin/yarn add lodash --ignore-engines
+yarn add v1.22.10
+warning You are using Node "16.0.0-pre" which is not supported and may encounter bugs or unexpected behavior. Yarn supports the following semver range: "^4.8.0 || ^5.7.0 || ^6.2.2 || >=8.0.0"
+warning ../../package.json: No license field
+info No lockfile found.
+[1/4] Resolving packages...
+[2/4] Fetching packages...
+[3/4] Linking dependencies...
+[4/4] Building fresh packages...
+success Saved lockfile.
+success Saved 2 new dependencies.
+info Direct dependencies
+├─ lodash@4.17.20
+└─ yarn@1.22.10
+info All dependencies
+├─ lodash@4.17.20
+└─ yarn@1.22.10
+Done in 1.94s.
+```
 
-[Notes about page sizes in V8](./heap.md#pagesize-in-v8).
+
+[Notes about page sizes in V8](./heap.md#pagesize-in-v8) might be helpful to
+try to understand this issue.
+
 
 __work in progress__
