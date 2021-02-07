@@ -101,5 +101,13 @@ Done in 4.19s.
 [Notes about page sizes in V8](./heap.md#pagesize-in-v8) might be helpful to
 try to understand this issue.
 
+The version of V8 used in 14.15.4 is:
+```console
+[sxa@147 node]$ ./node -p process.versions
+{
+  node: '14.15.4',
+  v8: '8.4.371.19-node.17',
+}
+```
 
 __work in progress__
