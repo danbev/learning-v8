@@ -1,7 +1,7 @@
-diff --git a/deps/v8/src/base/build_config.h b/deps/v8/src/base/build_config.h
+diff --git a/src/base/build_config.h b/src/base/build_config.h
 index 8d142c456c..327f9ab306 100644
---- a/deps/v8/src/base/build_config.h
-+++ b/deps/v8/src/base/build_config.h
+--- a/src/base/build_config.h
++++ b/src/base/build_config.h
 @@ -205,6 +205,10 @@
  // PPC has large (64KB) physical pages.
  const int kPageSizeBits = 19;
@@ -13,10 +13,10 @@ index 8d142c456c..327f9ab306 100644
  const int kPageSizeBits = 18;
  #endif
  
-diff --git a/deps/v8/src/compiler/allocation-builder.h b/deps/v8/src/compiler/allocation-builder.h
+diff --git a/src/compiler/allocation-builder.h b/src/compiler/allocation-builder.h
 index 040dd01405..3a8dbdfff7 100644
---- a/deps/v8/src/compiler/allocation-builder.h
-+++ b/deps/v8/src/compiler/allocation-builder.h
+--- a/src/compiler/allocation-builder.h
++++ b/src/compiler/allocation-builder.h
 @@ -27,7 +27,7 @@ class AllocationBuilder final {
    // Primitive allocation of static size.
    void Allocate(int size, AllocationType allocation = AllocationType::kYoung,
@@ -26,10 +26,10 @@ index 040dd01405..3a8dbdfff7 100644
      effect_ = graph()->NewNode(
          common()->BeginRegion(RegionObservability::kNotObservable), effect_);
      allocation_ =
-diff --git a/deps/v8/src/compiler/memory-lowering.cc b/deps/v8/src/compiler/memory-lowering.cc
+diff --git a/src/compiler/memory-lowering.cc b/src/compiler/memory-lowering.cc
 index 8c230b6efd..d9ab0b8174 100644
---- a/deps/v8/src/compiler/memory-lowering.cc
-+++ b/deps/v8/src/compiler/memory-lowering.cc
+--- a/src/compiler/memory-lowering.cc
++++ b/src/compiler/memory-lowering.cc
 @@ -98,6 +98,10 @@ Reduction MemoryLowering::ReduceAllocateRaw(
    DCHECK_EQ(IrOpcode::kAllocateRaw, node->opcode());
    DCHECK_IMPLIES(allocation_folding_ == AllocationFolding::kDoAllocationFolding,
@@ -41,10 +41,10 @@ index 8c230b6efd..d9ab0b8174 100644
    Node* value;
    Node* size = node->InputAt(0);
    Node* effect = node->InputAt(1);
-diff --git a/deps/v8/src/diagnostics/objects-debug.cc b/deps/v8/src/diagnostics/objects-debug.cc
+diff --git a/src/diagnostics/objects-debug.cc b/src/diagnostics/objects-debug.cc
 index 32caba2da8..6df2aec1ed 100644
---- a/deps/v8/src/diagnostics/objects-debug.cc
-+++ b/deps/v8/src/diagnostics/objects-debug.cc
+--- a/src/diagnostics/objects-debug.cc
++++ b/src/diagnostics/objects-debug.cc
 @@ -955,7 +955,8 @@ void Code::CodeVerify(Isolate* isolate) {
    // everything is set up.
    // CHECK_EQ(ReadOnlyHeap::Contains(*this), !IsExecutable());
@@ -55,10 +55,10 @@ index 32caba2da8..6df2aec1ed 100644
          isolate->heap()->InSpace(*this, CODE_LO_SPACE));
    Address last_gc_pc = kNullAddress;
  
-diff --git a/deps/v8/src/heap/factory-base.cc b/deps/v8/src/heap/factory-base.cc
+diff --git a/src/heap/factory-base.cc b/src/heap/factory-base.cc
 index 028949e861..9113eaee13 100644
---- a/deps/v8/src/heap/factory-base.cc
-+++ b/deps/v8/src/heap/factory-base.cc
+--- a/src/heap/factory-base.cc
++++ b/src/heap/factory-base.cc
 @@ -721,7 +721,8 @@ template <typename Impl>
  HeapObject FactoryBase<Impl>::AllocateRawArray(int size,
                                                 AllocationType allocation) {
@@ -69,10 +69,10 @@ index 028949e861..9113eaee13 100644
      MemoryChunk* chunk = MemoryChunk::FromHeapObject(result);
      chunk->SetFlag<AccessMode::ATOMIC>(MemoryChunk::HAS_PROGRESS_BAR);
    }
-diff --git a/deps/v8/src/heap/factory.cc b/deps/v8/src/heap/factory.cc
-index 7e4f897fee..a87c4995cf 100644
---- a/deps/v8/src/heap/factory.cc
-+++ b/deps/v8/src/heap/factory.cc
+diff --git a/src/heap/factory.cc b/src/heap/factory.cc
+index d8cb70928d..57abf7e158 100644
+--- a/src/heap/factory.cc
++++ b/src/heap/factory.cc
 @@ -346,7 +346,8 @@ MaybeHandle<FixedArray> Factory::TryNewFixedArray(
    AllocationResult allocation = heap->AllocateRaw(size, allocation_type);
    HeapObject result;
@@ -83,10 +83,10 @@ index 7e4f897fee..a87c4995cf 100644
      MemoryChunk* chunk = MemoryChunk::FromHeapObject(result);
      chunk->SetFlag<AccessMode::ATOMIC>(MemoryChunk::HAS_PROGRESS_BAR);
    }
-diff --git a/deps/v8/src/heap/heap-inl.h b/deps/v8/src/heap/heap-inl.h
+diff --git a/src/heap/heap-inl.h b/src/heap/heap-inl.h
 index 39f5ec6c66..cb7d05c3b0 100644
---- a/deps/v8/src/heap/heap-inl.h
-+++ b/deps/v8/src/heap/heap-inl.h
+--- a/src/heap/heap-inl.h
++++ b/src/heap/heap-inl.h
 @@ -192,7 +192,9 @@ AllocationResult Heap::AllocateRaw(int size_in_bytes, AllocationType type,
    IncrementObjectCounters();
  #endif
@@ -107,11 +107,11 @@ index 39f5ec6c66..cb7d05c3b0 100644
        (*limit - *top >= static_cast<unsigned>(size)) &&
        V8_LIKELY(!FLAG_single_generation && FLAG_inline_new &&
                  FLAG_gc_interval == 0)) {
-diff --git a/deps/v8/src/heap/heap.cc b/deps/v8/src/heap/heap.cc
-index d035fece83..5d5eaae068 100644
---- a/deps/v8/src/heap/heap.cc
-+++ b/deps/v8/src/heap/heap.cc
-@@ -4963,6 +4963,14 @@ bool Heap::AllocationLimitOvershotByLargeMargin() {
+diff --git a/src/heap/heap.cc b/src/heap/heap.cc
+index 64eeeb6b19..e5f936f914 100644
+--- a/src/heap/heap.cc
++++ b/src/heap/heap.cc
+@@ -4953,6 +4953,14 @@ bool Heap::AllocationLimitOvershotByLargeMargin() {
    return v8_overshoot >= v8_margin || global_overshoot >= global_margin;
  }
  
@@ -126,10 +126,10 @@ index d035fece83..5d5eaae068 100644
  bool Heap::ShouldOptimizeForLoadTime() {
    return isolate()->rail_mode() == PERFORMANCE_LOAD &&
           !AllocationLimitOvershotByLargeMargin() &&
-diff --git a/deps/v8/src/heap/heap.h b/deps/v8/src/heap/heap.h
-index 888d174c02..74e3e5381b 100644
---- a/deps/v8/src/heap/heap.h
-+++ b/deps/v8/src/heap/heap.h
+diff --git a/src/heap/heap.h b/src/heap/heap.h
+index 4103c19093..c7c71e29c5 100644
+--- a/src/heap/heap.h
++++ b/src/heap/heap.h
 @@ -481,7 +481,7 @@ class Heap {
  
    bool IsImmovable(HeapObject object);
@@ -139,7 +139,7 @@ index 888d174c02..74e3e5381b 100644
  
    // This method supports the deserialization allocator.  All allocations
    // are word-aligned.  The method should never fail to allocate since the
-@@ -1316,6 +1316,14 @@ class Heap {
+@@ -1319,6 +1319,14 @@ class Heap {
    // more eager to finalize incremental marking.
    bool AllocationLimitOvershotByLargeMargin();
  
@@ -154,10 +154,23 @@ index 888d174c02..74e3e5381b 100644
    // ===========================================================================
    // Prologue/epilogue callback methods.========================================
    // ===========================================================================
-diff --git a/deps/v8/src/heap/memory-chunk.cc b/deps/v8/src/heap/memory-chunk.cc
+@@ -1407,8 +1415,10 @@ class Heap {
+   // Heap object allocation tracking. ==========================================
+   // ===========================================================================
+ 
+-  void AddHeapObjectAllocationTracker(HeapObjectAllocationTracker* tracker);
+-  void RemoveHeapObjectAllocationTracker(HeapObjectAllocationTracker* tracker);
++  V8_EXPORT_PRIVATE void AddHeapObjectAllocationTracker(
++      HeapObjectAllocationTracker* tracker);
++  V8_EXPORT_PRIVATE void RemoveHeapObjectAllocationTracker(
++      HeapObjectAllocationTracker* tracker);
+   bool has_heap_object_allocation_tracker() const {
+     return !allocation_trackers_.empty();
+   }
+diff --git a/src/heap/memory-chunk.cc b/src/heap/memory-chunk.cc
 index 865e6f1a72..854699b862 100644
---- a/deps/v8/src/heap/memory-chunk.cc
-+++ b/deps/v8/src/heap/memory-chunk.cc
+--- a/src/heap/memory-chunk.cc
++++ b/src/heap/memory-chunk.cc
 @@ -47,7 +47,6 @@ intptr_t MemoryChunkLayout::ObjectEndOffsetInCodePage() {
  
  size_t MemoryChunkLayout::AllocatableMemoryInCodePage() {
@@ -179,11 +192,11 @@ index 865e6f1a72..854699b862 100644
  #ifdef THREAD_SANITIZER
  void MemoryChunk::SynchronizedHeapLoad() {
    CHECK(reinterpret_cast<Heap*>(base::Acquire_Load(
-diff --git a/deps/v8/src/heap/memory-chunk.h b/deps/v8/src/heap/memory-chunk.h
-index 4381a229ab..58fdbefa17 100644
---- a/deps/v8/src/heap/memory-chunk.h
-+++ b/deps/v8/src/heap/memory-chunk.h
-@@ -32,6 +32,8 @@ class V8_EXPORT_PRIVATE MemoryChunkLayout {
+diff --git a/src/heap/memory-chunk.h b/src/heap/memory-chunk.h
+index 877acc993b..0513507907 100644
+--- a/src/heap/memory-chunk.h
++++ b/src/heap/memory-chunk.h
+@@ -33,6 +33,8 @@ class V8_EXPORT_PRIVATE MemoryChunkLayout {
    static size_t AllocatableMemoryInDataPage();
    static size_t ObjectStartOffsetInMemoryChunk(AllocationSpace space);
    static size_t AllocatableMemoryInMemoryChunk(AllocationSpace space);
@@ -192,10 +205,10 @@ index 4381a229ab..58fdbefa17 100644
  };
  
  // MemoryChunk represents a memory region owned by a specific space.
-diff --git a/deps/v8/src/heap/spaces.h b/deps/v8/src/heap/spaces.h
-index 72ae96cadd..50688dda20 100644
---- a/deps/v8/src/heap/spaces.h
-+++ b/deps/v8/src/heap/spaces.h
+diff --git a/src/heap/spaces.h b/src/heap/spaces.h
+index 6baa0f52ff..a01c71cb62 100644
+--- a/src/heap/spaces.h
++++ b/src/heap/spaces.h
 @@ -127,8 +127,10 @@ class Space;
  #define DCHECK_OBJECT_SIZE(size) \
    DCHECK((0 < size) && (size <= kMaxRegularHeapObjectSize))
@@ -209,10 +222,10 @@ index 72ae96cadd..50688dda20 100644
  
  using FreeListCategoryType = int32_t;
  
-diff --git a/deps/v8/src/utils/allocation.cc b/deps/v8/src/utils/allocation.cc
+diff --git a/src/utils/allocation.cc b/src/utils/allocation.cc
 index 12dfaf9572..cf820c37e7 100644
---- a/deps/v8/src/utils/allocation.cc
-+++ b/deps/v8/src/utils/allocation.cc
+--- a/src/utils/allocation.cc
++++ b/src/utils/allocation.cc
 @@ -165,8 +165,7 @@ void* GetRandomMmapAddr() {
  void* AllocatePages(v8::PageAllocator* page_allocator, void* hint, size_t size,
                      size_t alignment, PageAllocator::Permission access) {
@@ -223,10 +236,10 @@ index 12dfaf9572..cf820c37e7 100644
    if (FLAG_randomize_all_allocations) {
      hint = page_allocator->GetRandomMmapAddr();
    }
-diff --git a/deps/v8/test/cctest/heap/heap-tester.h b/deps/v8/test/cctest/heap/heap-tester.h
+diff --git a/test/cctest/heap/heap-tester.h b/test/cctest/heap/heap-tester.h
 index 998e3ff011..1b001e99a4 100644
---- a/deps/v8/test/cctest/heap/heap-tester.h
-+++ b/deps/v8/test/cctest/heap/heap-tester.h
+--- a/test/cctest/heap/heap-tester.h
++++ b/test/cctest/heap/heap-tester.h
 @@ -34,6 +34,7 @@
    V(InvalidatedSlotsSomeInvalidatedRanges)                  \
    V(TestNewSpaceRefsInCopiedCode)                           \
@@ -235,10 +248,10 @@ index 998e3ff011..1b001e99a4 100644
    V(MarkCompactCollector)                                   \
    V(MarkCompactEpochCounter)                                \
    V(MemoryReducerActivationForSmallHeaps)                   \
-diff --git a/deps/v8/test/cctest/heap/test-heap.cc b/deps/v8/test/cctest/heap/test-heap.cc
-index b9a4b2101c..9ce47fd9cc 100644
---- a/deps/v8/test/cctest/heap/test-heap.cc
-+++ b/deps/v8/test/cctest/heap/test-heap.cc
+diff --git a/test/cctest/heap/test-heap.cc b/test/cctest/heap/test-heap.cc
+index b9a4b2101c..9c349cd1c3 100644
+--- a/test/cctest/heap/test-heap.cc
++++ b/test/cctest/heap/test-heap.cc
 @@ -6404,7 +6404,7 @@ HEAP_TEST(Regress5831) {
  
    // Generate the code.
@@ -257,10 +270,27 @@ index b9a4b2101c..9ce47fd9cc 100644
      code1 = DummyOptimizedCode(isolate);
      Handle<Code> code2 = DummyOptimizedCode(isolate);
      code2_address = code2->address();
-@@ -7002,6 +7002,66 @@ TEST(Regress978156) {
+@@ -7002,6 +7002,87 @@ TEST(Regress978156) {
    marking_state->GreyToBlack(filler);
  }
  
++class TestAllocationTracker : public HeapObjectAllocationTracker {
++ public:
++  explicit TestAllocationTracker(int expected_size)
++      : expected_size_(expected_size) {}
++
++  void AllocationEvent(Address addr, int size) {
++    CHECK(expected_size_ == size);
++    address_ = addr;
++  }
++
++  Address address() { return address_; }
++
++ private:
++  int expected_size_;
++  Address address_;
++};
++
 +UNINITIALIZED_HEAP_TEST(CodeLargeObjectSpace64k) {
 +  // Simulate having a system with 64k OS pages.
 +  i::FLAG_v8_os_page_size = 64;
@@ -283,9 +313,11 @@ index b9a4b2101c..9ce47fd9cc 100644
 +    HeapObject obj;
 +    {
 +      AllocationResult allocation = heap->AllocateRaw(
-+          size_in_bytes, AllocationType::kCode, AllocationOrigin::kRuntime);
++          size_in_bytes, AllocationType::kCode, AllocationOrigin::kRuntime,
++          AllocationAlignment::kCodeAligned);
 +      CHECK(allocation.To(&obj));
-+      CHECK_EQ(allocation.ToAddress(), allocation_tracker.address());
++      CHECK_EQ(allocation.ToObjectChecked().address(),
++          allocation_tracker.address());
 +
 +      heap->CreateFillerObjectAt(obj.address(), size_in_bytes,
 +                                 ClearRecordedSlots::kNo);
@@ -305,9 +337,11 @@ index b9a4b2101c..9ce47fd9cc 100644
 +    HeapObject obj;
 +    {
 +      AllocationResult allocation = heap->AllocateRaw(
-+          size_in_bytes, AllocationType::kCode, AllocationOrigin::kRuntime);
++          size_in_bytes, AllocationType::kCode, AllocationOrigin::kRuntime,
++          AllocationAlignment::kCodeAligned);
 +      CHECK(allocation.To(&obj));
-+      CHECK_EQ(allocation.ToAddress(), allocation_tracker.address());
++      CHECK_EQ(allocation.ToObjectChecked().address(),
++          allocation_tracker.address());
 +
 +      heap->CreateFillerObjectAt(obj.address(), size_in_bytes,
 +                                 ClearRecordedSlots::kNo);
@@ -324,10 +358,10 @@ index b9a4b2101c..9ce47fd9cc 100644
  }  // namespace heap
  }  // namespace internal
  }  // namespace v8
-diff --git a/deps/v8/test/cctest/test-code-pages.cc b/deps/v8/test/cctest/test-code-pages.cc
+diff --git a/test/cctest/test-code-pages.cc b/test/cctest/test-code-pages.cc
 index 7fafe62629..9624a79504 100644
---- a/deps/v8/test/cctest/test-code-pages.cc
-+++ b/deps/v8/test/cctest/test-code-pages.cc
+--- a/test/cctest/test-code-pages.cc
++++ b/test/cctest/test-code-pages.cc
 @@ -263,7 +263,7 @@ TEST(LargeCodeObject) {
  
    // Create a big function that ends up in CODE_LO_SPACE.
@@ -355,10 +389,10 @@ index 7fafe62629..9624a79504 100644
    std::unique_ptr<byte[]> instructions(new byte[instruction_size]);
  
    CodeDesc desc;
-diff --git a/deps/v8/test/cctest/test-factory.cc b/deps/v8/test/cctest/test-factory.cc
+diff --git a/test/cctest/test-factory.cc b/test/cctest/test-factory.cc
 index 98823f1ec9..859698f886 100644
---- a/deps/v8/test/cctest/test-factory.cc
-+++ b/deps/v8/test/cctest/test-factory.cc
+--- a/test/cctest/test-factory.cc
++++ b/test/cctest/test-factory.cc
 @@ -60,7 +60,8 @@ TEST(Factory_CodeBuilder) {
    HandleScope scope(isolate);
  
@@ -369,16 +403,16 @@ index 98823f1ec9..859698f886 100644
    std::unique_ptr<byte[]> instructions(new byte[instruction_size]);
  
    CodeDesc desc;
-diff --git a/deps/v8/test/cctest/test-unwinder-code-pages.cc b/deps/v8/test/cctest/test-unwinder-code-pages.cc
-index fc023e4145..8737b34077 100644
---- a/deps/v8/test/cctest/test-unwinder-code-pages.cc
-+++ b/deps/v8/test/cctest/test-unwinder-code-pages.cc
+diff --git a/test/cctest/test-unwinder-code-pages.cc b/test/cctest/test-unwinder-code-pages.cc
+index fc023e4145..40001d51b1 100644
+--- a/test/cctest/test-unwinder-code-pages.cc
++++ b/test/cctest/test-unwinder-code-pages.cc
 @@ -564,7 +564,7 @@ TEST(PCIsInV8_LargeCodeObject_CodePagesAPI) {
  
    // Create a big function that ends up in CODE_LO_SPACE.
    const int instruction_size = Page::kPageSize + 1;
 -  STATIC_ASSERT(instruction_size > kMaxRegularHeapObjectSize);
-+  CHECK_GT(instruction_size, MemoryChunkLayout::MaxRegularCodeObjectSize())
++  CHECK_GT(instruction_size, MemoryChunkLayout::MaxRegularCodeObjectSize());
    std::unique_ptr<byte[]> instructions(new byte[instruction_size]);
  
    CodeDesc desc;

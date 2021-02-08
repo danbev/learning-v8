@@ -110,4 +110,5 @@ The version of V8 used in 14.15.4 is:
 }
 ```
 
-__work in progress__
+This [pull request](https://github.com/nodejs/node/pull/37225) was opened for
+this issue.
