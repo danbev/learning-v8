@@ -309,5 +309,5 @@ TODO: continue exploration...
 
 [Promise Objects](https://tc39.es/ecma262/#sec-promise-objects).
 
-There is an example in [promise_test.cc](./test/promise_test.cc)
+There is an example in [promise_test.cc](../test/promise_test.cc)
 
