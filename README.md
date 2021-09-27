@@ -88,7 +88,7 @@ enum AccessControl {
 
 ### ObjectTemplate
 These allow you to create JavaScript objects without a dedicated constructor.
-When an instance is create using an ObjectTemplate the new instance will have
+When an instance is created using an ObjectTemplate the new instance will have
 the properties and functions configured on the ObjectTemplate.
 
 This would be something like:
@@ -116,7 +116,7 @@ which can be both be used as names for a property.
 
 The implementation for `Set` can be found in `src/api/api.cc`:
 ```c++
-void Template::Set<v8::Local<Name> name, v8::Local<Data> value, v8::PropertyAttribute attribute) {
+void Template::Set(v8::Local<Name> name, v8::Local<Data> value, v8::PropertyAttribute attribute) {
   ...
 
   i::ApiNatives::AddDataProperty(isolate, templ, Utils::OpenHandle(*name),           
