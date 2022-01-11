@@ -51,7 +51,7 @@ stack is empty.
 
 ### Task
 A task is a function that can be scheduled by placing the task on the callback
-queue. This is done be WebAPIs like `setTimeout` and `setInterval`.
+queue. This is done by WebAPIs like `setTimeout` and `setInterval`.
 When the event loop starts executing tasks it will run all the tasks that
 are currently in the task queue. Any new tasks that get scheduled by WebAPI
 function calls are only pushed onto the queue but will not be executed until
