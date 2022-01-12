@@ -136,7 +136,7 @@ class V8_EXPORT FunctionTemplate : public Template {
 ```
 Rememeber that a function in javascript can have properties just like object.
 
-There is an example in [functionttemplate_test.cc](./test/functiontemplate_test.cc)
+There is an example in [functiontemplate_test.cc](./test/functiontemplate_test.cc)
 
 An instance of a function template can be created using:
 ```c++
