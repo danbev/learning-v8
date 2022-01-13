@@ -26,7 +26,7 @@ TEST_F(MaybeTest, Maybe) {
 
 /*
  * I think the intention with a type Maybe<void> is that we don't really
- * care/want to have a value in the Maybe apart from that is is empty or
+ * care/want to have a value in the Maybe apart from that is empty or
  * something. So instead of having a bool and setting it to true just
  * have void and return an empty. I think this signals the intent of a
  * function better as one might otherwise wonder what the value in the maybe
