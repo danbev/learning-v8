@@ -392,7 +392,7 @@ is of a certain type, like `IsUndefined()`, `IsNull`, `IsNumber` etc.
 It also has useful methods to convert to a Local<T>, for example:
 ```c++
 V8_WARN_UNUSED_RESULT MaybeLocal<Number> ToNumber(Local<Context> context) const;
-V8_WARN_UNUSED_RESULT MaybeLocal<String> ToNumber(Local<String> context) const;
+V8_WARN_UNUSED_RESULT MaybeLocal<String> ToString(Local<Context> context) const;
 ...
 ```
 
