@@ -452,9 +452,9 @@ $19 = 0x5
 See [handle_test.cc](./test/handle_test.cc) for an example.
 
 ### HandleScope
-Contains a number of Local/Handle's (think pointers to objects but is managed
-by V8) and will take care of deleting the Local/Handles for us. HandleScopes
-are stack allocated
+Contains a number of local handles (like pointers to objects but are managed
+by V8) and will take care of deleting the local handles for us. HandleScopes
+are stack allocated.
 
 When ~HandleScope is called all handles created within that scope are removed
 from the stack maintained by the HandleScope which makes objects to which the
