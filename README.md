@@ -583,8 +583,8 @@ Local handles are located on the stack and are deleted when the appropriate
 destructor is called. If there is a local HandleScope then it will take care
 of this when the scope returns. When there are no references left to a handle
 it can be garbage collected. This means if a function has a HandleScope and
-wants to return a handle/local it will not be available after the function
-returns. This is what EscapableHandleScope is for, it enable the value to be
+wants to return a local handle it will not be available after the function
+returns. This is what EscapableHandleScope is for, it enables the value to be
 placed in the enclosing handle scope to allow it to survive. When the enclosing
 HandleScope goes out of scope it will be cleaned up.
 
