@@ -684,6 +684,8 @@ Local handles should be cleaned up.
 its local handles, and then gives back the new handle copy which can safely be
 returned.
 
+See [escapable_handlescope_test.cc](./test/escapable_handlescope_test.cc) for an example.
+
 ### HeapObject
 TODO:
 
