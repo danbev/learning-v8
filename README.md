@@ -521,7 +521,7 @@ being created:
 ```c++
 Handle<Struct> str = handle(Struct::cast(result), isolate()); 
 ```
-This will land in the constructor Handle<T>src/handles/handles-inl.h
+This will land in the constructor `Handle<T>` in `src/handles/handles-inl.h`:
 ```c++
 template <typename T>                                                           
 Handle<T>::Handle(T object, Isolate* isolate): HandleBase(object.ptr(), isolate) {}

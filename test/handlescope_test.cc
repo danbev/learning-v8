@@ -39,7 +39,7 @@ TEST_F(HandleScopeTest, Create) {
 TEST_F(HandleScopeTest, HandleScopeImplementer) {
   i::Isolate* i_isolate = asInternal(isolate_);
   i::HandleScopeImplementer implementer{i_isolate};
-  // Context is just a HeapObject so we can construct using the default not
+  // Context is just a HeapObject, so we can construct using the default not
   // args constructor.
   i::Context context{};
 
