@@ -708,7 +708,7 @@ So a Local contains a pointer to type T. We can access this pointer using
 
 We can cast from a subtype to a supertype using Local::Cast:
 ```c++
-v8::Local<v8::Number> nr = v8::Local<v8::Number>(v8::Number::New(isolate_, 12));
+v8::Local<v8::Number> nr = v8::Number::New(isolate_, 12);
 v8::Local<v8::Value> val = v8::Local<v8::Value>::Cast(nr);
 ```
 And there is also the 
