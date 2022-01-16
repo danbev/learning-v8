@@ -680,7 +680,7 @@ Next, we take a look at what happens when the EscapableHandleScope goes out of
 scope. This will call HandleScope::~HandleScope which makes sense as any other
 Local handles should be cleaned up.
 
-`Escape` copies the value of its argument into the enclosing scope, deletes alli
+`Escape` copies the value of its argument into the enclosing scope, deletes all
 its local handles, and then gives back the new handle copy which can safely be
 returned.
 
