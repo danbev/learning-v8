@@ -736,7 +736,7 @@ Lets take a closer look at the above:
   v8::internal::Object** gl = ((v8::internal::Object**)(*global));
 ```
 We use the dereference operator to get the value of a Local (*global), which is
-just of type `T*`, a pointer to the type the Local:
+just of type `T*`, a pointer to the type of the Local:
 ```c++
 template <class T>
 class Local {
