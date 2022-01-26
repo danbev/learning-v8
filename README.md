@@ -3666,7 +3666,7 @@ in the root of the output directory we find two .ninja files:
 ```console
 build.ninja  toolchain.ninja
 ```
-By default ninja will look for `build.ninja' and when we run ninja we usually
+By default ninja will look for `build.ninja` and when we run ninja we usually
 specify the `-C out/dir`. If no targets are specified on the command line ninja
 will execute all outputs unless there is one specified as default. V8 has the 
 following default target:
