@@ -3573,7 +3573,7 @@ From the resulting class you can see how `Parameter` can be used from within `TF
 
 ## Building V8
 You'll need to have checked out the Google V8 sources to you local file system
-and build it by following the instructions found [here](https://developers.google.com/v8/build).
+and build it by following the instructions found [here](https://v8.dev/docs/build).
 
 ### Configure v8 build for learning-v8
 There is a make target that can generate a build configuration for V8 that is
