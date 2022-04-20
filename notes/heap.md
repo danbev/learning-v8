@@ -228,7 +228,7 @@ AllocatePageSize: 4096
 CommitPageSize: 4096
 ```
 
-PageAllocator is the interface for interacting with with memory pages (memory
+PageAllocator is the interface for interacting with memory pages (memory
 units of 4096 bytes). The PageAllocator implemention provided by V8 is what
 interacts with the underlying operating system via the base::OS class
 (src/base/platform/platform.h).
