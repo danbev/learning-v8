@@ -42,7 +42,7 @@ must be specified for each one.  This is to avoid them interfering with each
 other, for example by changing the builtin objects provided.
 
 ### Template
-This is the super class of both ObjecTemplate and FunctionTemplate. Remember
+This is the super class of both ObjectTemplate and FunctionTemplate. Remember
 that in JavaScript a function can have fields just like objects.
 
 ```c++
@@ -134,7 +134,7 @@ from Template:
 class V8_EXPORT FunctionTemplate : public Template {
 }
 ```
-Rememeber that a function in javascript can have properties just like object.
+Remember that a function in javascript can have properties just like object.
 
 There is an example in [functiontemplate_test.cc](./test/functiontemplate_test.cc)
 
@@ -232,7 +232,7 @@ do {
 } while (false);
 ```
 Notice that if there was an exception an empty object is returned.
-Later in `Invoke` in `execution.cc`a:
+Later in `Invoke` in `execution.cc`:
 ```c++
   auto value = Builtins::InvokeApiFunction(                                 
           isolate, params.is_construct, function, receiver, params.argc,        
@@ -262,7 +262,7 @@ a data pointer. It is an unsigned integer type that any valid pointer to void
 can be converted to this type (and back).
 
 ### TaggedImpl
-This class is declared in `src/objects/tagged-impl.h and has a single private
+This class is declared in `src/objects/tagged-impl.h` and has a single private
 member which is declared as:
 ```c++
  public
