@@ -61,7 +61,7 @@ Plane 3: U+30000 -> U+3FFFF
 ...
 Plane 16: U+100000 -> U+10FFFF      Supplementary Private Use Area B.
 ```
-BPM contains most of the characters that are used when programming which can
+BMP contains most of the characters that are used when programming which can
 have 4 hex digits.
 
 #### Code units
