@@ -342,7 +342,7 @@ MaybeHandle<Context> ContextDeserializer::DeserializeContext(
 ### External references
 When we have functions that are not defined in V8 itself these functions will
 have addresses that V8 does not know about. The function will be a symbol that
-needs to be resolved when V8 deserialzes a blob.
+needs to be resolved when V8 deserializes a blob.
 
 These symbols are serialized and when V8 deserializes a snapshot it will try
 to match symbols to addresses. This is done using `external_references` which
@@ -995,7 +995,7 @@ Notice that this call to the callback, `serialize_embedder_fields_.callback`
 returns an instance of StartupData, which is then added to the serialized_data
 vector:
 ```c++
-lass V8_EXPORT StartupData {                                                   
+class V8_EXPORT StartupData {                                                   
    public:                                                                        
     bool CanBeRehashed() const;                                                        
     bool IsValid() const;                                                              
