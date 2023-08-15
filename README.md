@@ -1193,7 +1193,7 @@ NATIVE_CONTEXT_FIELDS(NATIVE_CONTEXT_FIELD_ACCESSOR)
 ```
 
 ```c++
-  Handle<type> Isolate::object_function() {
+  Handle<JSFunction> Isolate::object_function() {
     return Handle<JSFunction>(raw_native_context()->object_function(), this);
   }
 
