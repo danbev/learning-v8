@@ -392,7 +392,7 @@ is of a certain type, like `IsUndefined()`, `IsNull`, `IsNumber` etc.
 It also has useful methods to convert to a Local<T>, for example:
 ```c++
 V8_WARN_UNUSED_RESULT MaybeLocal<Number> ToNumber(Local<Context> context) const;
-V8_WARN_UNUSED_RESULT MaybeLocal<String> ToNumber(Local<String> context) const;
+V8_WARN_UNUSED_RESULT MaybeLocal<String> ToString(Local<Context> context) const;
 ...
 ```
 
@@ -452,9 +452,9 @@ $19 = 0x5
 See [handle_test.cc](./test/handle_test.cc) for an example.
 
 ### HandleScope
-Contains a number of Local/Handle's (think pointers to objects but is managed
-by V8) and will take care of deleting the Local/Handles for us. HandleScopes
-are stack allocated
+Contains a number of local handles (like pointers to objects but are managed
+by V8) and will take care of deleting the local handles for us. HandleScopes
+are stack allocated.
 
 When ~HandleScope is called all handles created within that scope are removed
 from the stack maintained by the HandleScope which makes objects to which the
@@ -521,7 +521,7 @@ being created:
 ```c++
 Handle<Struct> str = handle(Struct::cast(result), isolate()); 
 ```
-This will land in the constructor Handle<T>src/handles/handles-inl.h
+This will land in the constructor `Handle<T>` in `src/handles/handles-inl.h`:
 ```c++
 template <typename T>                                                           
 Handle<T>::Handle(T object, Isolate* isolate): HandleBase(object.ptr(), isolate) {}
@@ -583,8 +583,8 @@ Local handles are located on the stack and are deleted when the appropriate
 destructor is called. If there is a local HandleScope then it will take care
 of this when the scope returns. When there are no references left to a handle
 it can be garbage collected. This means if a function has a HandleScope and
-wants to return a handle/local it will not be available after the function
-returns. This is what EscapableHandleScope is for, it enable the value to be
+wants to return a local handle it will not be available after the function
+returns. This is what EscapableHandleScope is for, it enables the value to be
 placed in the enclosing handle scope to allow it to survive. When the enclosing
 HandleScope goes out of scope it will be cleaned up.
 
@@ -680,9 +680,11 @@ Next, we take a look at what happens when the EscapableHandleScope goes out of
 scope. This will call HandleScope::~HandleScope which makes sense as any other
 Local handles should be cleaned up.
 
-`Escape` copies the value of its argument into the enclosing scope, deletes alli
+`Escape` copies the value of its argument into the enclosing scope, deletes all
 its local handles, and then gives back the new handle copy which can safely be
 returned.
+
+See [escapable_handlescope_test.cc](./test/escapable_handlescope_test.cc) for an example.
 
 ### HeapObject
 TODO:
@@ -706,7 +708,7 @@ So a Local contains a pointer to type T. We can access this pointer using
 
 We can cast from a subtype to a supertype using Local::Cast:
 ```c++
-v8::Local<v8::Number> nr = v8::Local<v8::Number>(v8::Number::New(isolate_, 12));
+v8::Local<v8::Number> nr = v8::Number::New(isolate_, 12);
 v8::Local<v8::Value> val = v8::Local<v8::Value>::Cast(nr);
 ```
 And there is also the 
@@ -734,7 +736,7 @@ Lets take a closer look at the above:
   v8::internal::Object** gl = ((v8::internal::Object**)(*global));
 ```
 We use the dereference operator to get the value of a Local (*global), which is
-just of type `T*`, a pointer to the type the Local:
+just of type `T*`, a pointer to the type of the Local:
 ```c++
 template <class T>
 class Local {
