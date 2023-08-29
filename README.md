@@ -849,33 +849,42 @@ In `src/api/api.cc` we have:
 static Local<ObjectTemplate> ObjectTemplateNew(
     i::Isolate* isolate, v8::Local<FunctionTemplate> constructor,
     bool do_not_cache) {
+  ...
   i::Handle<i::Struct> struct_obj = isolate->factory()->NewStruct(
       i::OBJECT_TEMPLATE_INFO_TYPE, i::AllocationType::kOld);
-  i::Handle<i::ObjectTemplateInfo> obj = i::Handle<i::ObjectTemplateInfo>::cast(struct_obj);
-  InitializeTemplate(obj, Consts::OBJECT_TEMPLATE);
-  int next_serial_number = 0;
-  if (!constructor.IsEmpty())
-    obj->set_constructor(*Utils::OpenHandle(*constructor));
-  obj->set_data(i::Smi::zero());
+  i::Handle<i::ObjectTemplateInfo> obj =
+      i::Handle<i::ObjectTemplateInfo>::cast(struct_obj);
+  {
+    // Disallow GC until all fields of obj have acceptable types.
+    i::DisallowGarbageCollection no_gc;
+    i::ObjectTemplateInfo raw = *obj;
+    InitializeTemplate(raw, Consts::OBJECT_TEMPLATE, do_not_cache);
+    raw.set_data(0);
+    if (!constructor.IsEmpty()) {
+      raw.set_constructor(*Utils::OpenHandle(*constructor));
+    }
+  }
   return Utils::ToLocal(obj);
 }
 ```
 What is a `Struct` in this context?  
 `src/objects/struct.h`
 ```c++
-#include "torque-generated/class-definitions-tq.h"
+#include "torque-generated/src/objects/struct-tq.inc"
 
 class Struct : public TorqueGeneratedStruct<Struct, HeapObject> {
  public:
-  inline void InitializeBody(int object_size);
   void BriefPrintDetails(std::ostream& os);
+  STATIC_ASSERT(kHeaderSize == HeapObject::kHeaderSize);
+
   TQ_OBJECT_CONSTRUCTORS(Struct)
+};
 ```
 Notice that the include is specifying `torque-generated` include which can be
-found `out/x64.release_gcc/gen/torque-generated/class-definitions-tq`. So, somewhere
-there must be an call to the `torque` executable which generates the Code Stub
-Assembler C++ headers and sources before compiling the main source files. There is
-and there is a section about this in `Building V8`.
+found `out/x64.release_gcc/gen/torque-generated/src/objects/struct-tq.inc`. 
+So, somewhere there must be a call to the `torque` executable which generates
+the Code Stub Assembler C++ headers and sources before compiling the main source
+files. There is a section about this in `Building V8`.
 The macro `TQ_OBJECT_CONSTRUCTORS` can be found in `src/objects/object-macros.h`
 and expands to:
 ```c++
@@ -894,35 +903,31 @@ template <class D, class P>
 class TorqueGeneratedStruct : public P {
  public:
 ```
-Where D is Struct and P is HeapObject in this case. But the above is the declartion
+Where D is Struct and P is HeapObject in this case. But the above is the declaration
 of the type but what we have in the .h file is what was generated. 
 
 This type is defined in `src/objects/struct.tq`:
 ```
-@abstract                                                                       
-@generatePrint                                                                  
-@generateCppClass                                                               
-extern class Struct extends HeapObject {                                        
-} 
+@abstract
+extern class Struct extends HeapObject {
+}
 ```
 
 `NewStruct` can be found in `src/heap/factory-base.cc`
 ```c++
 template <typename Impl>
-HandleFor<Impl, Struct> FactoryBase<Impl>::NewStruct(
-    InstanceType type, AllocationType allocation) {
-  Map map = Map::GetStructMap(read_only_roots(), type);
+Handle<Struct> FactoryBase<Impl>::NewStruct(InstanceType type,
+                                            AllocationType allocation) {
+  ReadOnlyRoots roots = read_only_roots();
+  Map map = Map::GetInstanceTypeMap(roots, type);
   int size = map.instance_size();
-  HeapObject result = AllocateRawWithImmortalMap(size, allocation, map);
-  HandleFor<Impl, Struct> str = handle(Struct::cast(result), isolate());
-  str->InitializeBody(size);
-  return str;
+  return handle(NewStructInternal(roots, map, size, allocation), isolate());
 }
 ```
 Every object that is stored on the v8 heap has a Map (`src/objects/map.h`) that
 describes the structure of the object being stored.
 ```c++
-class Map : public HeapObject {
+class Map : public TorqueGeneratedMap<Map, HeapObject> {
 ```
 
 ```console
